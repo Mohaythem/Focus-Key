@@ -516,9 +516,10 @@ persistence, colour customization, theming, and design fidelity work.
 
 - Branch: `native/phased-rewrite` (no work on `main`, no merge, no pull request)
 - Phase 0 audit correction: `a1d1e21`, pushed
-- Phase 1 commit: `PENDING` — filled in by the follow-up commit that records it, since a commit
-  cannot contain its own hash
-- Push: recorded below
+- Phase 1 commit: `e575682` — "Phase 1: session data layer"
+- Followed by one documentation commit that records the SHA above, since a commit cannot contain
+  its own hash
+- Push: `native/phased-rewrite` fast-forwarded on `origin`, verified against the remote afterwards
 
 ## Scope confirmation
 

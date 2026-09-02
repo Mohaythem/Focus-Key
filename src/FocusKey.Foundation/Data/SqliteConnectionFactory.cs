@@ -8,6 +8,18 @@ namespace FocusKey.Foundation.Data;
 /// </summary>
 public sealed class SqliteConnectionFactory
 {
+    /// <summary>
+    /// WAL: readers never block the writer, and the database survives an abrupt exit.
+    /// NORMAL synchronous is the usual desktop trade-off alongside WAL.
+    /// busy_timeout keeps a briefly locked database from failing instantly.
+    /// </summary>
+    private static readonly string[] Pragmas =
+    [
+        "PRAGMA journal_mode = WAL;",
+        "PRAGMA synchronous = NORMAL;",
+        "PRAGMA busy_timeout = 5000;",
+    ];
+
     private readonly string _connectionString;
 
     /// <param name="databaseFile">Full path of the SQLite database file. Created on first use.</param>
@@ -32,22 +44,49 @@ public sealed class SqliteConnectionFactory
     public SqliteConnection OpenConnection()
     {
         var connection = new SqliteConnection(_connectionString);
-        connection.Open();
 
-        // WAL: readers never block the writer, and the database survives an abrupt exit.
-        // NORMAL synchronous is the usual desktop trade-off alongside WAL.
-        // busy_timeout keeps a briefly locked database from failing instantly.
-        Execute(connection, "PRAGMA journal_mode = WAL;");
-        Execute(connection, "PRAGMA synchronous = NORMAL;");
-        Execute(connection, "PRAGMA busy_timeout = 5000;");
+        try
+        {
+            connection.Open();
 
-        return connection;
+            foreach (string pragma in Pragmas)
+            {
+                using SqliteCommand command = connection.CreateCommand();
+                command.CommandText = pragma;
+                command.ExecuteNonQuery();
+            }
+
+            return connection;
+        }
+        catch
+        {
+            connection.Dispose();
+            throw;
+        }
     }
 
-    private static void Execute(SqliteConnection connection, string sql)
+    /// <inheritdoc cref="OpenConnection"/>
+    public async Task<SqliteConnection> OpenConnectionAsync(CancellationToken cancellationToken = default)
     {
-        using SqliteCommand command = connection.CreateCommand();
-        command.CommandText = sql;
-        command.ExecuteNonQuery();
+        var connection = new SqliteConnection(_connectionString);
+
+        try
+        {
+            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+            foreach (string pragma in Pragmas)
+            {
+                await using SqliteCommand command = connection.CreateCommand();
+                command.CommandText = pragma;
+                await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            return connection;
+        }
+        catch
+        {
+            await connection.DisposeAsync().ConfigureAwait(false);
+            throw;
+        }
     }
 }

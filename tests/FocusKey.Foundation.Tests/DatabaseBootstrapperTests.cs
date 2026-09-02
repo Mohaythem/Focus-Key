@@ -16,7 +16,7 @@ public sealed class DatabaseBootstrapperTests
         Assert.True(result.DatabaseFileCreated);
         Assert.Equal(0, result.SchemaVersionBefore);
         Assert.Equal(SchemaMigrations.TargetVersion, result.SchemaVersionAfter);
-        Assert.Equal([1], result.AppliedMigrations);
+        Assert.Equal(SchemaMigrations.All.Select(migration => migration.Version), result.AppliedMigrations);
         Assert.Equal(databaseFile, result.DatabaseFile);
         Assert.True(File.Exists(databaseFile));
     }
@@ -34,10 +34,14 @@ public sealed class DatabaseBootstrapperTests
         command.CommandText = "SELECT version, name, applied_at_utc FROM schema_migrations ORDER BY version;";
         using SqliteDataReader reader = command.ExecuteReader();
 
-        Assert.True(reader.Read());
-        Assert.Equal(1, reader.GetInt32(0));
-        Assert.Equal("schema_metadata", reader.GetString(1));
-        Assert.True(UtcTimestamp.TryParse(reader.GetString(2), out _));
+        foreach (SchemaMigration migration in SchemaMigrations.All.OrderBy(m => m.Version))
+        {
+            Assert.True(reader.Read());
+            Assert.Equal(migration.Version, reader.GetInt32(0));
+            Assert.Equal(migration.Name, reader.GetString(1));
+            Assert.True(UtcTimestamp.TryParse(reader.GetString(2), out _));
+        }
+
         Assert.False(reader.Read());
     }
 
@@ -55,9 +59,9 @@ public sealed class DatabaseBootstrapperTests
         Assert.All(results, result =>
             Assert.Equal(SchemaMigrations.TargetVersion, result.SchemaVersionAfter));
 
-        // Exactly one writer applied the migration, and the audit table has no duplicate row.
-        Assert.Equal(1, results.Sum(result => result.AppliedMigrations.Count));
-        Assert.Equal(1, CountMigrationRows(databaseFile));
+        // Every migration was applied exactly once across both writers, with no duplicate rows.
+        Assert.Equal(SchemaMigrations.All.Count, results.Sum(result => result.AppliedMigrations.Count));
+        Assert.Equal(SchemaMigrations.All.Count, CountMigrationRows(databaseFile));
     }
 
     [Fact]
@@ -73,7 +77,7 @@ public sealed class DatabaseBootstrapperTests
         Assert.Equal(SchemaMigrations.TargetVersion, second.SchemaVersionBefore);
         Assert.Equal(SchemaMigrations.TargetVersion, second.SchemaVersionAfter);
         Assert.Empty(second.AppliedMigrations);
-        Assert.Equal(1, CountMigrationRows(databaseFile));
+        Assert.Equal(SchemaMigrations.All.Count, CountMigrationRows(databaseFile));
     }
 
     [Fact]
@@ -91,14 +95,15 @@ public sealed class DatabaseBootstrapperTests
     }
 
     [Fact]
-    public void Initialize_CreatesNoProductTables()
+    public void Initialize_CreatesOnlyTheDocumentedTables()
     {
         using var temp = new TempDirectory();
         string databaseFile = Path.Combine(temp.Path, "focus_key.db");
 
         Initialize(databaseFile);
 
-        Assert.Equal(["schema_migrations"], UserTables(databaseFile));
+        // A new table may only appear here together with the migration that introduces it.
+        Assert.Equal(["schema_migrations", "sessions"], UserTables(databaseFile));
     }
 
     [Fact]

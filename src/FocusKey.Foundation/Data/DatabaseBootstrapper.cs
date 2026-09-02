@@ -49,9 +49,17 @@ public sealed class DatabaseBootstrapper
                 continue;
             }
 
-            Apply(connection, migration);
-            appliedMigrations.Add(migration.Version);
-            _logger.Info($"Applied database migration {migration.Version} ({migration.Name}).");
+            if (Apply(connection, migration))
+            {
+                appliedMigrations.Add(migration.Version);
+                _logger.Info($"Applied database migration {migration.Version} ({migration.Name}).");
+            }
+            else
+            {
+                _logger.Info(
+                    $"Database migration {migration.Version} ({migration.Name}) was already applied " +
+                    "by another writer; skipped.");
+            }
         }
 
         int versionAfter = ReadSchemaVersion(connection);
@@ -70,13 +78,24 @@ public sealed class DatabaseBootstrapper
             DatabaseFileCreated = databaseFileCreated,
             SchemaVersionBefore = versionBefore,
             SchemaVersionAfter = versionAfter,
-            AppliedMigrations = appliedMigrations,
+            AppliedMigrations = appliedMigrations.AsReadOnly(),
         };
     }
 
-    private static void Apply(SqliteConnection connection, SchemaMigration migration)
+    /// <summary>
+    /// Applies one migration. Returns false when another writer already applied it.
+    /// </summary>
+    private static bool Apply(SqliteConnection connection, SchemaMigration migration)
     {
-        using SqliteTransaction transaction = connection.BeginTransaction();
+        // BEGIN IMMEDIATE takes the write lock before the decision is made, so two processes
+        // starting at the same moment cannot both apply the same migration.
+        using SqliteTransaction transaction = connection.BeginTransaction(deferred: false);
+
+        if (ReadSchemaVersion(connection, transaction) >= migration.Version)
+        {
+            transaction.Rollback();
+            return false;
+        }
 
         Execute(connection, transaction, migration.Sql);
 
@@ -90,7 +109,7 @@ public sealed class DatabaseBootstrapper
                 """;
             record.Parameters.AddWithValue("$version", migration.Version);
             record.Parameters.AddWithValue("$name", migration.Name);
-            record.Parameters.AddWithValue("$appliedAtUtc", DateTimeOffset.UtcNow.ToString("O"));
+            record.Parameters.AddWithValue("$appliedAtUtc", UtcTimestamp.Format(DateTimeOffset.UtcNow));
             record.ExecuteNonQuery();
         }
 
@@ -98,6 +117,7 @@ public sealed class DatabaseBootstrapper
         Execute(connection, transaction, $"PRAGMA user_version = {migration.Version};");
 
         transaction.Commit();
+        return true;
     }
 
     private static void VerifyUsable(SqliteConnection connection, int versionAfter)
@@ -123,9 +143,10 @@ public sealed class DatabaseBootstrapper
         }
     }
 
-    private static int ReadSchemaVersion(SqliteConnection connection)
+    private static int ReadSchemaVersion(SqliteConnection connection, SqliteTransaction? transaction = null)
     {
         using SqliteCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText = "PRAGMA user_version;";
         return Convert.ToInt32(command.ExecuteScalar());
     }

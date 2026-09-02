@@ -94,6 +94,16 @@ the authoritative version; `schema_migrations` records what was applied and when
 inside a transaction, forward only, and initialization verifies the end state instead of assuming
 it.
 
+**Migrations take the write lock before deciding.** Each migration runs in a `BEGIN IMMEDIATE`
+transaction and re-reads `user_version` inside it, so two processes starting at the same moment
+cannot both apply the same migration. The loser observes the applied version and skips. (Added by
+the post-phase audit — see below.)
+
+**One canonical timestamp text for the database.** `UtcTimestamp` formats and parses
+`yyyy-MM-ddTHH:mm:ss.fffffffZ`: always UTC, fixed width, sortable as ordinary text, exact to a
+.NET tick. Every timestamp written to SQLite goes through it, starting with the migration audit
+column.
+
 **`FOCUSKEY_DATA_ROOT` override.** `AppPaths.Resolve()` honours this environment variable and
 otherwise uses `%LOCALAPPDATA%\FocusKey`. It exists because the required runtime smoke test would
 otherwise have written into a pre-existing `%LOCALAPPDATA%\FocusKey` folder left by the previous
@@ -150,6 +160,7 @@ Solution and build configuration:
 - `Data/SchemaMigration.cs`
 - `Data/DatabaseBootstrapper.cs`
 - `Data/DatabaseInitializationResult.cs`
+- `Data/UtcTimestamp.cs`
 
 `src/FocusKey.App`:
 
@@ -170,6 +181,7 @@ Solution and build configuration:
 - `AppPathsTests.cs`
 - `FileAppLoggerTests.cs`
 - `DatabaseBootstrapperTests.cs`
+- `UtcTimestampTests.cs`
 
 Untracked local verification artifacts (ignored by `.gitignore`, kept out of the repository on
 purpose): `.smoke/run-smoke.ps1`, `.smoke/window.png`, `.smoke/appdata/`.
@@ -242,7 +254,7 @@ database is `schema_migrations`, so this cannot drift silently.
 
 ## Tests
 
-26 tests, all foundational. Nothing here tests session behaviour, because none exists.
+38 tests, all foundational. Nothing here tests session behaviour, because none exists.
 
 **`AppPathsTests` (10)** — the documented layout is composed exactly; relative segments are
 normalized; repeated resolution is deterministic; blank and null roots fail predictably;
@@ -255,12 +267,18 @@ in the expected shape; timestamps are UTC and parseable; `Error` includes full e
 a second session appends instead of truncating; writing after dispose is harmless rather than
 throwing during shutdown; a blank path fails predictably.
 
-**`DatabaseBootstrapperTests` (9)** — a new database reaches the target schema version and reports
-what it did; the migration row is recorded with a parseable UTC timestamp; a second initialization
+**`DatabaseBootstrapperTests` (10)** — a new database reaches the target schema version and reports
+what it did; the migration row is recorded with a canonical UTC timestamp; a second initialization
 applies nothing and does not duplicate rows (idempotency); a database claiming a newer schema
 version is rejected with a clear message; **no product tables are created**; WAL is actually in
-effect on an opened connection; missing constructor arguments and a blank database path fail
-predictably.
+effect on an opened connection; two writers initializing the same file at once end at the target
+version with exactly one migration applied and no duplicate audit row; missing constructor
+arguments and a blank database path fail predictably.
+
+**`UtcTimestampTests` (11)** — the canonical shape is produced exactly; offsets are normalized to
+UTC so the same instant always writes the same text; round-trip is exact to the tick; formatted
+values sort correctly as plain text across a midnight boundary; null, empty, date-only,
+second-precision, and offset-suffixed forms are all rejected rather than half-accepted.
 
 The reasoning behind the selection: these are the failure modes that would silently corrupt every
 later phase — a path that differs between runs, a log that cannot be written, a database that
@@ -323,11 +341,11 @@ Time Elapsed 00:00:09.64
 **Tests**
 
 ```text
-Passed!  - Failed:     0, Passed:    26, Skipped:     0, Total:    26, Duration: 734 ms
+Passed!  - Failed:     0, Passed:    38, Skipped:     0, Total:    38, Duration: 126 ms
           - FocusKey.Foundation.Tests.dll (net10.0)
 ```
 
-Totals: 26 total, 26 passed, 0 failed, 0 skipped.
+Totals: 38 total, 38 passed, 0 failed, 0 skipped.
 
 ---
 
@@ -412,6 +430,40 @@ real application, not just in tests.
 | SQLite initialization succeeds | Database file created, migration 1 applied, `Database ready at schema version 1.` |
 | Logging works | 843-byte log with every lifecycle line |
 | Clean shutdown | `WM_CLOSE` accepted, process exited within 20 s, exit code 0, shutdown line logged |
+
+---
+
+## Post-phase independent audit (2026-09-02)
+
+Phase 0 was re-audited from the repository rather than from its own report, before Phase 1 was
+allowed to start. Verified independently: tracked file inventory (30 files, no build output),
+`Focus Key.md` and `Focus Key.zip` unchanged with the archive still intact, no future-phase
+vocabulary anywhere in tracked source (no timer, tray, hotkey, notification, overlay,
+single-instance, Today, Reports, Work/Break, or session statuses), no web-prototype code, no
+hard-coded machine paths, every `catch` site justified, and a fresh
+restore → non-incremental build → test → runtime smoke cycle.
+
+One defect was found and corrected inside Phase 0 scope:
+
+**Concurrent first start could crash the migration runner.** Two processes launching
+simultaneously against a brand-new database could both read `user_version = 0`, and the second
+would then fail inserting a duplicate `schema_migrations.version` row. Migrations now run in a
+`BEGIN IMMEDIATE` transaction and re-read `user_version` inside it; the second writer sees the
+applied version and skips. `Initialize` still reports only what it applied itself, so the
+distinction stays visible. Covered by `Initialize_IsSafeWhenTwoWritersStartTogether`.
+
+Two smaller hardening changes came with it: `AppliedMigrations` is now returned as a genuinely
+read-only list, and the migration audit timestamp is written through the new `UtcTimestamp`
+formatter so the database has one timestamp representation. Rows written by the pre-correction
+build keep their original ISO-8601 text; nothing parses that column programmatically, so no data
+migration was needed.
+
+Post-correction verification: build succeeded with 0 warnings and 0 errors, 38/38 tests passed, and
+the runtime smoke test passed on a fresh data root (`Focus Key` window shown, migration 1 applied,
+schema version 1, clean exit code 0 on both runs).
+
+Single-instance behaviour, which would make concurrent starts impossible in the first place,
+remains Phase 4 scope and was **not** implemented here.
 
 ---
 

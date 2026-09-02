@@ -37,12 +37,27 @@ public sealed class DatabaseBootstrapperTests
         Assert.True(reader.Read());
         Assert.Equal(1, reader.GetInt32(0));
         Assert.Equal("schema_metadata", reader.GetString(1));
-        Assert.True(DateTimeOffset.TryParse(
-            reader.GetString(2),
-            System.Globalization.CultureInfo.InvariantCulture,
-            System.Globalization.DateTimeStyles.AssumeUniversal,
-            out _));
+        Assert.True(UtcTimestamp.TryParse(reader.GetString(2), out _));
         Assert.False(reader.Read());
+    }
+
+    [Fact]
+    public async Task Initialize_IsSafeWhenTwoWritersStartTogether()
+    {
+        using var temp = new TempDirectory();
+        string databaseFile = Path.Combine(temp.Path, "focus_key.db");
+
+        // Two independent bootstrappers on their own connections, as two processes would be.
+        DatabaseInitializationResult[] results = await Task.WhenAll(
+            Task.Run(() => Initialize(databaseFile)),
+            Task.Run(() => Initialize(databaseFile)));
+
+        Assert.All(results, result =>
+            Assert.Equal(SchemaMigrations.TargetVersion, result.SchemaVersionAfter));
+
+        // Exactly one writer applied the migration, and the audit table has no duplicate row.
+        Assert.Equal(1, results.Sum(result => result.AppliedMigrations.Count));
+        Assert.Equal(1, CountMigrationRows(databaseFile));
     }
 
     [Fact]

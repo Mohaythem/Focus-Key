@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="FocusKey.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Focus Key">
+
+    <StackPanel Padding="32" Spacing="6" VerticalAlignment="Top">
+        <TextBlock Text="Focus Key" FontSize="28" FontWeight="SemiBold" />
+        <TextBlock Text="Native foundation running." Opacity="0.7" />
+        <TextBlock
+            x:Name="FoundationDetails"
+            Margin="0,20,0,0"
+            FontFamily="Consolas"
+            FontSize="12"
+            IsTextSelectionEnabled="True"
+            Opacity="0.75"
+            TextWrapping="Wrap" />
+    </StackPanel>
+</Window>

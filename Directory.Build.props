@@ -1,0 +1,16 @@
+<Project>
+
+  <!--
+    Shared build settings for every Focus Key project. Deliberately small.
+    The application project pins its own runtime identifier; libraries and tests stay
+    architecture-neutral so a single build tree serves the whole solution.
+  -->
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <NeutralLanguage>en-US</NeutralLanguage>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+</Project>

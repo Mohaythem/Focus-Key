@@ -61,6 +61,9 @@ dist/
 Thumbs.db
 Desktop.ini
 
+# Machine-local assistant permissions (not project configuration)
+.claude/settings.local.json
+
 # ---------------------------------------------------------------------------
 # Focus Key local verification artifacts and stray runtime data
 # ---------------------------------------------------------------------------

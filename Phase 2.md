@@ -1,6 +1,6 @@
 # Phase 2 — Session Engine
 
-Status: implementation and verification PASS; Git checkpoint recorded below.
+Status: **complete, verified, and pushed**.
 Date: 2026-09-05
 Workspace: `D:\Focus Key`
 Branch: `native/phased-rewrite` (not renamed)
@@ -212,8 +212,18 @@ Reference Git blob hashes still match HEAD:
 ## Git checkpoint
 
 Branch remains `native/phased-rewrite`; origin remains `https://github.com/Mohaythem/Focus-Key.git`.
-The implementation commit and verified remote result will be recorded in a documentation follow-up,
-because a commit cannot contain its own SHA. No rename, merge, force push, or history rewrite.
+
+- Implementation commit: `c68a3ffdb0aefef6bc54ca1ee39442c538fd361b` —
+  `Phase 2: complete session engine with atomic lifecycle transitions`.
+- Push succeeded: `2942185..c68a3ff`, a normal fast-forward to `origin/native/phased-rewrite`.
+- `git ls-remote --heads origin native/phased-rewrite` independently returned the exact SHA above.
+- This documentation-only follow-up records the implementation SHA and verified push; a commit
+  cannot contain its own SHA. The final task report provides the resulting documentation commit.
+- Expected final working tree: only the preserved, untracked `chat_history.txt`; no unstaged or
+  staged tracked-file changes. Runtime databases/logs/build outputs are ignored.
+
+No rename, merge, force push, or history rewrite. `main` remains at
+`17ae9a886c21a8305ee9dd67708506372cf16d1c`.
 
 ## Limitations and deferred scope
 

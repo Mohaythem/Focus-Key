@@ -3,7 +3,7 @@
 # initialization and schema, then closes the window and checks clean shutdown.
 
 param(
-    [string] $DataRootName = "p2-$([guid]::NewGuid().ToString('N'))"
+    [string] $DataRootName = "p3-$([guid]::NewGuid().ToString('N'))"
 )
 
 $ErrorActionPreference = 'Stop'
@@ -49,7 +49,7 @@ function Wait-Until([scriptblock] $Condition, [int] $TimeoutSeconds, [string] $F
     throw $FailureMessage
 }
 
-function Read-Log { if (Test-Path -LiteralPath $logFile) { Get-Content -LiteralPath $logFile -Raw } else { '' } }
+function Read-Log { if (Test-Path -LiteralPath $logFile) { [string](Get-Content -LiteralPath $logFile -Raw) } else { [string]'' } }
 
 function Get-NewLog([string] $before) {
     $after = Read-Log
@@ -89,7 +89,9 @@ function Invoke-Run($label) {
         if ($process.ExitCode -ne 0) { throw "Run $label exited with code $($process.ExitCode)." }
         $logAfterClose = Get-NewLog $logBefore
         if ($logAfterClose -notmatch "Database ready at schema version $expectedSchema\." -or
-            $logAfterClose -notmatch 'Placeholder window displayed\.') {
+            $logAfterClose -notmatch 'Placeholder window displayed\.' -or
+            $logAfterClose -notmatch 'Session startup recovery: NoActiveSession\.' -or
+            $logAfterClose -notmatch 'Session shutdown: NoActiveSession\.') {
             throw "Run $label did not confirm the current schema and placeholder window."
         }
         if ($logAfterClose -notmatch 'Main window closed\. Focus Key shutting down\.') { throw "Run $label did not report clean shutdown." }

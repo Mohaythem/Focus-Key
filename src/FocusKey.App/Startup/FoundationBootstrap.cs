@@ -2,6 +2,7 @@ using System.Reflection;
 using FocusKey.Foundation;
 using FocusKey.Foundation.Data;
 using FocusKey.Foundation.Logging;
+using FocusKey.Foundation.Sessions;
 
 namespace FocusKey.Startup;
 
@@ -11,7 +12,7 @@ namespace FocusKey.Startup;
 /// </summary>
 internal static class FoundationBootstrap
 {
-    internal static StartupContext Run()
+    internal static async Task<StartupContext> RunAsync(CancellationToken cancellationToken = default)
     {
         AppPaths paths = AppPaths.Resolve();
         paths.EnsureCreated();
@@ -33,6 +34,9 @@ internal static class FoundationBootstrap
 
             var connections = new SqliteConnectionFactory(paths.DatabaseFile);
             DatabaseInitializationResult database = new DatabaseBootstrapper(connections, logger).Initialize();
+            var sessions = new SessionCoordinator(new SqliteSessionRepository(connections));
+            SessionRecoveryResult recovery = await sessions.InitializeAsync(cancellationToken).ConfigureAwait(false);
+            logger.Info($"Session startup recovery: {recovery.Kind}.");
 
             logger.Info("Foundation initialization complete.");
 
@@ -41,6 +45,7 @@ internal static class FoundationBootstrap
                 Paths = paths,
                 Logger = logger,
                 Database = database,
+                Sessions = sessions,
             };
         }
         catch (Exception exception)

@@ -32,6 +32,25 @@ internal static partial class FatalError
         ShowMessage("Focus Key", message.ToString());
     }
 
+    internal static void ReportShutdownFailure(Exception exception)
+    {
+        string? reportFile = WriteFallbackReport("Focus Key could not complete session shutdown.", exception);
+
+        var message = new StringBuilder();
+        message.AppendLine("Focus Key could not finish shutting down.");
+        message.AppendLine("The window will stay open. Please retry closing it.");
+        message.AppendLine();
+        message.AppendLine(exception.Message);
+
+        if (reportFile is not null)
+        {
+            message.AppendLine();
+            message.AppendLine($"Details were written to:{Environment.NewLine}{reportFile}");
+        }
+
+        ShowMessage("Focus Key", message.ToString());
+    }
+
     /// <summary>Appends a report next to the normal logs. Returns the file written, if any.</summary>
     internal static string? WriteFallbackReport(string message, Exception? exception)
     {

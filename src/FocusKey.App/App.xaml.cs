@@ -1,16 +1,20 @@
+using FocusKey.Foundation.Sessions;
 using FocusKey.Startup;
+using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 
 namespace FocusKey;
 
 /// <summary>
-/// Application entry point. Phase 0 responsibility: bring up the foundation, show the
-/// placeholder window, record failures, and shut down cleanly.
+/// Application entry point: initialize and recover before showing the placeholder window,
+/// record failures, and persist session shutdown before closing.
 /// </summary>
 public partial class App : Application
 {
     private StartupContext? _startup;
     private Window? _window;
+    private bool _allowClose;
+    private bool _shutdownInProgress;
 
     public App()
     {
@@ -21,11 +25,11 @@ public partial class App : Application
         TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
     }
 
-    protected override void OnLaunched(LaunchActivatedEventArgs args)
+    protected override async void OnLaunched(LaunchActivatedEventArgs args)
     {
         try
         {
-            _startup = FoundationBootstrap.Run();
+            _startup = await FoundationBootstrap.RunAsync();
         }
         catch (Exception exception)
         {
@@ -36,8 +40,46 @@ public partial class App : Application
         }
 
         _window = new MainWindow(_startup);
+        _window.AppWindow.Closing += OnAppWindowClosing;
         _window.Closed += OnMainWindowClosed;
         _window.Activate();
+    }
+
+    private async void OnAppWindowClosing(AppWindow sender, AppWindowClosingEventArgs args)
+    {
+        if (_allowClose)
+        {
+            return;
+        }
+
+        args.Cancel = true;
+        if (_shutdownInProgress || _startup is null)
+        {
+            return;
+        }
+
+        _shutdownInProgress = true;
+        try
+        {
+            SessionRecoveryResult shutdown = await _startup.Sessions.ShutdownAsync();
+            _startup.Logger.Info($"Session shutdown: {shutdown.Kind}.");
+
+            Window window = _window ?? throw new InvalidOperationException("The main window is unavailable.");
+            if (!window.DispatcherQueue.TryEnqueue(() =>
+            {
+                _allowClose = true;
+                window.Close();
+            }))
+            {
+                throw new InvalidOperationException("The window dispatcher could not schedule shutdown.");
+            }
+        }
+        catch (Exception exception)
+        {
+            _shutdownInProgress = false;
+            _startup.Logger.Error("Session shutdown failed.", exception);
+            FatalError.ReportShutdownFailure(exception);
+        }
     }
 
     private void OnMainWindowClosed(object sender, WindowEventArgs args)

@@ -92,6 +92,11 @@ public sealed record SessionRecord
                 nameof(PlannedDuration));
         }
 
+        if (PlannedDuration.Ticks > DateTimeOffset.MaxValue.UtcTicks - StartedAt.UtcTicks)
+        {
+            throw new ArgumentException("The planned end must be a representable UTC timestamp.", nameof(PlannedDuration));
+        }
+
         if (Status == SessionStatus.Running && EndedAt is not null)
         {
             throw new ArgumentException(

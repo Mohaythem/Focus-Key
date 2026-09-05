@@ -32,6 +32,17 @@ public interface ISessionRepository
     Task UpdateAsync(SessionRecord session, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Atomically replaces a record only if every stored field still equals <paramref name="expected"/>.
+    /// Both records must be valid and have the same identity. Returns false when the row is missing
+    /// or has changed; never overwrites a competing writer. No lifecycle policy is decided here.
+    /// Cancellation is honored before commit; after commit the successful result is returned.
+    /// </summary>
+    Task<bool> TryUpdateAsync(
+        SessionRecord expected,
+        SessionRecord replacement,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Reads the single Running session, or null when none is stored. Storage guarantees there can
     /// never be more than one.
     /// </summary>

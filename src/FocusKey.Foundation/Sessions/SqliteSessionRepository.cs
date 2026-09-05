@@ -61,7 +61,8 @@ public sealed class SqliteSessionRepository : ISessionRepository
         AddSessionParameters(command, session);
 
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        transaction.Commit();
     }
 
     public async Task<SessionRecord?> GetAsync(SessionId id, CancellationToken cancellationToken = default)
@@ -131,7 +132,55 @@ public sealed class SqliteSessionRepository : ISessionRepository
             throw new SessionNotFoundException(session.Id);
         }
 
-        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        transaction.Commit();
+    }
+
+    public async Task<bool> TryUpdateAsync(
+        SessionRecord expected,
+        SessionRecord replacement,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(expected);
+        ArgumentNullException.ThrowIfNull(replacement);
+        expected.Validate();
+        replacement.Validate();
+        if (expected.Id != replacement.Id)
+        {
+            throw new ArgumentException("An atomic update cannot change session identity.", nameof(replacement));
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        await using SqliteConnection connection =
+            await _connections.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using SqliteTransaction transaction = connection.BeginTransaction(deferred: false);
+        await using SqliteCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            UPDATE sessions
+            SET type = $type, status = $status, started_at_utc = $startedAt,
+                planned_duration_seconds = $plannedSeconds, ended_at_utc = $endedAt,
+                created_at_utc = $createdAt
+            WHERE id = $id AND type = $expectedType AND status = $expectedStatus
+                AND started_at_utc = $expectedStart AND planned_duration_seconds = $expectedSeconds
+                AND ended_at_utc IS $expectedEnd AND created_at_utc = $expectedCreated;
+            """;
+        AddSessionParameters(command, replacement);
+        command.Parameters.AddWithValue("$expectedType", SessionTypeText.Format(expected.Type));
+        command.Parameters.AddWithValue("$expectedStatus", SessionStatusText.Format(expected.Status));
+        command.Parameters.AddWithValue("$expectedStart", UtcTimestamp.Format(expected.StartedAt));
+        command.Parameters.AddWithValue("$expectedSeconds", expected.PlannedDuration.Ticks / TimeSpan.TicksPerSecond);
+        command.Parameters.AddWithValue("$expectedEnd",
+            expected.EndedAt is { } end ? UtcTimestamp.Format(end) : (object)DBNull.Value);
+        command.Parameters.AddWithValue("$expectedCreated", UtcTimestamp.Format(expected.CreatedAt));
+
+        int affected = await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        // There is deliberately no cancellable work after commit: cancellation cannot turn a
+        // durable transition into an apparent failure. Disposal rolls back any earlier failure.
+        cancellationToken.ThrowIfCancellationRequested();
+        transaction.Commit();
+        return affected == 1;
     }
 
     public async Task<SessionRecord?> GetRunningAsync(CancellationToken cancellationToken = default)
@@ -235,14 +284,19 @@ public sealed class SqliteSessionRepository : ISessionRepository
     /// Reads one row. Any stored value outside the canonical forms throws rather than being coerced
     /// into something valid.
     /// </summary>
-    private static SessionRecord Map(SqliteDataReader reader) => new()
+    private static SessionRecord Map(SqliteDataReader reader)
     {
-        Id = SessionId.Parse(reader.GetString(0)),
-        Type = SessionTypeText.Parse(reader.GetString(1)),
-        Status = SessionStatusText.Parse(reader.GetString(2)),
-        StartedAt = UtcTimestamp.Parse(reader.GetString(3)),
-        PlannedDuration = TimeSpan.FromSeconds(reader.GetInt64(4)),
-        EndedAt = reader.IsDBNull(5) ? null : UtcTimestamp.Parse(reader.GetString(5)),
-        CreatedAt = UtcTimestamp.Parse(reader.GetString(6)),
-    };
+        var session = new SessionRecord
+        {
+            Id = SessionId.Parse(reader.GetString(0)),
+            Type = SessionTypeText.Parse(reader.GetString(1)),
+            Status = SessionStatusText.Parse(reader.GetString(2)),
+            StartedAt = UtcTimestamp.Parse(reader.GetString(3)),
+            PlannedDuration = TimeSpan.FromTicks(checked(reader.GetInt64(4) * TimeSpan.TicksPerSecond)),
+            EndedAt = reader.IsDBNull(5) ? null : UtcTimestamp.Parse(reader.GetString(5)),
+            CreatedAt = UtcTimestamp.Parse(reader.GetString(6)),
+        };
+        session.Validate();
+        return session;
+    }
 }

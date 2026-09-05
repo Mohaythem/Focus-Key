@@ -68,4 +68,4 @@ Single instance, tray, hotkey, overlays, notifications/sounds, Today, Reports, S
 
 ## Git delivery
 
-Implementation is ready for the authorized commit and push on `native/phased-rewrite`. Delivery SHA and remote verification are recorded below after the push completes.
+Implementation commit: `a7272c106dcffe6408c3213904b4bf1e28fc8bcb` (`Implement Phase 3 recovery and application coordination`). `git push origin native/phased-rewrite` succeeded. `git ls-remote origin refs/heads/native/phased-rewrite` returned the identical full SHA, verifying remote delivery. This delivery record is a documentation-only follow-up commit. The branch name is unchanged; no force push or history rewrite was used. The only intentionally untracked user file is the unchanged `chat_history.txt`.

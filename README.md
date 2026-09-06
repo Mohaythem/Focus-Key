@@ -60,7 +60,8 @@ Nothing is implemented early because it will be needed later.
 
 Phase records live at the repository root and contain the factual implementation and
 verification evidence for each phase: [`Phase 0.md`](Phase%200.md), [`Phase 1.md`](Phase%201.md),
-[`Phase 2.md`](Phase%202.md), [`Phase 3.md`](Phase%203.md), and [`Phase 4.md`](Phase%204.md).
+[`Phase 2.md`](Phase%202.md), [`Phase 3.md`](Phase%203.md), [`Phase 4.md`](Phase%204.md), and
+[`Phase 5.md`](Phase%205.md).
 
 | Phase | Scope                                 |
 | ----- | ------------------------------------- |

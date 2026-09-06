@@ -1,5 +1,7 @@
 using FocusKey.Foundation.Sessions;
 using FocusKey.Foundation.Shell;
+using FocusKey.Foundation.Overlay;
+using FocusKey.Overlay;
 using FocusKey.Shell;
 using FocusKey.Startup;
 using System.Security.Principal;
@@ -20,6 +22,7 @@ public partial class App : Application
     private SingleInstanceLease? _ownership;
     private BackgroundShell? _shell;
     private InstanceActivationSignal? _activationSignal;
+    private QuickOverlayController? _quickOverlay;
 
     public App()
     {
@@ -50,6 +53,9 @@ public partial class App : Application
             }
 
             _startup = await FoundationBootstrap.RunAsync();
+            _quickOverlay = new QuickOverlayController(() => new QuickOverlayWindow(),
+                _startup.Sessions.GetActiveAsync, _startup.Sessions.StartAsync);
+            _quickOverlay.ErrorOccurred += exception => _startup?.Logger.Error("Quick overlay operation failed.", exception);
             _startup.Logger.Info("Single-instance shell ownership acquired.");
             _window = new MainWindow(_startup);
             _window.ExitRequested += OnExplicitExitRequested;
@@ -87,14 +93,18 @@ public partial class App : Application
         _startup?.Logger.Info("Main window hidden; shell remains running.");
     }
 
-    private void OnShellActivation(ShellActivationKind kind)
+    private async void OnShellActivation(ShellActivationKind kind)
     {
         _startup?.Logger.Info($"Shell activation: {kind}.");
         if (kind == ShellActivationKind.ShowWindow)
         {
             ShowWindow();
         }
-        // Hotkey activation is deliberately routed without UI. Phase 5 supplies its consumer.
+        else if (_quickOverlay is not null)
+        {
+            try { await _quickOverlay.HandleActivationAsync(kind); }
+            catch (Exception exception) { OnShellError(exception); }
+        }
     }
 
     private void ShowWindow()
@@ -110,6 +120,7 @@ public partial class App : Application
 
     private async Task ShutdownSessionsAsync()
     {
+        _quickOverlay?.Dismiss();
         if (_startup is null) return;
         SessionRecoveryResult result = await _startup.Sessions.ShutdownAsync();
         _startup.Logger.Info($"Session shutdown: {result.Kind}.");
@@ -130,6 +141,7 @@ public partial class App : Application
 
     private void OnShellExited()
     {
+        _quickOverlay?.Dispose();
         _startup?.Logger.Info("Shell stopped: tray removed; hotkey unregistered.");
         // Unwind the native tray callback before destroying the WinUI window.
         if (_window is null || !_window.DispatcherQueue.TryEnqueue(() =>
@@ -151,6 +163,7 @@ public partial class App : Application
 
     private void ReleaseResources()
     {
+        _quickOverlay?.Dispose();
         _shell?.Dispose();
         _activationSignal?.Dispose();
         _startup?.Dispose();

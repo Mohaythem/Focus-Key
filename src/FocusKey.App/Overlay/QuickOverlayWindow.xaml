@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="FocusKey.Overlay.QuickOverlayWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Focus Key — Quick Overlay">
+
+    <Border
+        x:Name="Surface"
+        Width="420"
+        Padding="24"
+        Background="#111616"
+        BorderBrush="#1e2424"
+        BorderThickness="1"
+        CornerRadius="6"
+        RequestedTheme="Dark">
+        <Border.Resources>
+            <!-- Keep WinUI's native button template and focus visuals while
+                 preventing the default accent blue from changing this palette. -->
+            <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#1e2424" />
+            <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#252d2d" />
+            <SolidColorBrush x:Key="ButtonBackgroundDisabled" Color="#111616" />
+            <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="#f0f4f4" />
+            <SolidColorBrush x:Key="ButtonForegroundPressed" Color="#f0f4f4" />
+            <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#1e2424" />
+            <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="#252d2d" />
+        </Border.Resources>
+
+        <StackPanel
+            x:Name="RootPanel"
+            Spacing="0"
+            TabFocusNavigation="Cycle">
+            <TextBlock
+                Text="FOCUS KEY"
+                FontSize="12"
+                Foreground="#909b9b"
+                CharacterSpacing="50"
+                Margin="0,0,0,20" />
+
+            <Grid Margin="0,0,0,20" ColumnSpacing="10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Button
+                    x:Name="WorkCard"
+                    Grid.Column="0"
+                    Padding="18,20"
+                    CornerRadius="4"
+                    HorizontalContentAlignment="Stretch"
+                    VerticalContentAlignment="Center"
+                    HorizontalAlignment="Stretch"
+                    UseSystemFocusVisuals="True"
+                    TabIndex="0"
+                    AutomationProperties.Name="Work, 30 minutes"
+                    Click="OnWorkClicked">
+                    <StackPanel Spacing="0">
+                        <TextBlock
+                            Text="Work"
+                            FontSize="13"
+                            FontWeight="Medium"
+                            Foreground="#f0f4f4"
+                            Margin="0,0,0,6" />
+                        <TextBlock
+                            x:Name="WorkDuration"
+                            Text="30:00"
+                            FontFamily="Consolas"
+                            FontSize="24"
+                            FontWeight="Normal"
+                            Foreground="#f0f4f4" />
+                    </StackPanel>
+                </Button>
+
+                <Button
+                    x:Name="BreakCard"
+                    Grid.Column="1"
+                    Padding="18,20"
+                    CornerRadius="4"
+                    HorizontalContentAlignment="Stretch"
+                    VerticalContentAlignment="Center"
+                    HorizontalAlignment="Stretch"
+                    UseSystemFocusVisuals="True"
+                    TabIndex="1"
+                    AutomationProperties.Name="Break, 10 minutes"
+                    Click="OnBreakClicked">
+                    <StackPanel Spacing="0">
+                        <TextBlock
+                            Text="Break"
+                            FontSize="13"
+                            FontWeight="Medium"
+                            Foreground="#f0f4f4"
+                            Margin="0,0,0,6" />
+                        <TextBlock
+                            x:Name="BreakDuration"
+                            Text="10:00"
+                            FontFamily="Consolas"
+                            FontSize="24"
+                            FontWeight="Normal"
+                            Foreground="#f0f4f4" />
+                    </StackPanel>
+                </Button>
+            </Grid>
+
+            <Button
+                x:Name="StartButton"
+                Content="Start"
+                Padding="10"
+                CornerRadius="4"
+                BorderThickness="0"
+                FontSize="13"
+                FontWeight="Medium"
+                HorizontalAlignment="Stretch"
+                HorizontalContentAlignment="Center"
+                UseSystemFocusVisuals="True"
+                TabIndex="2"
+                AutomationProperties.Name="Start"
+                Background="#183739"
+                Foreground="#f0f4f4"
+                Click="OnStartClicked" />
+
+            <TextBlock
+                x:Name="FeedbackText"
+                Text=""
+                Visibility="Collapsed"
+                Foreground="#909b9b"
+                FontSize="12"
+                TextWrapping="Wrap"
+                Margin="0,12,0,0"
+                AutomationProperties.LiveSetting="Polite" />
+
+            <StackPanel
+                Orientation="Horizontal"
+                HorizontalAlignment="Center"
+                Margin="0,16,0,0">
+                <StackPanel Orientation="Horizontal" Margin="0,0,16,0">
+                    <Border
+                        Background="#1a1f1f"
+                        BorderBrush="#252d2d"
+                        BorderThickness="1"
+                        CornerRadius="3"
+                        Padding="5,1">
+                        <TextBlock
+                            Text="←→"
+                            FontFamily="Consolas"
+                            FontSize="10"
+                            Foreground="#909b9b" />
+                    </Border>
+                    <TextBlock
+                        Text="Select"
+                        FontSize="10"
+                        Foreground="#5a6666"
+                        VerticalAlignment="Center"
+                        Margin="5,0,0,0" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,16,0">
+                    <Border
+                        Background="#1a1f1f"
+                        BorderBrush="#252d2d"
+                        BorderThickness="1"
+                        CornerRadius="3"
+                        Padding="5,1">
+                        <TextBlock
+                            Text="↵"
+                            FontFamily="Consolas"
+                            FontSize="10"
+                            Foreground="#909b9b" />
+                    </Border>
+                    <TextBlock
+                        Text="Start"
+                        FontSize="10"
+                        Foreground="#5a6666"
+                        VerticalAlignment="Center"
+                        Margin="5,0,0,0" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <Border
+                        Background="#1a1f1f"
+                        BorderBrush="#252d2d"
+                        BorderThickness="1"
+                        CornerRadius="3"
+                        Padding="5,1">
+                        <TextBlock
+                            Text="Esc"
+                            FontFamily="Consolas"
+                            FontSize="10"
+                            Foreground="#909b9b" />
+                    </Border>
+                    <TextBlock
+                        Text="Close"
+                        FontSize="10"
+                        Foreground="#5a6666"
+                        VerticalAlignment="Center"
+                        Margin="5,0,0,0" />
+                </StackPanel>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>

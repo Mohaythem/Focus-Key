@@ -63,8 +63,12 @@ internal sealed class SessionStore : IDisposable
 
     public void Dispose()
     {
-        // Release pooled file handles so the temporary directory can be removed.
-        SqliteConnection.ClearAllPools();
+        // Release only this fixture's pool. Global clearing can invalidate another parallel
+        // test's connection while it is executing a command.
+        using (SqliteConnection connection = Connections.OpenConnection())
+        {
+            SqliteConnection.ClearPool(connection);
+        }
         _temp.Dispose();
     }
 }

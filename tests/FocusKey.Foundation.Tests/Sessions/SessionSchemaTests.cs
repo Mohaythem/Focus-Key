@@ -67,7 +67,7 @@ public sealed class SessionSchemaTests
             "sessions",
             Scalar<string>(connections, "SELECT name FROM schema_migrations WHERE version = 2;"));
 
-        SqliteConnection.ClearAllPools();
+        using (SqliteConnection connection = connections.OpenConnection()) SqliteConnection.ClearPool(connection);
     }
 
     [Fact]
@@ -95,7 +95,7 @@ public sealed class SessionSchemaTests
         Assert.Equal(running.Id, (await repository.GetRunningAsync())!.Id);
         Assert.Equal(2, Scalar<long>(connections, "SELECT COUNT(*) FROM schema_migrations;"));
 
-        SqliteConnection.ClearAllPools();
+        using (SqliteConnection connection = connections.OpenConnection()) SqliteConnection.ClearPool(connection);
     }
 
     [Fact]

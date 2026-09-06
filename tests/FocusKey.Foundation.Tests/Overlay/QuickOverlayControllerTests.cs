@@ -1,0 +1,237 @@
+using FocusKey.Foundation.Overlay;
+using FocusKey.Foundation.Sessions;
+using FocusKey.Foundation.Shell;
+using FocusKey.Foundation.Tests.Sessions;
+
+namespace FocusKey.Foundation.Tests.Overlay;
+
+public sealed class QuickOverlayControllerTests
+{
+    [Fact]
+    public async Task HotkeyCreatesAndShowsOneView_AndShowWindowIsIgnored()
+    {
+        var view = new FakeView();
+        int creates = 0;
+        using var controller = New(view, () => { creates++; return view; });
+
+        await controller.HandleActivationAsync(ShellActivationKind.ShowWindow);
+        Assert.Equal(0, creates);
+        await controller.HandleActivationAsync(ShellActivationKind.Hotkey);
+        Assert.Equal(1, creates);
+        Assert.Equal(1, view.ShowCount);
+        Assert.Equal(new(SessionType.Work, false, true, null), view.LastState);
+    }
+
+    [Fact]
+    public async Task RepeatedAndInflightActivationReusesViewAndDoesNotReadTwice()
+    {
+        var view = new FakeView();
+        var read = new TaskCompletionSource<SessionSnapshot?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        int reads = 0;
+        using var controller = New(view, getActive: _ => { reads++; return read.Task; });
+        Task first = controller.HandleActivationAsync(ShellActivationKind.Hotkey);
+        await view.WaitFor(s => s.IsBusy);
+        await controller.HandleActivationAsync(ShellActivationKind.Hotkey);
+        Assert.Equal(2, view.ShowCount);
+        Assert.Equal(1, reads);
+        read.SetResult(null);
+        await first;
+    }
+
+    [Fact]
+    public async Task SelectionAndStartUseExactDelegate()
+    {
+        var view = new FakeView();
+        SessionType? selected = null;
+        using var controller = New(view, start: (type, _) => { selected = type; return Task.FromResult(TestSessions.Running(type: type)); });
+        await controller.HandleActivationAsync(ShellActivationKind.Hotkey);
+        view.RaiseSelection(SessionType.Break);
+        Assert.Equal(SessionType.Break, view.LastState.Selected);
+        view.RaiseStart();
+        await view.Hidden.Task;
+        Assert.Equal(SessionType.Break, selected);
+    }
+
+    [Fact]
+    public async Task RealCoordinatorUsesWorkAndBreakDefaults()
+    {
+        using var store = new SessionStore();
+        var clock = new ManualTimeProvider(TestSessions.Anchor);
+        var coordinator = new SessionCoordinator(store.Repository, clock);
+        await coordinator.InitializeAsync();
+        var view = new FakeView();
+        using var controller = New(view, getActive: coordinator.GetActiveAsync, start: coordinator.StartAsync);
+        await controller.HandleActivationAsync(ShellActivationKind.Hotkey);
+        await controller.StartAsync();
+        SessionRecord work = (await store.Repository.GetRunningAsync())!;
+        Assert.Equal(SessionType.Work, work.Type);
+        Assert.Equal(TestSessions.WorkLength, work.PlannedDuration);
+        await coordinator.StopAsync();
+        await controller.HandleActivationAsync(ShellActivationKind.Hotkey);
+        view.RaiseSelection(SessionType.Break);
+        await controller.StartAsync();
+        SessionRecord rest = (await store.Repository.GetRunningAsync())!;
+        Assert.Equal(SessionType.Break, rest.Type);
+        Assert.Equal(TestSessions.BreakLength, rest.PlannedDuration);
+    }
+
+    [Fact]
+    public async Task ExistingRunningShowsFeedbackAndDoesNotStart()
+    {
+        var view = new FakeView();
+        int starts = 0;
+        using var controller = New(view, getActive: _ => Task.FromResult<SessionSnapshot?>(SessionSnapshot.For(TestSessions.Running(), TestSessions.Anchor)), start: (_, _) => { starts++; return Task.FromResult(TestSessions.Running()); });
+        await controller.HandleActivationAsync(ShellActivationKind.Hotkey);
+        Assert.False(view.LastState.CanStart);
+        Assert.Contains("already running", view.LastState.Feedback);
+        view.RaiseStart();
+        Assert.Equal(0, starts);
+    }
+
+    [Fact]
+    public async Task StartRaceShowsFeedbackAndCanRetry()
+    {
+        var view = new FakeView();
+        int starts = 0;
+        using var controller = New(view, start: (_, _) => { starts++; return starts == 1 ? Task.FromException<SessionRecord>(new ActiveSessionAlreadyExistsException(SessionId.New())) : Task.FromResult(TestSessions.Running()); });
+        await controller.HandleActivationAsync(ShellActivationKind.Hotkey);
+        view.RaiseStart();
+        await view.WaitFor(s => s.Feedback == "A session is already running.");
+        Assert.False(view.LastState.CanStart);
+        // A raced start requires a fresh observation before it is retried.
+        controller.Dismiss();
+        await controller.HandleActivationAsync(ShellActivationKind.Hotkey);
+        Assert.True(view.LastState.CanStart);
+        await controller.StartAsync();
+        Assert.Equal(2, starts);
+    }
+
+    [Fact]
+    public async Task DismissedOverlayCannotStartAndDismissEventHides()
+    {
+        var view = new FakeView(); int starts = 0;
+        using var controller = New(view, start: (_, _) => { starts++; return Task.FromResult(TestSessions.Running()); });
+        await controller.HandleActivationAsync(ShellActivationKind.Hotkey);
+        view.RaiseDismiss();
+        view.RaiseStart();
+        Assert.Equal(1, view.HideCount);
+        Assert.Equal(0, starts);
+    }
+
+    [Fact]
+    public async Task CloseReopenResetsSelectionAndReadsFreshState()
+    {
+        var view = new FakeView(); int reads = 0;
+        using var controller = New(view, getActive: _ => Task.FromResult<SessionSnapshot?>(reads++ == 0 ? null : SessionSnapshot.For(TestSessions.Running(type: SessionType.Break), TestSessions.Anchor)));
+        await controller.HandleActivationAsync(ShellActivationKind.Hotkey);
+        view.RaiseSelection(SessionType.Break); view.RaiseDismiss();
+        await controller.HandleActivationAsync(ShellActivationKind.Hotkey);
+        Assert.Equal(SessionType.Work, view.LastState.Selected);
+        Assert.False(view.LastState.CanStart);
+        Assert.Contains("already running", view.LastState.Feedback);
+        Assert.Equal(2, reads);
+    }
+
+    [Fact]
+    public async Task StaleReadAfterHideAndReopenCannotClobberNewState()
+    {
+        var view = new FakeView();
+        var oldRead = new TaskCompletionSource<SessionSnapshot?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var newRead = new TaskCompletionSource<SessionSnapshot?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        int reads = 0;
+        using var controller = New(view, getActive: _ => ++reads == 1 ? oldRead.Task : newRead.Task);
+        Task first = controller.HandleActivationAsync(ShellActivationKind.Hotkey); await view.WaitFor(s => s.IsBusy);
+        view.RaiseDismiss();
+        Task second = controller.HandleActivationAsync(ShellActivationKind.Hotkey); await view.WaitFor(s => s.IsBusy);
+        newRead.SetResult(null); await second;
+        oldRead.SetResult(SessionSnapshot.For(TestSessions.Running(type: SessionType.Break), TestSessions.Anchor)); await first;
+        Assert.Equal(new(SessionType.Work, false, true, null), view.LastState);
+    }
+
+    [Fact]
+    public async Task DuplicateStartRequestsWhilePendingCallStartOnce_AndEscapeDoesNotCancelAcceptedStart()
+    {
+        var view = new FakeView(); var release = new TaskCompletionSource<SessionRecord>(TaskCreationOptions.RunContinuationsAsynchronously); int starts = 0;
+        using var controller = New(view, start: (_, _) => { starts++; return release.Task; });
+        await controller.HandleActivationAsync(ShellActivationKind.Hotkey);
+        Task accepted = controller.StartAsync();
+        Task duplicate = controller.StartAsync();
+        await view.WaitFor(s => s.IsBusy);
+        view.RaiseDismiss();
+        Assert.Equal(1, starts);
+        await controller.HandleActivationAsync(ShellActivationKind.Hotkey);
+        Assert.False(view.LastState.CanStart);
+        Assert.True(view.LastState.IsBusy);
+        release.SetResult(TestSessions.Running());
+        await accepted;
+        Assert.Equal(2, view.HideCount);
+        await duplicate;
+    }
+
+    [Fact]
+    public async Task SQLiteRaceRejectsSecondStartWithoutDuplicateRows()
+    {
+        using var store = new SessionStore();
+        var clock = new ManualTimeProvider(TestSessions.Anchor);
+        var coordinator = new SessionCoordinator(store.Repository, clock);
+        await coordinator.InitializeAsync();
+        var view = new FakeView();
+        using var controller = New(view, getActive: coordinator.GetActiveAsync, start: coordinator.StartAsync);
+        await controller.HandleActivationAsync(ShellActivationKind.Hotkey);
+        SessionRecord external = await coordinator.StartAsync(SessionType.Break);
+        view.RaiseStart();
+        await view.WaitFor(s => s.Feedback == "A session is already running.");
+        Assert.False(view.LastState.CanStart);
+        Assert.Equal(external.Id, (await store.Repository.GetRunningAsync())!.Id);
+        Assert.Equal(1L, store.ScalarRaw<long>("SELECT COUNT(*) FROM sessions"));
+    }
+
+    [Fact]
+    public async Task FailureAllowsRetryAndReportsError()
+    {
+        var view = new FakeView(); var errors = new List<Exception>(); int starts = 0;
+        using var controller = New(view, start: (_, _) => starts++ == 0 ? Task.FromException<SessionRecord>(new InvalidOperationException()) : Task.FromResult(TestSessions.Running()));
+        controller.ErrorOccurred += errors.Add;
+        await controller.HandleActivationAsync(ShellActivationKind.Hotkey); view.RaiseStart();
+        await view.WaitFor(s => s.CanStart && s.Feedback is not null);
+        Assert.Single(errors); view.RaiseStart(); await view.Hidden.Task; Assert.Equal(2, starts);
+    }
+
+    [Fact]
+    public async Task ReadFailureReportsErrorAndReopenRetries()
+    {
+        var view = new FakeView(); var errors = new List<Exception>(); int reads = 0;
+        using var controller = New(view, getActive: _ => ++reads == 1 ? Task.FromException<SessionSnapshot?>(new InvalidOperationException()) : Task.FromResult<SessionSnapshot?>(null));
+        controller.ErrorOccurred += errors.Add;
+        await controller.HandleActivationAsync(ShellActivationKind.Hotkey); Assert.Single(errors);
+        view.RaiseDismiss(); await controller.HandleActivationAsync(ShellActivationKind.Hotkey); Assert.True(view.LastState.CanStart); Assert.Equal(2, reads);
+    }
+
+    [Fact]
+    public async Task DisposeUnsubscribesAndInFlightResultsCannotReopen()
+    {
+        var view = new FakeView(); var read = new TaskCompletionSource<SessionSnapshot?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var controller = New(view, getActive: _ => read.Task); Task activation = controller.HandleActivationAsync(ShellActivationKind.Hotkey); int rendersBeforeDispose = view.RenderCount; controller.Dispose();
+        Assert.Equal(1, view.DisposeCount); view.RaiseSelection(SessionType.Break); view.RaiseStart(); Assert.Equal(rendersBeforeDispose, view.RenderCount);
+        read.SetResult(null); await activation; Assert.Equal(1, view.HideCount);
+    }
+
+    private static QuickOverlayController New(FakeView view, Func<IQuickOverlayView>? create = null, Func<CancellationToken, Task<SessionSnapshot?>>? getActive = null, Func<SessionType, CancellationToken, Task<SessionRecord>>? start = null) =>
+        new(create ?? (() => view), getActive ?? (_ => Task.FromResult<SessionSnapshot?>(null)), start ?? ((type, _) => Task.FromResult(TestSessions.Running(type: type))));
+
+    private sealed class FakeView : IQuickOverlayView
+    {
+        internal readonly List<QuickOverlayState> States = [];
+        internal readonly TaskCompletionSource Hidden = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal int ShowCount, HideCount, DisposeCount, RenderCount;
+        internal QuickOverlayState LastState => States[^1];
+        internal Task WaitFor(Func<QuickOverlayState, bool> p) { var t = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously); foreach (var s in States) if (p(s)) t.TrySetResult(); if (!t.Task.IsCompleted) _watchers.Add((p,t)); return t.Task; }
+        private readonly List<(Func<QuickOverlayState,bool> P, TaskCompletionSource T)> _watchers = [];
+        public event Action<SessionType>? SelectionRequested; public event Action? StartRequested; public event Action? DismissRequested;
+        public void Render(QuickOverlayState state) { States.Add(state); RenderCount++; foreach (var w in _watchers.ToArray()) if (w.P(state)) w.T.TrySetResult(); }
+        public void ShowAndFocus() => ShowCount++;
+        public void Hide() { HideCount++; Hidden.TrySetResult(); }
+        public void RaiseSelection(SessionType t) => SelectionRequested?.Invoke(t); public void RaiseStart() => StartRequested?.Invoke(); public void RaiseDismiss() => DismissRequested?.Invoke();
+        public void Dispose() => DisposeCount++;
+    }
+}

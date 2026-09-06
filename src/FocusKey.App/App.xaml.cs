@@ -11,7 +11,7 @@ using Microsoft.UI.Xaml;
 namespace FocusKey;
 
 /// <summary>
-/// Application entry point: initialize and recover before showing the placeholder window,
+/// Application entry point: initialize and recover before showing the Today window,
 /// record failures, and persist session shutdown before closing.
 /// </summary>
 public partial class App : Application
@@ -56,7 +56,8 @@ public partial class App : Application
 
             _startup = await FoundationBootstrap.RunAsync();
             _startup.Logger.Info("Single-instance shell ownership acquired.");
-            _window = new MainWindow(_startup);
+            _window = new MainWindow(_startup, StopSessionAsync,
+                exception => _startup?.Logger.Error("Today operation failed.", exception));
             _window.ExitRequested += OnExplicitExitRequested;
             _window.AppWindow.Closing += OnAppWindowClosing;
             _window.Closed += OnMainWindowClosed;
@@ -64,8 +65,13 @@ public partial class App : Application
             _completion = new CompletionCoordinator(_startup.Sessions, session => NotifyCompletedAsync(integration, session),
                 exception => _startup?.Logger.Error("Completion coordination failed.", exception));
             integration.ClockChangedOrResumed += _completion.RequestEvaluation;
+            integration.ClockChangedOrResumed += () =>
+            {
+                TimeZoneInfo.ClearCachedData();
+                _window?.RefreshToday();
+            };
             _quickOverlay = new QuickOverlayController(() => new QuickOverlayWindow(),
-                _startup.Sessions.GetActiveAsync, _completion.StartAsync);
+                _startup.Sessions.GetActiveAsync, StartSessionAsync);
             _quickOverlay.ErrorOccurred += exception => _startup?.Logger.Error("Quick overlay operation failed.", exception);
             _shell = new BackgroundShell(integration, ShutdownSessionsAsync);
             _shell.ActivationRequested += OnShellActivation;
@@ -76,6 +82,7 @@ public partial class App : Application
             _activationSignal.Listen(_window.DispatcherQueue, () => _shell.RequestActivation(ShellActivationKind.ShowWindow));
             _startup.Logger.Info("Shell ready: tray added; Shift + F3 registered.");
             _window.Activate();
+            _window.OpenToday();
         }
         catch (Exception exception)
         {
@@ -97,6 +104,7 @@ public partial class App : Application
         }
 
         args.Cancel = true;
+        _window?.HideToday();
         sender.Hide();
         _startup?.Logger.Info("Main window hidden; shell remains running.");
     }
@@ -124,11 +132,27 @@ public partial class App : Application
             presenter.Restore();
         }
         _window.Activate();
+        _window.OpenToday();
+    }
+
+    private async Task<SessionRecord> StartSessionAsync(SessionType type, CancellationToken cancellationToken)
+    {
+        SessionRecord session = await _completion!.StartAsync(type, cancellationToken);
+        _window?.RefreshToday();
+        return session;
+    }
+
+    private async Task<SessionOutcome> StopSessionAsync(SessionId expectedId, CancellationToken cancellationToken)
+    {
+        SessionOutcome result = await _completion!.StopAsync(expectedId, cancellationToken);
+        if (_quickOverlay is not null) await _quickOverlay.RefreshIfVisibleAsync();
+        return result;
     }
 
     private async Task ShutdownSessionsAsync()
     {
         _quickOverlay?.Dismiss();
+        _window?.HideToday();
         if (_startup is null) return;
         _isExiting = true;
         try
@@ -138,7 +162,7 @@ public partial class App : Application
                 : await _startup.Sessions.ShutdownAsync();
             _startup.Logger.Info($"Session shutdown: {result.Kind}.");
         }
-        catch { _isExiting = false; throw; }
+        catch { _isExiting = false; _window?.OpenToday(); throw; }
     }
 
     private Task NotifyCompletedAsync(WindowsShellIntegration integration, SessionRecord session)
@@ -148,9 +172,19 @@ public partial class App : Application
         {
             try
             {
-                integration.NotifyCompleted(session);
-                _startup?.Logger.Info($"Completion notification submitted: {session.Id} {session.Type}; ended={session.EndedAt:O}.");
-                if (!_isExiting && _quickOverlay is not null) await _quickOverlay.RefreshIfVisibleAsync();
+                try
+                {
+                    integration.NotifyCompleted(session);
+                    _startup?.Logger.Info($"Completion notification submitted: {session.Id} {session.Type}; ended={session.EndedAt:O}.");
+                }
+                finally
+                {
+                    if (!_isExiting)
+                    {
+                        _window?.RefreshToday();
+                        if (_quickOverlay is not null) await _quickOverlay.RefreshIfVisibleAsync();
+                    }
+                }
                 done.SetResult();
             }
             catch (Exception exception) { done.SetException(exception); }

@@ -48,6 +48,21 @@ public sealed class CompletionCoordinator : IDisposable
     /// <summary>Safe entry point for native clock/resume signals and the one-shot timer.</summary>
     public void RequestEvaluation() => _ = EvaluateAsync();
 
+    public async Task<SessionOutcome> StopAsync(SessionId expectedId, CancellationToken cancellationToken = default)
+    {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (_shutdown) throw new InvalidOperationException("Completion coordination has shut down.");
+            SessionOutcome outcome = await _sessions.StopAsync(expectedId, cancellationToken).ConfigureAwait(false);
+            if (outcome.Kind == SessionOutcomeKind.Completed) await NotifyAsync(outcome.Session!).ConfigureAwait(false);
+            if (outcome.Kind != SessionOutcomeKind.Conflict) Disarm();
+            return outcome;
+        }
+        finally { _gate.Release(); }
+    }
+
     public async Task EvaluateAsync()
     {
         await _gate.WaitAsync().ConfigureAwait(false);

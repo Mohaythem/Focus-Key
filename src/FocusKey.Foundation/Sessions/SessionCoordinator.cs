@@ -53,6 +53,9 @@ public sealed class SessionCoordinator
     public Task<SessionOutcome> StopAsync(CancellationToken cancellationToken = default) =>
         UseEngineAsync(_engine.StopAsync, cancellationToken);
 
+    public Task<SessionOutcome> StopAsync(SessionId expectedId, CancellationToken cancellationToken = default) =>
+        UseEngineAsync(token => _engine.StopAsync(expectedId, token), cancellationToken);
+
     public Task<SessionOutcome> CompleteIfDueAsync(CancellationToken cancellationToken = default) =>
         UseEngineAsync(_engine.CompleteIfDueAsync, cancellationToken);
 

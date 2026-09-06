@@ -119,7 +119,14 @@ public sealed class SessionEngine
     /// <see cref="SessionOutcomeKind.Completed"/>, or <see cref="SessionOutcomeKind.Conflict"/>
     /// when another writer changed the observed session.
     /// </returns>
-    public async Task<SessionOutcome> StopAsync(CancellationToken cancellationToken = default)
+    public Task<SessionOutcome> StopAsync(CancellationToken cancellationToken = default) =>
+        StopCoreAsync(null, cancellationToken);
+
+    /// <summary>Stops only the session the user saw; a stale UI cannot stop its replacement.</summary>
+    public Task<SessionOutcome> StopAsync(SessionId expectedId, CancellationToken cancellationToken = default) =>
+        StopCoreAsync(expectedId, cancellationToken);
+
+    private async Task<SessionOutcome> StopCoreAsync(SessionId? expectedId, CancellationToken cancellationToken)
     {
         await _lifecycle.WaitAsync(cancellationToken).ConfigureAwait(false);
 
@@ -132,6 +139,9 @@ public sealed class SessionEngine
             {
                 return SessionOutcome.NoActiveSession();
             }
+
+            if (expectedId is { } expected && expected != running.Id)
+                return SessionOutcome.Conflict(running);
 
             DateTimeOffset now = _time.GetUtcNow();
 

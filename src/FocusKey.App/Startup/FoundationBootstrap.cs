@@ -3,6 +3,7 @@ using FocusKey.Foundation;
 using FocusKey.Foundation.Data;
 using FocusKey.Foundation.Logging;
 using FocusKey.Foundation.Sessions;
+using FocusKey.Foundation.Today;
 
 namespace FocusKey.Startup;
 
@@ -34,7 +35,8 @@ internal static class FoundationBootstrap
 
             var connections = new SqliteConnectionFactory(paths.DatabaseFile);
             DatabaseInitializationResult database = new DatabaseBootstrapper(connections, logger).Initialize();
-            var sessions = new SessionCoordinator(new SqliteSessionRepository(connections));
+            var repository = new SqliteSessionRepository(connections);
+            var sessions = new SessionCoordinator(repository);
             SessionRecoveryResult recovery = await sessions.InitializeAsync(cancellationToken).ConfigureAwait(false);
             logger.Info($"Session startup recovery: {recovery.Kind}.");
 
@@ -46,6 +48,7 @@ internal static class FoundationBootstrap
                 Logger = logger,
                 Database = database,
                 Sessions = sessions,
+                Today = new TodayService(repository),
             };
         }
         catch (Exception exception)

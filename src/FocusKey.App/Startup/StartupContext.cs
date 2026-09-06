@@ -2,6 +2,7 @@ using FocusKey.Foundation;
 using FocusKey.Foundation.Data;
 using FocusKey.Foundation.Logging;
 using FocusKey.Foundation.Sessions;
+using FocusKey.Foundation.Today;
 
 namespace FocusKey.Startup;
 
@@ -15,6 +16,7 @@ internal sealed class StartupContext : IDisposable
     public required DatabaseInitializationResult Database { get; init; }
 
     public required SessionCoordinator Sessions { get; init; }
+    public required TodayService Today { get; init; }
 
     public void Dispose() => Logger.Dispose();
 }

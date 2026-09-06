@@ -130,8 +130,10 @@ retries. Git whitespace validation passed. Reference and chat file hashes remain
 
 ## Git delivery
 
-Implementation commit and verified origin SHA will be recorded immediately after the authorized
-commit and push, in a documentation-only follow-up commit on `native/phased-rewrite`.
+Implementation commit: `2f7274396e6396949f5f487ca65441b94d6d36c0`.
+Pushed successfully to `origin/native/phased-rewrite`; `git ls-remote` returned that exact SHA
+on 2026-09-06. This delivery record is a documentation-only follow-up commit on the same branch.
+Only the preserved, pre-existing untracked `chat_history.txt` remains outside the commits.
 
 ## Limitations and deferred scope
 

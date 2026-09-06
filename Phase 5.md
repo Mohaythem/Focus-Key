@@ -105,7 +105,10 @@ after its planned end. Existing Phase 3 startup/shutdown semantics remain unchan
 
 ## Git delivery
 
-Implementation commit and verified remote SHA will be recorded after the authorized push.
+Implementation commit: `03926b25856443c0ebde36f2e59f6e062de324f5`
+(`Implement Phase 5 native Quick Overlay`). Pushed to `origin/native/phased-rewrite`;
+`git ls-remote origin refs/heads/native/phased-rewrite` verified that exact remote SHA on
+2026-09-06. This delivery record is a documentation-only follow-up commit.
 The design specification, ZIP, and `chat_history.txt` remain byte-for-byte unchanged; no build,
 database, or log artifacts are included in the commit.
 

@@ -51,6 +51,13 @@ internal static partial class FatalError
         ShowMessage("Focus Key", message.ToString());
     }
 
+    internal static void ReportShellFailure(Exception exception)
+    {
+        WriteFallbackReport("Focus Key encountered a shell or shutdown error.", exception);
+        ShowMessage("Focus Key", "Focus Key encountered a shell or shutdown error.\n" +
+            "The main window remains available. Use Exit Focus Key to retry exiting.\n\n" + exception.Message);
+    }
+
     /// <summary>Appends a report next to the normal logs. Returns the file written, if any.</summary>
     internal static string? WriteFallbackReport(string message, Exception? exception)
     {

@@ -1,0 +1,105 @@
+using System.Runtime.InteropServices;
+
+namespace FocusKey.Shell;
+
+internal static class NativeMethods
+{
+    internal const int WM_NCCREATE = 0x0081;
+    internal const int WM_DESTROY = 0x0002;
+    internal const int WM_COMMAND = 0x0111;
+    internal const int WM_HOTKEY = 0x0312;
+    internal const int WM_CONTEXTMENU = 0x007B;
+    internal const int WM_NULL = 0x0000;
+    internal const int NIN_SELECT = 0x0400;
+    internal const int NIN_KEYSELECT = 0x0401;
+    internal const int WM_LBUTTONUP = 0x0202;
+    internal const int WM_LBUTTONDBLCLK = 0x0203;
+    internal const int WM_RBUTTONUP = 0x0205;
+
+    internal const uint WS_POPUP = 0x80000000;
+    internal const uint WS_EX_TOOLWINDOW = 0x00000080;
+    internal const uint NIF_MESSAGE = 0x00000001;
+    internal const uint NIF_ICON = 0x00000002;
+    internal const uint NIF_TIP = 0x00000004;
+    internal const uint NIF_SHOWTIP = 0x00000080;
+    internal const uint NIM_ADD = 0x00000000;
+    internal const uint NIM_DELETE = 0x00000002;
+    internal const uint NIM_SETVERSION = 0x00000004;
+    internal const uint NIM_SETVERSION4 = 4;
+    internal const uint TPM_RETURNCMD = 0x0100;
+    internal const uint TPM_RIGHTBUTTON = 0x0002;
+    internal const uint MF_STRING = 0x00000000;
+    internal const uint MOD_SHIFT = 0x0004;
+    internal const uint MOD_NOREPEAT = 0x4000;
+    internal const ushort VK_F3 = 0x72;
+    internal const int SW_SHOWNORMAL = 1;
+    internal const uint GWLP_USERDATA = unchecked((uint)-21);
+    internal const int IDI_APPLICATION = 32512;
+
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+    internal delegate IntPtr WndProc(IntPtr hWnd, uint message, IntPtr wParam, IntPtr lParam);
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    internal struct WNDCLASSEX
+    {
+        internal uint cbSize;
+        internal uint style;
+        internal WndProc lpfnWndProc;
+        internal int cbClsExtra;
+        internal int cbWndExtra;
+        internal IntPtr hInstance;
+        internal IntPtr hIcon;
+        internal IntPtr hCursor;
+        internal IntPtr hbrBackground;
+        internal string lpszMenuName;
+        internal string lpszClassName;
+        internal IntPtr hIconSm;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    internal struct NOTIFYICONDATA
+    {
+        internal uint cbSize;
+        internal IntPtr hWnd;
+        internal uint uID;
+        internal uint uFlags;
+        internal uint uCallbackMessage;
+        internal IntPtr hIcon;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] internal string szTip;
+        internal uint dwState;
+        internal uint dwStateMask;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)] internal string szInfo;
+        internal uint uTimeoutOrVersion;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 64)] internal string szInfoTitle;
+        internal uint dwInfoFlags;
+        internal Guid guidItem;
+        internal IntPtr hBalloonIcon;
+    }
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    internal static extern ushort RegisterClassEx(ref WNDCLASSEX windowClass);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    internal static extern bool UnregisterClass(string className, IntPtr instance);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    internal static extern IntPtr CreateWindowEx(uint exStyle, string className, string windowName, uint style,
+        int x, int y, int width, int height, IntPtr parent, IntPtr menu, IntPtr instance, IntPtr param);
+    [DllImport("user32.dll", SetLastError = true)] internal static extern bool DestroyWindow(IntPtr window);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] internal static extern IntPtr DefWindowProc(IntPtr hWnd, uint message, IntPtr wParam, IntPtr lParam);
+    [DllImport("user32.dll", SetLastError = true)] internal static extern IntPtr SetWindowLongPtr(IntPtr hWnd, uint index, IntPtr value);
+    [DllImport("user32.dll", SetLastError = true)] internal static extern IntPtr GetWindowLongPtr(IntPtr hWnd, uint index);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] internal static extern IntPtr GetModuleHandle(string? moduleName);
+    [DllImport("user32.dll", SetLastError = true)] internal static extern IntPtr LoadIcon(IntPtr instance, IntPtr iconName);
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode, SetLastError = true)] internal static extern bool Shell_NotifyIcon(uint message, ref NOTIFYICONDATA data);
+    [DllImport("user32.dll", SetLastError = true)] internal static extern bool RegisterHotKey(IntPtr hWnd, int id, uint modifiers, uint virtualKey);
+    [DllImport("user32.dll", SetLastError = true)] internal static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] internal static extern uint RegisterWindowMessage(string message);
+    [DllImport("user32.dll", SetLastError = true)] internal static extern IntPtr CreatePopupMenu();
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)] internal static extern bool AppendMenu(IntPtr menu, uint flags, UIntPtr id, string text);
+    [DllImport("user32.dll", SetLastError = true)] internal static extern uint TrackPopupMenu(IntPtr menu, uint flags, int x, int y, int reserved, IntPtr owner, IntPtr rect);
+    [DllImport("user32.dll", SetLastError = true)] internal static extern bool DestroyMenu(IntPtr menu);
+    [DllImport("user32.dll", SetLastError = true)] internal static extern bool SetForegroundWindow(IntPtr window);
+    [DllImport("user32.dll", SetLastError = true)] internal static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
+    [DllImport("user32.dll", SetLastError = true)] internal static extern bool GetCursorPos(out POINT point);
+
+    [StructLayout(LayoutKind.Sequential)] internal struct POINT { internal int X; internal int Y; }
+}

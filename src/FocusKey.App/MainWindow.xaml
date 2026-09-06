@@ -8,6 +8,8 @@
     <StackPanel Padding="32" Spacing="6" VerticalAlignment="Top">
         <TextBlock Text="Focus Key" FontSize="28" FontWeight="SemiBold" />
         <TextBlock Text="Native foundation running." Opacity="0.7" />
+        <TextBlock Text="Close this window to keep Focus Key running in the tray." Opacity="0.7" />
+        <Button Content="Exit Focus Key" Click="OnExitClick" Margin="0,10,0,0" />
         <TextBlock
             x:Name="FoundationDetails"
             Margin="0,20,0,0"

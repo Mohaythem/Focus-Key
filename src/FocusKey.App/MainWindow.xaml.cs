@@ -10,6 +10,10 @@ namespace FocusKey;
 /// </summary>
 public sealed partial class MainWindow : Window
 {
+    internal event Action? ExitRequested;
+
+    private void OnExitClick(object sender, RoutedEventArgs args) => ExitRequested?.Invoke();
+
     internal MainWindow(StartupContext startup)
     {
         ArgumentNullException.ThrowIfNull(startup);

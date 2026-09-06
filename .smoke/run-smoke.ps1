@@ -1,128 +1,56 @@
-# Focus Key - native runtime smoke test
-# Launches the unpackaged WinUI 3 build against an isolated data root, verifies
-# initialization and schema, then closes the window and checks clean shutdown.
-
-param(
-    [string] $DataRootName = "p3-$([guid]::NewGuid().ToString('N'))"
-)
-
+# Focus Key - Phase 4 native shell smoke test.
+param([string] $DataRootName = "p4-$([guid]::NewGuid().ToString('N'))")
 $ErrorActionPreference = 'Stop'
-
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $smokeRoot = Join-Path $projectRoot '.smoke'
 $exe = Join-Path $projectRoot 'src\FocusKey.App\bin\Debug\net10.0-windows10.0.19041.0\win-x64\FocusKey.exe'
-
-if ([string]::IsNullOrWhiteSpace($DataRootName) -or [IO.Path]::IsPathRooted($DataRootName) -or
-    $DataRootName -match '(^|[\\/])\.\.([\\/]|$)') {
-    throw "DataRootName must be a relative path contained by '$smokeRoot'."
-}
-
-$dataRoot = [IO.Path]::GetFullPath((Join-Path $smokeRoot $DataRootName))
-$smokePrefix = $smokeRoot.TrimEnd('\','/') + [IO.Path]::DirectorySeparatorChar
-if (-not $dataRoot.StartsWith($smokePrefix, [StringComparison]::OrdinalIgnoreCase)) {
-    throw "Resolved data root '$dataRoot' is outside '$smokeRoot'."
-}
-
-$previousDataRoot = [Environment]::GetEnvironmentVariable('FOCUSKEY_DATA_ROOT', 'Process')
-$logFile = Join-Path $dataRoot 'logs\focus_key.log'
-$databaseFile = Join-Path $dataRoot 'focus_key.db'
-$expectedSchema = 2
-
-function Show-Header($text) {
-    Write-Output ''
-    Write-Output "===== $text ====="
-}
-
-Show-Header 'PRE-CONDITIONS'
-Write-Output "executable            : $exe"
-if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { throw "Executable not found: $exe" }
-if (Test-Path -LiteralPath $dataRoot) { throw "Use a fresh smoke data root; '$dataRoot' already exists." }
-Write-Output "smoke data root       : $dataRoot"
-Write-Output "project root          : $projectRoot"
-
-function Wait-Until([scriptblock] $Condition, [int] $TimeoutSeconds, [string] $FailureMessage) {
-    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
-    do {
-        if (& $Condition) { return }
-        Start-Sleep -Milliseconds 200
-    } while ([DateTime]::UtcNow -lt $deadline)
-    throw $FailureMessage
-}
-
+$probeProject = Join-Path $smokeRoot 'ShellProbe\ShellProbe.csproj'
+$probe = Join-Path $smokeRoot 'ShellProbe\bin\Debug\net10.0-windows10.0.19041.0\ShellProbe.exe'
+$previousDataRoot = [Environment]::GetEnvironmentVariable('FOCUSKEY_DATA_ROOT', 'Process'); $process = $null
+function Wait-Until([scriptblock]$Condition, [int]$TimeoutSeconds, [string]$Message) { $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds); do { if (& $Condition) { return }; Start-Sleep -Milliseconds 200 } while ([DateTime]::UtcNow -lt $deadline); throw $Message }
 function Read-Log { if (Test-Path -LiteralPath $logFile) { [string](Get-Content -LiteralPath $logFile -Raw) } else { [string]'' } }
-
-function Get-NewLog([string] $before) {
-    $after = Read-Log
-    if ($after.Length -lt $before.Length) { throw 'The runtime log was truncated during the smoke run.' }
-    return $after.Substring($before.Length)
-}
-
-function Assert-Database {
-    if (-not (Test-Path -LiteralPath $databaseFile -PathType Leaf)) { throw "Database was not created: $databaseFile" }
-    $bytes = New-Object byte[] 64
-    $stream = [IO.File]::OpenRead($databaseFile)
-    try { if ($stream.Read($bytes, 0, 64) -ne 64) { throw "Database is truncated: $databaseFile" } }
-    finally { $stream.Dispose() }
-    $header = [Text.Encoding]::ASCII.GetString($bytes, 0, 15)
-    if ($header -ne 'SQLite format 3') { throw "Database is not a SQLite file: $databaseFile" }
-    $schemaVersion = ([int64]$bytes[60] * 16777216) + ([int64]$bytes[61] * 65536) + ([int64]$bytes[62] * 256) + $bytes[63]
-    if ($schemaVersion -ne $expectedSchema) { throw "Database header reports schema version $schemaVersion instead of $expectedSchema." }
-}
-
-function Invoke-Run($label) {
-    Show-Header "RUN ${label}: LAUNCH"
-    $logBefore = Read-Log
-    $process = Start-Process -FilePath $exe -WorkingDirectory $projectRoot -WindowStyle Hidden -PassThru
-    try {
-        Wait-Until { $process.Refresh(); if ($process.HasExited) { throw "Run $label exited early with code $($process.ExitCode)." }; $process.MainWindowHandle -ne 0 } 30 "Run $label did not create a ready window within 30 seconds."
-        Wait-Until { $process.Refresh(); if ($process.HasExited) { throw "Run $label exited during initialization with code $($process.ExitCode)." }; (Get-NewLog $logBefore) -match 'Foundation initialization complete\.' } 30 "Run $label did not complete foundation initialization within 30 seconds."
-        $process.Refresh()
-        if (-not $process.Responding -or $process.MainWindowTitle -ne 'Focus Key') { throw "Run $label window was not responsive or had unexpected title '$($process.MainWindowTitle)'." }
-
-        Write-Output "process id            : $($process.Id)"
-        Write-Output "responding            : $($process.Responding)"
-        Write-Output "main window title     : '$($process.MainWindowTitle)'"
-
-        Show-Header "RUN ${label}: SHUTDOWN"
-        if (-not $process.CloseMainWindow()) { throw "Run $label could not send a close request." }
-        if (-not $process.WaitForExit(20000)) { throw "Run $label did not exit within 20 seconds." }
-        if ($process.ExitCode -ne 0) { throw "Run $label exited with code $($process.ExitCode)." }
-        $logAfterClose = Get-NewLog $logBefore
-        if ($logAfterClose -notmatch "Database ready at schema version $expectedSchema\." -or
-            $logAfterClose -notmatch 'Placeholder window displayed\.' -or
-            $logAfterClose -notmatch 'Session startup recovery: NoActiveSession\.' -or
-            $logAfterClose -notmatch 'Session shutdown: NoActiveSession\.') {
-            throw "Run $label did not confirm the current schema and placeholder window."
-        }
-        if ($logAfterClose -notmatch 'Main window closed\. Focus Key shutting down\.') { throw "Run $label did not report clean shutdown." }
-        $script:RunLogAfter = $logAfterClose
-        Write-Output "exit code             : $($process.ExitCode)"
-    } finally {
-        if (-not $process.HasExited) { $process.CloseMainWindow() | Out-Null; $process.WaitForExit(5000) }
-        $process.Dispose()
-    }
-}
-
+function Invoke-Probe([string[]]$Arguments) { & $probe @Arguments; if ($LASTEXITCODE -ne 0) { throw "ShellProbe $($Arguments -join ' ') failed with exit code $LASTEXITCODE." } }
+function Assert-Database { if (-not (Test-Path -LiteralPath $databaseFile -PathType Leaf)) { throw "Database was not created: $databaseFile" }; $bytes = New-Object byte[] 64; $stream = [IO.File]::Open($databaseFile, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite); try { if ($stream.Read($bytes, 0, 64) -ne 64) { throw 'Database is truncated.' } } finally { $stream.Dispose() }; if ([Text.Encoding]::ASCII.GetString($bytes, 0, 15) -ne 'SQLite format 3') { throw 'Database is not SQLite.' }; $version = ([int64]$bytes[60] * 16777216) + ([int64]$bytes[61] * 65536) + ([int64]$bytes[62] * 256) + $bytes[63]; if ($version -ne 2) { throw "Database schema version is $version, expected 2." } }
 try {
-    $env:FOCUSKEY_DATA_ROOT = $dataRoot
-    Invoke-Run '1'
-    Assert-Database
-    if ($RunLogAfter -notmatch 'Applied database migration 1 \(schema_metadata\)\.' -or
-        $RunLogAfter -notmatch 'Applied database migration 2 \(sessions\)\.') {
-        throw 'Run 1 did not apply both expected schema migrations on the fresh data root.'
-    }
-
-    Invoke-Run '2'
-    Assert-Database
-    if ($RunLogAfter -match 'Applied database migration') {
-        throw 'Run 2 applied a migration; initialization was not idempotent.'
-    }
+    if ([string]::IsNullOrWhiteSpace($DataRootName) -or [IO.Path]::IsPathRooted($DataRootName) -or $DataRootName -match '(^|[\\/])\.\.([\\/]|$)') { throw 'DataRootName must be a relative child of .smoke.' }
+    $dataRoot = [IO.Path]::GetFullPath((Join-Path $smokeRoot $DataRootName)); $prefix = $smokeRoot.TrimEnd('\','/') + [IO.Path]::DirectorySeparatorChar
+    if (-not $dataRoot.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase) -or (Test-Path -LiteralPath $dataRoot)) { throw "Smoke data root must be fresh and contained: $dataRoot" }
+    if (Get-Process -Name FocusKey -ErrorAction SilentlyContinue) { throw 'An existing FocusKey process is running; exit it before this smoke test.' }
+    if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { throw "Executable not found: $exe" }
+    dotnet build $probeProject --no-restore; if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $probe -PathType Leaf)) { throw 'ShellProbe build failed or executable is missing.' }
+    & $probe hotkey-free; if ($LASTEXITCODE -ne 0) { throw 'Shift+F3 is already held by another application.' }
+    $logFile = Join-Path $dataRoot 'logs\focus_key.log'; $databaseFile = Join-Path $dataRoot 'focus_key.db'; $env:FOCUSKEY_DATA_ROOT = $dataRoot
+    $process = Start-Process -FilePath $exe -WorkingDirectory $projectRoot -WindowStyle Hidden -PassThru
+    Wait-Until { $process.Refresh(); -not $process.HasExited -and $process.MainWindowHandle -ne 0 } 30 'Focus Key did not create a ready window.'
+    Wait-Until { (Read-Log) -match 'Foundation initialization complete\.' } 30 'Foundation did not initialize.'
+    Wait-Until { (Read-Log) -match 'Shell ready: tray added; Shift \+ F3 registered\.' } 30 'Shell did not become ready.'
+    if ((Read-Log) -notmatch 'Database ready at schema version 2\.' -or (Read-Log) -notmatch 'Session startup recovery: NoActiveSession\.') { throw 'First launch did not confirm schema and startup recovery.' }
+    Invoke-Probe -Arguments @('probe', [string]$process.Id)
+    # The on-disk header can lag committed schema changes while WAL is open.
+    # Check it after graceful exit/checkpoint; live schema is verified by bootstrap logs.
+    if ((Read-Log) -notmatch 'Applied database migration 1 \(schema_metadata\)\.' -or (Read-Log) -notmatch 'Applied database migration 2 \(sessions\)\.') { throw 'Fresh database did not apply both expected migrations.' }
+    $beforeHide = Read-Log; if (-not $process.CloseMainWindow()) { throw 'Could not request window close.' }
+    Wait-Until { (Read-Log).Length -gt $beforeHide.Length -and (Read-Log) -match 'Main window hidden; shell remains running\.' } 10 'Window close was not converted to hide.'
+    $process.Refresh(); if ($process.HasExited) { throw 'Process exited when main window was closed.' }; Invoke-Probe -Arguments @('open', [string]$process.Id)
+    Wait-Until { (Read-Log) -match 'Shell activation: ShowWindow\.' } 10 'ShowWindow activation was not logged.'
+    $competingRoot = Join-Path $smokeRoot ("$DataRootName-competing"); if (Test-Path -LiteralPath $competingRoot) { throw "Competing root already exists: $competingRoot" }
+    $psi = [Diagnostics.ProcessStartInfo]::new($exe); $psi.WorkingDirectory = $projectRoot; $psi.WindowStyle = 'Hidden'; $psi.UseShellExecute = $false; $psi.Environment['FOCUSKEY_DATA_ROOT'] = $competingRoot
+    $competing = [Diagnostics.Process]::Start($psi); if (-not $competing.WaitForExit(30000)) { throw 'Competing process did not exit.' }; if ($competing.ExitCode -ne 0) { throw "Competing process exited with $($competing.ExitCode)." }; $competing.Dispose()
+    if (Test-Path -LiteralPath $competingRoot) { throw 'Competing launch created a data root.' }; $process.Refresh(); if ($process.HasExited) { throw 'Owner exited after competing launch.' }
+    Invoke-Probe -Arguments @('exit', [string]$process.Id); if (-not $process.WaitForExit(30000)) { throw 'Explicit shell exit did not complete.' }; if ($process.ExitCode -ne 0) { throw "Owner exited with $($process.ExitCode)." }
+    $finalLog = Read-Log; if ($finalLog -notmatch 'Session shutdown: NoActiveSession\.' -or $finalLog -notmatch 'Shell stopped: tray removed; hotkey unregistered\.' -or $finalLog -notmatch 'Main window closed\. Focus Key shutting down\.') { throw 'Clean shell shutdown was not confirmed in the log.' }
+    & $probe hotkey-free; if ($LASTEXITCODE -ne 0) { throw 'Shift+F3 remained registered after shutdown.' }; Assert-Database
+    $secondStart = Read-Log
+    $process.Dispose()
+    $process = Start-Process -FilePath $exe -WorkingDirectory $projectRoot -WindowStyle Hidden -PassThru
+    Wait-Until { $process.Refresh(); -not $process.HasExited -and $process.MainWindowHandle -ne 0 } 30 'Second launch did not create a ready window.'
+    Wait-Until { (Read-Log).Substring($secondStart.Length) -match 'Shell ready: tray added; Shift \+ F3 registered\.' } 30 'Second launch did not become ready.'
+    Invoke-Probe -Arguments @('probe', [string]$process.Id); Invoke-Probe -Arguments @('exit', [string]$process.Id)
+    if (-not $process.WaitForExit(30000)) { throw 'Second launch did not exit.' }; if ($process.ExitCode -ne 0) { throw "Second launch exited with $($process.ExitCode)." }
+    $secondLog = (Read-Log).Substring($secondStart.Length)
+    if ($secondLog -match 'Applied database migration') { throw 'Second launch applied a migration; initialization was not idempotent.' }
+    if ($secondLog -notmatch 'Session shutdown: NoActiveSession\.' -or $secondLog -notmatch 'Shell stopped: tray removed; hotkey unregistered\.') { throw 'Second launch did not confirm clean shell shutdown.' }
+    Invoke-Probe -Arguments @('hotkey-free'); Assert-Database
+    Write-Output "PASS: native shell API smoke, two clean launches. Isolated data root: $dataRoot"
 }
-finally {
-    if ($null -eq $previousDataRoot) { Remove-Item Env:FOCUSKEY_DATA_ROOT -ErrorAction SilentlyContinue }
-    else { $env:FOCUSKEY_DATA_ROOT = $previousDataRoot }
-}
-
-Show-Header 'FINAL STATE'
-Write-Output "database file exists  : $(Test-Path -LiteralPath $databaseFile)"
-Write-Output "isolated data root    : $dataRoot"
+finally { if ($null -ne $process) { $process.Refresh(); if (-not $process.HasExited) { try { Invoke-Probe -Arguments @('exit', [string]$process.Id); $process.WaitForExit(10000) | Out-Null } catch { } }; $process.Dispose() }; if ($null -eq $previousDataRoot) { Remove-Item Env:FOCUSKEY_DATA_ROOT -ErrorAction SilentlyContinue } else { $env:FOCUSKEY_DATA_ROOT = $previousDataRoot } }

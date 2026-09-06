@@ -216,6 +216,44 @@ public sealed class QuickOverlayControllerTests
         read.SetResult(null); await activation; Assert.Equal(1, view.HideCount);
     }
 
+    [Fact]
+    public async Task RefreshWhenHiddenDoesNotCreateViewOrRead()
+    {
+        var view = new FakeView(); int creates = 0; int reads = 0;
+        using var controller = New(view, create: () => { creates++; return view; }, getActive: _ => { reads++; return Task.FromResult<SessionSnapshot?>(null); });
+        await controller.RefreshIfVisibleAsync();
+        Assert.Equal(0, creates); Assert.Equal(0, reads);
+    }
+
+    [Fact]
+    public async Task RefreshAfterCompletionClearsRunningFeedback()
+    {
+        var view = new FakeView(); int reads = 0;
+        using var controller = New(view, getActive: _ => Task.FromResult<SessionSnapshot?>(reads++ == 0 ? SessionSnapshot.For(TestSessions.Running(), TestSessions.Anchor) : null));
+        await controller.HandleActivationAsync(ShellActivationKind.Hotkey);
+        Assert.Contains("already running", view.LastState.Feedback);
+        await controller.RefreshIfVisibleAsync();
+        Assert.True(view.LastState.CanStart);
+        Assert.Null(view.LastState.Feedback);
+    }
+
+    [Fact]
+    public async Task StaleRefreshCannotOverwriteDismissalAndReopen()
+    {
+        var view = new FakeView();
+        var stale = new TaskCompletionSource<SessionSnapshot?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        int reads = 0;
+        using var controller = New(view, getActive: _ => ++reads == 1 ? Task.FromResult<SessionSnapshot?>(SessionSnapshot.For(TestSessions.Running(), TestSessions.Anchor)) : reads == 2 ? stale.Task : Task.FromResult<SessionSnapshot?>(null));
+        await controller.HandleActivationAsync(ShellActivationKind.Hotkey);
+        Task refresh = controller.RefreshIfVisibleAsync();
+        view.RaiseDismiss();
+        await controller.HandleActivationAsync(ShellActivationKind.Hotkey);
+        stale.SetResult(SessionSnapshot.For(TestSessions.Running(type: SessionType.Break), TestSessions.Anchor));
+        await refresh;
+        Assert.True(view.LastState.CanStart);
+        Assert.Null(view.LastState.Feedback);
+    }
+
     private static QuickOverlayController New(FakeView view, Func<IQuickOverlayView>? create = null, Func<CancellationToken, Task<SessionSnapshot?>>? getActive = null, Func<SessionType, CancellationToken, Task<SessionRecord>>? start = null) =>
         new(create ?? (() => view), getActive ?? (_ => Task.FromResult<SessionSnapshot?>(null)), start ?? ((type, _) => Task.FromResult(TestSessions.Running(type: type))));
 

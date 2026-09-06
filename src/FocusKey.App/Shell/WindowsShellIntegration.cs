@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using FocusKey.Foundation.Shell;
+using FocusKey.Foundation.Sessions;
 
 namespace FocusKey.Shell;
 
@@ -15,6 +16,7 @@ internal sealed class WindowsShellIntegration : IShellIntegration
     private IntPtr _instance;
     private IntPtr _window;
     private IntPtr _icon;
+    private IntPtr _powerRegistration;
     private bool _classRegistered;
     private bool _trayAdded;
     private bool _hotkeyRegistered;
@@ -27,6 +29,21 @@ internal sealed class WindowsShellIntegration : IShellIntegration
     public event Action<ShellActivationKind>? ActivationRequested;
     public event Action? ExitRequested;
     public event Action<Exception>? ErrorOccurred;
+    public event Action? ClockChangedOrResumed;
+
+    // Use the existing notification-area identity. Windows supplies its standard quiet sound
+    // and owns banner styling, dismissal, and user notification suppression settings.
+    public void NotifyCompleted(SessionRecord session)
+    {
+        if (session.Status != SessionStatus.Completed) throw new ArgumentException("Only completed sessions may notify.", nameof(session));
+        if (!_started || _disposed) throw new InvalidOperationException("The Windows shell is not running.");
+        var data = TrayData(NativeMethods.NIF_INFO);
+        data.szInfoTitle = "Focus Key";
+        data.szInfo = session.Type == SessionType.Work ? "Work session completed." : "Break session completed.";
+        data.dwInfoFlags = NativeMethods.NIIF_INFO | NativeMethods.NIIF_RESPECT_QUIET_TIME;
+        if (!NativeMethods.Shell_NotifyIcon(NativeMethods.NIM_MODIFY, ref data))
+            throw LastError("Could not submit the session completion notification.");
+    }
 
     public void Start()
     {
@@ -50,6 +67,8 @@ internal sealed class WindowsShellIntegration : IShellIntegration
             _window = NativeMethods.CreateWindowEx(NativeMethods.WS_EX_TOOLWINDOW, _className, "Focus Key", NativeMethods.WS_POPUP,
                 0, 0, 0, 0, IntPtr.Zero, IntPtr.Zero, _instance, IntPtr.Zero);
             if (_window == IntPtr.Zero) throw LastError("Could not create the shell window.");
+            _powerRegistration = NativeMethods.RegisterSuspendResumeNotification(_window, 0); // DEVICE_NOTIFY_WINDOW_HANDLE
+            if (_powerRegistration == IntPtr.Zero) throw LastError("Could not subscribe to system resume notifications.");
             if (!NativeMethods.RegisterHotKey(_window, HotkeyId, NativeMethods.MOD_SHIFT | NativeMethods.MOD_NOREPEAT, NativeMethods.VK_F3))
                 throw new Win32Exception(Marshal.GetLastWin32Error(), "Could not register Shift+F3 global hotkey; it may already be in use by another application.");
             _hotkeyRegistered = true;
@@ -64,7 +83,7 @@ internal sealed class WindowsShellIntegration : IShellIntegration
         if (_disposed) return;
         _disposed = true;
         Rollback();
-        ActivationRequested = null; ExitRequested = null; ErrorOccurred = null;
+        ActivationRequested = null; ExitRequested = null; ErrorOccurred = null; ClockChangedOrResumed = null;
     }
 
     private void AddTrayIcon()
@@ -92,6 +111,14 @@ internal sealed class WindowsShellIntegration : IShellIntegration
         {
             // This instance delegate is rooted for the entire native window lifetime.
             if (_disposed) return NativeMethods.DefWindowProc(hwnd, message, wParam, lParam);
+            // Broadcasts reach this existing top-level shell window even when all UI is hidden.
+            // Re-evaluate UTC deadlines after a clock change or an automatic/user resume.
+            if (message == NativeMethods.WM_TIMECHANGE || (message == NativeMethods.WM_POWERBROADCAST &&
+                wParam.ToInt64() is NativeMethods.PBT_APMRESUMESUSPEND or NativeMethods.PBT_APMRESUMEAUTOMATIC))
+            {
+                ClockChangedOrResumed?.Invoke();
+                return message == NativeMethods.WM_POWERBROADCAST ? (IntPtr)1 : IntPtr.Zero;
+            }
             if (message == _taskbarCreated && _started) { AddTrayIcon(); return IntPtr.Zero; }
             if (message == NativeMethods.WM_HOTKEY && wParam.ToInt64() == HotkeyId) { RaiseActivation(ShellActivationKind.Hotkey); return IntPtr.Zero; }
             if (message == TrayCallback)
@@ -140,6 +167,8 @@ internal sealed class WindowsShellIntegration : IShellIntegration
     private static Win32Exception LastError(string message) => new(Marshal.GetLastWin32Error(), message);
     private void Rollback()
     {
+        if (_powerRegistration != IntPtr.Zero) NativeMethods.UnregisterSuspendResumeNotification(_powerRegistration);
+        _powerRegistration = IntPtr.Zero;
         if (_hotkeyRegistered && _window != IntPtr.Zero) NativeMethods.UnregisterHotKey(_window, HotkeyId);
         _hotkeyRegistered = false;
         if (_trayAdded && _window != IntPtr.Zero)

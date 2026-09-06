@@ -76,6 +76,21 @@ public sealed class QuickOverlayController : IDisposable
         SetState(_state with { Selected = type });
     }
 
+    /// <summary>Refresh existing Running feedback after completion without opening a hidden view.</summary>
+    public async Task RefreshIfVisibleAsync()
+    {
+        if (_disposed || !_visible || _starting) return;
+        int observation = ++_observation;
+        try
+        {
+            SessionSnapshot? active = await _getActive(CancellationToken.None);
+            if (IsCurrent(observation) && !_starting)
+                SetState(new(_state.Selected, false, active is null,
+                    active is null ? null : $"A {active.Type.ToString().ToLowerInvariant()} session is already running."));
+        }
+        catch (Exception exception) { ErrorOccurred?.Invoke(exception); }
+    }
+
     public async Task StartAsync()
     {
         if (_disposed || !_visible || _starting || !_state.CanStart || _state.IsBusy) return;

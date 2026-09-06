@@ -10,6 +10,10 @@ internal static class NativeMethods
     internal const int WM_HOTKEY = 0x0312;
     internal const int WM_CONTEXTMENU = 0x007B;
     internal const int WM_NULL = 0x0000;
+    internal const int WM_TIMECHANGE = 0x001E;
+    internal const int WM_POWERBROADCAST = 0x0218;
+    internal const int PBT_APMRESUMESUSPEND = 7;
+    internal const int PBT_APMRESUMEAUTOMATIC = 18;
     internal const int NIN_SELECT = 0x0400;
     internal const int NIN_KEYSELECT = 0x0401;
     internal const int WM_LBUTTONUP = 0x0202;
@@ -21,8 +25,12 @@ internal static class NativeMethods
     internal const uint NIF_MESSAGE = 0x00000001;
     internal const uint NIF_ICON = 0x00000002;
     internal const uint NIF_TIP = 0x00000004;
+    internal const uint NIF_INFO = 0x00000010;
+    internal const uint NIIF_INFO = 0x00000001;
+    internal const uint NIIF_RESPECT_QUIET_TIME = 0x00000080;
     internal const uint NIF_SHOWTIP = 0x00000080;
     internal const uint NIM_ADD = 0x00000000;
+    internal const uint NIM_MODIFY = 0x00000001;
     internal const uint NIM_DELETE = 0x00000002;
     internal const uint NIM_SETVERSION = 0x00000004;
     internal const uint NIM_SETVERSION4 = 4;
@@ -84,6 +92,8 @@ internal static class NativeMethods
     internal static extern IntPtr CreateWindowEx(uint exStyle, string className, string windowName, uint style,
         int x, int y, int width, int height, IntPtr parent, IntPtr menu, IntPtr instance, IntPtr param);
     [DllImport("user32.dll", SetLastError = true)] internal static extern bool DestroyWindow(IntPtr window);
+    [DllImport("user32.dll", SetLastError = true)] internal static extern IntPtr RegisterSuspendResumeNotification(IntPtr recipient, uint flags);
+    [DllImport("user32.dll", SetLastError = true)] internal static extern bool UnregisterSuspendResumeNotification(IntPtr handle);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] internal static extern IntPtr DefWindowProc(IntPtr hWnd, uint message, IntPtr wParam, IntPtr lParam);
     [DllImport("user32.dll", SetLastError = true)] internal static extern IntPtr SetWindowLongPtr(IntPtr hWnd, uint index, IntPtr value);
     [DllImport("user32.dll", SetLastError = true)] internal static extern IntPtr GetWindowLongPtr(IntPtr hWnd, uint index);

@@ -23,6 +23,8 @@ public partial class App : Application
     private BackgroundShell? _shell;
     private InstanceActivationSignal? _activationSignal;
     private QuickOverlayController? _quickOverlay;
+    private CompletionCoordinator? _completion;
+    private bool _isExiting;
 
     public App()
     {
@@ -53,25 +55,31 @@ public partial class App : Application
             }
 
             _startup = await FoundationBootstrap.RunAsync();
-            _quickOverlay = new QuickOverlayController(() => new QuickOverlayWindow(),
-                _startup.Sessions.GetActiveAsync, _startup.Sessions.StartAsync);
-            _quickOverlay.ErrorOccurred += exception => _startup?.Logger.Error("Quick overlay operation failed.", exception);
             _startup.Logger.Info("Single-instance shell ownership acquired.");
             _window = new MainWindow(_startup);
             _window.ExitRequested += OnExplicitExitRequested;
             _window.AppWindow.Closing += OnAppWindowClosing;
             _window.Closed += OnMainWindowClosed;
-            _shell = new BackgroundShell(new WindowsShellIntegration(), ShutdownSessionsAsync);
+            var integration = new WindowsShellIntegration();
+            _completion = new CompletionCoordinator(_startup.Sessions, session => NotifyCompletedAsync(integration, session),
+                exception => _startup?.Logger.Error("Completion coordination failed.", exception));
+            integration.ClockChangedOrResumed += _completion.RequestEvaluation;
+            _quickOverlay = new QuickOverlayController(() => new QuickOverlayWindow(),
+                _startup.Sessions.GetActiveAsync, _completion.StartAsync);
+            _quickOverlay.ErrorOccurred += exception => _startup?.Logger.Error("Quick overlay operation failed.", exception);
+            _shell = new BackgroundShell(integration, ShutdownSessionsAsync);
             _shell.ActivationRequested += OnShellActivation;
             _shell.ErrorOccurred += OnShellError;
             _shell.Exited += OnShellExited;
             _shell.Start();
+            await _completion.EvaluateAsync();
             _activationSignal.Listen(_window.DispatcherQueue, () => _shell.RequestActivation(ShellActivationKind.ShowWindow));
             _startup.Logger.Info("Shell ready: tray added; Shift + F3 registered.");
             _window.Activate();
         }
         catch (Exception exception)
         {
+            _completion?.Dispose();
             _shell?.Dispose();
             _activationSignal?.Dispose();
             _startup?.Dispose();
@@ -122,8 +130,32 @@ public partial class App : Application
     {
         _quickOverlay?.Dismiss();
         if (_startup is null) return;
-        SessionRecoveryResult result = await _startup.Sessions.ShutdownAsync();
-        _startup.Logger.Info($"Session shutdown: {result.Kind}.");
+        _isExiting = true;
+        try
+        {
+            SessionRecoveryResult result = _completion is not null
+                ? await _completion.ShutdownAsync()
+                : await _startup.Sessions.ShutdownAsync();
+            _startup.Logger.Info($"Session shutdown: {result.Kind}.");
+        }
+        catch { _isExiting = false; throw; }
+    }
+
+    private Task NotifyCompletedAsync(WindowsShellIntegration integration, SessionRecord session)
+    {
+        var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        if (_window is null || !_window.DispatcherQueue.TryEnqueue(async () =>
+        {
+            try
+            {
+                integration.NotifyCompleted(session);
+                _startup?.Logger.Info($"Completion notification submitted: {session.Id} {session.Type}; ended={session.EndedAt:O}.");
+                if (!_isExiting && _quickOverlay is not null) await _quickOverlay.RefreshIfVisibleAsync();
+                done.SetResult();
+            }
+            catch (Exception exception) { done.SetException(exception); }
+        })) done.SetException(new InvalidOperationException("Cannot dispatch completion notification to the Windows shell."));
+        return done.Task;
     }
 
     private void OnShellError(Exception exception)
@@ -163,6 +195,7 @@ public partial class App : Application
 
     private void ReleaseResources()
     {
+        _completion?.Dispose();
         _quickOverlay?.Dispose();
         _shell?.Dispose();
         _activationSignal?.Dispose();

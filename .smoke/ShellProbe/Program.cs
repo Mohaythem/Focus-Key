@@ -31,6 +31,9 @@ internal static class ShellProbe
                 "hold-hotkey" => HoldHotkey(),
                 "seed" => await SeedAsync(args),
                 "inspect" => await InspectAsync(args),
+                "start-short" => await StartShortAsync(args),
+                "reevaluate" => PostClockSignal(ParsePid(args), false),
+                "resume" => PostClockSignal(ParsePid(args), true),
                 _ => Usage(),
             };
         }
@@ -115,6 +118,38 @@ internal static class ShellProbe
         return 0;
     }
 
+    private static async Task<int> StartShortAsync(string[] args)
+    {
+        if (args.Length != 5 || !int.TryParse(args[1], out int pid) || pid <= 0 ||
+            !int.TryParse(args[4], out int seconds) || seconds is < 1 or > 120 ||
+            args[3] is not ("work" or "break"))
+            throw new ArgumentException("Usage: start-short <pid> <dataRoot> <work|break> <seconds 1..120>");
+        AppPaths paths = GuardedPaths(args[2]);
+        if (!File.Exists(paths.DatabaseFile) || !File.Exists(paths.LogFile))
+            throw new ArgumentException("Use an existing isolated smoke data root.");
+        using var logStream = new FileStream(paths.LogFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        using var logReader = new StreamReader(logStream);
+        if (!logReader.ReadToEnd().Contains($"(process {pid}).", StringComparison.Ordinal))
+            throw new ArgumentException("Use the existing isolated data root belonging to the running smoke app.");
+        if (FindWindows(pid).Count != 1) throw new InvalidOperationException("Expected one live Focus Key shell window.");
+        var repository = new SqliteSessionRepository(new SqliteConnectionFactory(paths.DatabaseFile));
+        var duration = TimeSpan.FromSeconds(seconds);
+        var engine = new SessionEngine(repository, TimeProvider.System, new SessionDurations(duration, duration));
+        var session = await engine.StartAsync(args[3] == "work" ? SessionType.Work : SessionType.Break);
+        Console.WriteLine($"{session.Id} {session.Type} started={session.StartedAt:O} plannedEnd={session.PlannedEndAt:O}");
+        return PostClockSignal(pid, false);
+    }
+
+    private static int PostClockSignal(int pid, bool resume)
+    {
+        var windows = FindWindows(pid);
+        if (windows.Count != 1) throw new InvalidOperationException("Expected one Focus Key shell window.");
+        if (!PostMessage(windows[0], resume ? 0x0218u : 0x001Eu, resume ? (IntPtr)18 : IntPtr.Zero, IntPtr.Zero))
+            throw LastError("Could not post completion evaluation signal.");
+        Console.WriteLine($"posted {(resume ? "resume" : "clock-change")} pid={pid}");
+        return 0;
+    }
+
     private static AppPaths GuardedPaths(string root)
     {
         string baseRoot = Path.GetFullPath(@"D:\Focus Key\.smoke");
@@ -124,7 +159,7 @@ internal static class ShellProbe
     }
     private static DateTimeOffset WholeSecond(DateTimeOffset value) => new(value.Ticks - value.Ticks % TimeSpan.TicksPerSecond, TimeSpan.Zero);
     private static int ParsePid(string[] args) => args.Length == 2 && int.TryParse(args[1], out int pid) && pid > 0 ? pid : throw new ArgumentException("Usage: <probe|open|exit> <pid>");
-    private static int Usage() { Console.Error.WriteLine("Usage: probe|open|exit <pid> | hotkey-free | hold-hotkey | seed <dataRoot> <future|due> | inspect <dataRoot>"); return 2; }
+    private static int Usage() { Console.Error.WriteLine("Usage: probe|open|exit|reevaluate|resume <pid> | hotkey-free | hold-hotkey | seed <dataRoot> <future|due> | inspect <dataRoot> | start-short <pid> <dataRoot> <work|break> <seconds 1..120>"); return 2; }
     private static Win32Exception LastError(string message) => new(Marshal.GetLastWin32Error(), message);
 
     private static List<IntPtr> FindWindows(int pid)

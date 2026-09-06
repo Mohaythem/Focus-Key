@@ -128,7 +128,11 @@ The default/legacy database, `Focus Key.md`, `Focus Key.zip`, and `chat_history.
 
 ## Git delivery
 
-Implementation commit and verified remote SHA will be recorded after the authorized push.
+Implementation commit: `7361859d8b42305614d98e7ce301e19f58f061bf`
+(`Implement Phase 6 completion coordination and notifications`). Pushed to
+`origin/native/phased-rewrite`; `git ls-remote origin refs/heads/native/phased-rewrite`
+verified that exact remote SHA on 2026-09-06. This delivery record is a documentation-only
+follow-up commit.
 Only reviewed source, tests, smoke scripts, and documentation are included. No database, log,
 build output, or other local verification artifact is committed.
 

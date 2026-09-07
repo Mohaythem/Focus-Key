@@ -11,6 +11,7 @@ public sealed class QuickOverlayController : IDisposable
 {
     private readonly Func<IQuickOverlayView> _createView;
     private readonly Func<CancellationToken, Task<SessionSnapshot?>> _getActive;
+    private readonly Func<CancellationToken, Task<SessionDurations>> _getDurations;
     private readonly Func<SessionType, CancellationToken, Task<SessionRecord>> _start;
     private IQuickOverlayView? _view;
     private bool _visible;
@@ -21,13 +22,16 @@ public sealed class QuickOverlayController : IDisposable
 
     public QuickOverlayController(Func<IQuickOverlayView> createView,
         Func<CancellationToken, Task<SessionSnapshot?>> getActive,
+        Func<CancellationToken, Task<SessionDurations>> getDurations,
         Func<SessionType, CancellationToken, Task<SessionRecord>> start)
     {
         ArgumentNullException.ThrowIfNull(createView);
         ArgumentNullException.ThrowIfNull(getActive);
+        ArgumentNullException.ThrowIfNull(getDurations);
         ArgumentNullException.ThrowIfNull(start);
         _createView = createView;
         _getActive = getActive;
+        _getDurations = getDurations;
         _start = start;
     }
 
@@ -47,6 +51,7 @@ public sealed class QuickOverlayController : IDisposable
         {
             _visible = true;
             _view.ShowAndFocus();
+            if (!_starting && !_state.IsBusy) await RefreshIfVisibleAsync();
             return;
         }
 
@@ -56,10 +61,11 @@ public sealed class QuickOverlayController : IDisposable
         _view.ShowAndFocus();
         try
         {
-            SessionSnapshot? active = await _getActive(CancellationToken.None);
+            (SessionSnapshot? active, SessionDurations durations) = await ReadStateAsync();
             if (!IsCurrent(observation)) return;
             SetState(new(SessionType.Work, false, active is null,
-                active is null ? null : $"A {active.Type.ToString().ToLowerInvariant()} session is already running."));
+                active is null ? null : $"A {active.Type.ToString().ToLowerInvariant()} session is already running.")
+                { Durations = durations });
         }
         catch (Exception exception)
         {
@@ -83,10 +89,11 @@ public sealed class QuickOverlayController : IDisposable
         int observation = ++_observation;
         try
         {
-            SessionSnapshot? active = await _getActive(CancellationToken.None);
+            (SessionSnapshot? active, SessionDurations durations) = await ReadStateAsync();
             if (IsCurrent(observation) && !_starting)
                 SetState(new(_state.Selected, false, active is null,
-                    active is null ? null : $"A {active.Type.ToString().ToLowerInvariant()} session is already running."));
+                    active is null ? null : $"A {active.Type.ToString().ToLowerInvariant()} session is already running.")
+                    { Durations = durations });
         }
         catch (Exception exception) { ErrorOccurred?.Invoke(exception); }
     }
@@ -124,6 +131,14 @@ public sealed class QuickOverlayController : IDisposable
     }
 
     private async void OnStartRequested() => await StartAsync();
+    private async Task<(SessionSnapshot? Active, SessionDurations Durations)> ReadStateAsync()
+    {
+        Task<SessionSnapshot?> active = _getActive(CancellationToken.None);
+        Task<SessionDurations> durations = _getDurations(CancellationToken.None);
+        await Task.WhenAll(active, durations);
+        return (await active, await durations);
+    }
+
     private bool IsCurrent(int observation) => !_disposed && _visible && observation == _observation;
     private void SetState(QuickOverlayState state)
     {

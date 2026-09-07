@@ -7,6 +7,16 @@ namespace FocusKey.Foundation.Tests.Overlay;
 
 public sealed class QuickOverlayControllerTests
 {
+    [Theory]
+    [InlineData(null, "--:--")]
+    [InlineData(19, "0:19")]
+    [InlineData(600, "10:00")]
+    [InlineData(2825, "47:05")]
+    [InlineData(5415, "1:30:15")]
+    public void DurationFormatterDisplaysCurrentWholeSecondValue(int? seconds, string expected) =>
+        Assert.Equal(expected, QuickOverlayDurationFormatter.Format(
+            seconds is null ? null : TimeSpan.FromSeconds(seconds.Value)));
+
     [Fact]
     public async Task HotkeyCreatesAndShowsOneView_AndShowWindowIsIgnored()
     {
@@ -19,7 +29,8 @@ public sealed class QuickOverlayControllerTests
         await controller.HandleActivationAsync(ShellActivationKind.Hotkey);
         Assert.Equal(1, creates);
         Assert.Equal(1, view.ShowCount);
-        Assert.Equal(new(SessionType.Work, false, true, null), view.LastState);
+        Assert.Equal(new QuickOverlayState(SessionType.Work, false, true, null)
+            { Durations = SessionDurations.Default }, view.LastState);
     }
 
     [Fact]
@@ -145,7 +156,8 @@ public sealed class QuickOverlayControllerTests
         Task second = controller.HandleActivationAsync(ShellActivationKind.Hotkey); await view.WaitFor(s => s.IsBusy);
         newRead.SetResult(null); await second;
         oldRead.SetResult(SessionSnapshot.For(TestSessions.Running(type: SessionType.Break), TestSessions.Anchor)); await first;
-        Assert.Equal(new(SessionType.Work, false, true, null), view.LastState);
+        Assert.Equal(new QuickOverlayState(SessionType.Work, false, true, null)
+            { Durations = SessionDurations.Default }, view.LastState);
     }
 
     [Fact]
@@ -238,6 +250,43 @@ public sealed class QuickOverlayControllerTests
     }
 
     [Fact]
+    public async Task ActivationDisplaysCurrentDurationsAndRefreshObservesRuntimeChanges()
+    {
+        var view = new FakeView();
+        SessionDurations current = new(TimeSpan.FromMinutes(42), TimeSpan.FromSeconds(95));
+        int reads = 0;
+        using var controller = New(view, getDurations: _ =>
+        {
+            reads++;
+            return Task.FromResult(current);
+        });
+
+        await controller.HandleActivationAsync(ShellActivationKind.Hotkey);
+        Assert.Equal(current, view.LastState.Durations);
+
+        current = new SessionDurations(TimeSpan.FromMinutes(55), TimeSpan.FromMinutes(8));
+        await controller.RefreshIfVisibleAsync();
+
+        Assert.Equal(current, view.LastState.Durations);
+        Assert.Equal(2, reads);
+    }
+
+    [Fact]
+    public async Task RepeatedHotkeyRefreshesDurationsAfterInitialObservationCompletes()
+    {
+        var view = new FakeView();
+        SessionDurations current = SessionDurations.Default;
+        using var controller = New(view, getDurations: _ => Task.FromResult(current));
+
+        await controller.HandleActivationAsync(ShellActivationKind.Hotkey);
+        current = new SessionDurations(TimeSpan.FromMinutes(25), TimeSpan.FromMinutes(5));
+        await controller.HandleActivationAsync(ShellActivationKind.Hotkey);
+
+        Assert.Equal(current, view.LastState.Durations);
+        Assert.Equal(2, view.ShowCount);
+    }
+
+    [Fact]
     public async Task StaleRefreshCannotOverwriteDismissalAndReopen()
     {
         var view = new FakeView();
@@ -254,8 +303,13 @@ public sealed class QuickOverlayControllerTests
         Assert.Null(view.LastState.Feedback);
     }
 
-    private static QuickOverlayController New(FakeView view, Func<IQuickOverlayView>? create = null, Func<CancellationToken, Task<SessionSnapshot?>>? getActive = null, Func<SessionType, CancellationToken, Task<SessionRecord>>? start = null) =>
-        new(create ?? (() => view), getActive ?? (_ => Task.FromResult<SessionSnapshot?>(null)), start ?? ((type, _) => Task.FromResult(TestSessions.Running(type: type))));
+    private static QuickOverlayController New(FakeView view, Func<IQuickOverlayView>? create = null,
+        Func<CancellationToken, Task<SessionSnapshot?>>? getActive = null,
+        Func<CancellationToken, Task<SessionDurations>>? getDurations = null,
+        Func<SessionType, CancellationToken, Task<SessionRecord>>? start = null) =>
+        new(create ?? (() => view), getActive ?? (_ => Task.FromResult<SessionSnapshot?>(null)),
+            getDurations ?? (_ => Task.FromResult(SessionDurations.Default)),
+            start ?? ((type, _) => Task.FromResult(TestSessions.Running(type: type))));
 
     private sealed class FakeView : IQuickOverlayView
     {

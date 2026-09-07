@@ -15,10 +15,11 @@ public sealed class SessionCoordinator
     public SessionCoordinator(
         ISessionRepository sessions,
         TimeProvider? timeProvider = null,
-        SessionDurations? durations = null)
+        SessionDurations? durations = null,
+        ISessionDurationProvider? durationProvider = null)
     {
         ArgumentNullException.ThrowIfNull(sessions);
-        _engine = new SessionEngine(sessions, timeProvider, durations);
+        _engine = new SessionEngine(sessions, timeProvider, durations, durationProvider);
         _recovery = new SessionRecovery(sessions, timeProvider);
     }
 
@@ -49,6 +50,9 @@ public sealed class SessionCoordinator
 
     public Task<SessionSnapshot?> GetActiveAsync(CancellationToken cancellationToken = default) =>
         UseEngineAsync(_engine.GetActiveAsync, cancellationToken);
+
+    public Task<SessionDurations> GetDurationsAsync(CancellationToken cancellationToken = default) =>
+        UseEngineAsync(_engine.GetDurationsAsync, cancellationToken);
 
     public Task<SessionOutcome> StopAsync(CancellationToken cancellationToken = default) =>
         UseEngineAsync(_engine.StopAsync, cancellationToken);

@@ -24,7 +24,7 @@ public sealed class SessionEngine
 {
     private readonly ISessionRepository _sessions;
     private readonly TimeProvider _time;
-    private readonly SessionDurations _durations;
+    private readonly ISessionDurationProvider _durationProvider;
 
     /// <summary>One gate for the whole lifecycle: start, stop, and completion cannot overlap.</summary>
     private readonly SemaphoreSlim _lifecycle = new(initialCount: 1, maxCount: 1);
@@ -32,17 +32,22 @@ public sealed class SessionEngine
     public SessionEngine(
         ISessionRepository sessions,
         TimeProvider? timeProvider = null,
-        SessionDurations? durations = null)
+        SessionDurations? durations = null,
+        ISessionDurationProvider? durationProvider = null)
     {
         ArgumentNullException.ThrowIfNull(sessions);
+        if (durations is not null && durationProvider is not null)
+            throw new ArgumentException("Specify fixed durations or a duration provider, not both.");
 
         _sessions = sessions;
         _time = timeProvider ?? TimeProvider.System;
-        _durations = durations ?? SessionDurations.Default;
+        _durationProvider = durationProvider ??
+            new FixedSessionDurationProvider(durations ?? SessionDurations.Default);
     }
 
-    /// <summary>The durations this engine starts sessions with.</summary>
-    public SessionDurations Durations => _durations;
+    /// <summary>Reads the duration snapshot that would be used by a subsequent start.</summary>
+    public Task<SessionDurations> GetDurationsAsync(CancellationToken cancellationToken = default) =>
+        _durationProvider.GetDurationsAsync(cancellationToken);
 
     /// <summary>
     /// Starts a Work or Break session and persists it immediately, so the session is durable from
@@ -57,7 +62,8 @@ public sealed class SessionEngine
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        TimeSpan duration = _durations.For(type);
+        if (type is not (SessionType.Work or SessionType.Break))
+            throw new ArgumentOutOfRangeException(nameof(type), type, "Unknown session type has no duration.");
         await _lifecycle.WaitAsync(cancellationToken).ConfigureAwait(false);
 
         try
@@ -70,6 +76,9 @@ public sealed class SessionEngine
                 throw new ActiveSessionAlreadyExistsException(running.Id);
             }
 
+            SessionDurations durations = await _durationProvider.GetDurationsAsync(cancellationToken)
+                .ConfigureAwait(false);
+            TimeSpan duration = durations.For(type);
             DateTimeOffset now = _time.GetUtcNow();
 
             var session = new SessionRecord

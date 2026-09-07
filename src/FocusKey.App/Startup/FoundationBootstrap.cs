@@ -38,10 +38,11 @@ internal static class FoundationBootstrap
             var connections = new SqliteConnectionFactory(paths.DatabaseFile);
             DatabaseInitializationResult database = new DatabaseBootstrapper(connections, logger).Initialize();
             var repository = new SqliteSessionRepository(connections);
-            var sessions = new SessionCoordinator(repository);
+            var settings = new SettingsService(new SqliteSettingsRepository(connections));
+            var sessions = new SessionCoordinator(repository,
+                durationProvider: new SettingsSessionDurationProvider(settings));
             SessionRecoveryResult recovery = await sessions.InitializeAsync(cancellationToken).ConfigureAwait(false);
             logger.Info($"Session startup recovery: {recovery.Kind}.");
-            var settings = new SettingsService(new SqliteSettingsRepository(connections));
             await settings.LoadAsync(cancellationToken).ConfigureAwait(false);
             logger.Info("Application settings loaded and validated.");
 

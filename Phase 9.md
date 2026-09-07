@@ -2,8 +2,8 @@
 
 Workspace: `D:\Focus Key`. Branch: `native/phased-rewrite`.
 
-Phase 9 is in progress. This document currently records Phase 9.1 only; no Phase 9.2 behavior or
-real Settings UI is included.
+Phase 9 is in progress. This document records completed sub-phases 9.1 and 9.2. A real Settings UI,
+appearance and color application are not included yet.
 
 ## Phase 9.1 — Settings Foundation & Persistence
 
@@ -121,10 +121,9 @@ Final verification on 2026-09-07:
 ### Limitations and Phase 9.2+ work
 
 No settings controls, theme resources, color application, configurable Quick Overlay values or
-custom session durations are wired yet. Phase 9.2 must build the real Settings UI and decide when
-saved values take effect while preserving active-session timestamps. It must use this service rather
-than query SQLite. Any user-facing repair/reset path for a corrupted settings row also belongs to a
-later authorized sub-phase. Phase 9 itself is deliberately not marked complete.
+custom session durations are wired in Phase 9.1. Later sub-phases must use this service rather than
+query SQLite. Any user-facing repair/reset path for a corrupted settings row also belongs to a later
+authorized sub-phase. Phase 9 itself is deliberately not marked complete.
 
 ### Git delivery
 
@@ -134,3 +133,99 @@ Pushed successfully to `origin/native/phased-rewrite`; `git ls-remote` returned 
 branch. Only the preserved, pre-existing untracked `chat_history.txt` remains outside the commits.
 
 PHASE 9.1 COMPLETE — PHASE 9 REMAINS IN PROGRESS.
+
+## Phase 9.2 — Runtime Work & Break Duration Settings
+
+Status: PASS — implementation and verification complete.
+
+### Scope and runtime behavior
+
+Work started from the verified Phase 9.1 delivery commit
+`7da0d8aead3e7ba94a8438d7e2b67cbb847b6a2e`. Phase 9.2 connects the durable settings record to
+new session creation and the Quick Overlay. It does not add Settings controls or apply appearance
+or colors.
+
+`ISessionDurationProvider` is the session-layer input boundary. The production
+`SettingsSessionDurationProvider` loads the authoritative `ApplicationSettings` singleton through
+`SettingsService` and maps its Work and Break values to `SessionDurations`. Bootstrap shares that
+provider with the existing `SessionCoordinator`; neither the engine nor WinUI queries SQLite.
+
+For each accepted Start, `SessionEngine` first confirms there is no Running record, then reads one
+complete duration snapshot while holding its existing lifecycle gate. It writes the selected value
+into the new session's immutable `PlannedDuration`. A settings update therefore affects the next
+Work or Break start without an application restart. It cannot alter a Running record or a historical
+record. Completion continues to use that record's `PlannedEndAt`, including delayed observation and
+the existing exact `EndedAt = PlannedEndAt` rule. Repository uniqueness and atomic transition rules
+are unchanged.
+
+Fixed `SessionDurations` construction remains available for deterministic tests and smoke scenarios,
+with the official 30/10 defaults as its fallback. Production application composition uses the
+persisted provider. Duration load failure or cancellation occurs before `AddAsync`, so it cannot
+create a partial session.
+
+### Quick Overlay
+
+The overlay controller requests current durations through `SessionCoordinator` together with its
+active-session observation. The view receives those values in `QuickOverlayState`; reopening,
+refreshing, or invoking the hotkey again after the initial load reads current persistence. Loading
+uses `--:--` rather than briefly presenting stale defaults. Whole-second values render as `m:ss` or
+`h:mm:ss`, and the Work/Break accessibility names receive the same live value. The old hard-coded
+`30:00` and `10:00` runtime labels were removed.
+
+### Tests and verification
+
+13 deterministic test cases were added (8 test methods, including five formatter cases). They cover:
+
+- fresh persisted 30-minute Work and 10-minute Break defaults;
+- custom Work and Break values loaded from real SQLite after a repository/service restart;
+- runtime updates observed without restarting the coordinator;
+- active and historical session duration preservation across a settings change;
+- exact and delayed completion using a custom duration;
+- failed and cancelled duration reads leaving persistence untouched;
+- overlay activation, visible refresh, repeated-hotkey refresh and exact duration formatting.
+
+Final verification on 2026-09-07:
+
+- Restore: PASS; all three projects restored successfully.
+- Full solution build: PASS; **0 warnings, 0 errors**.
+- Complete test suite: PASS; **390 passed, 0 failed, 0 skipped** (377 baseline + 13 new cases).
+- Native shell smoke `.smoke/p9-2-final-shell-20260907`: PASS; two clean launches against a fresh
+  isolated root, schema/settings validation, tray ownership, window hide/open, competing-instance
+  handling, graceful exit and hotkey release all passed.
+- Runtime duration smoke `.smoke/p9-2-shell-20260907`: PASS; settings changed to Work 47 seconds and
+  Break 19 seconds while the isolated native app was running. A provider-backed Work start persisted
+  exactly 47 seconds. Graceful shutdown classified it as Interrupted while retaining the original
+  47-second planned duration.
+- Normal/default user data was never opened. Only isolated test and `.smoke` databases were used.
+
+### Files changed
+
+- `src/FocusKey.Foundation/Sessions/ISessionDurationProvider.cs`
+- `src/FocusKey.Foundation/Sessions/SessionEngine.cs`
+- `src/FocusKey.Foundation/Sessions/SessionCoordinator.cs`
+- `src/FocusKey.Foundation/Settings/SettingsSessionDurationProvider.cs`
+- `src/FocusKey.Foundation/Overlay/IQuickOverlayView.cs`
+- `src/FocusKey.Foundation/Overlay/QuickOverlayController.cs`
+- `src/FocusKey.Foundation/Overlay/QuickOverlayDurationFormatter.cs`
+- `src/FocusKey.App/Startup/FoundationBootstrap.cs`
+- `src/FocusKey.App/App.xaml.cs`
+- `src/FocusKey.App/Overlay/QuickOverlayWindow.xaml`
+- `src/FocusKey.App/Overlay/QuickOverlayWindow.xaml.cs`
+- `tests/FocusKey.Foundation.Tests/Settings/RuntimeDurationSettingsTests.cs`
+- `tests/FocusKey.Foundation.Tests/Overlay/QuickOverlayControllerTests.cs`
+- `.smoke/ShellProbe/Program.cs`
+- this root `Phase 9.md`
+
+### Limitations and deferred work
+
+Phase 9.2 intentionally provides no user-facing Settings editor. Appearance mode, theme switching,
+Work/Break color application, the final Settings page and visual refinement remain deferred to
+Phase 9.3 and later authorized phases. The existing invalid-persistence startup failure remains
+explicit; no repair/reset UI was added. No Phase 10 or later functionality was implemented.
+
+### Git delivery
+
+Implementation commit: `PENDING`. Remote verification and the documentation follow-up commit will
+be recorded after the verified implementation is pushed.
+
+PHASE 9.2 COMPLETE — PHASE 9 REMAINS IN PROGRESS.

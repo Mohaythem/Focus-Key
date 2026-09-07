@@ -71,7 +71,7 @@ public partial class App : Application
                 _window?.RefreshPages();
             };
             _quickOverlay = new QuickOverlayController(() => new QuickOverlayWindow(),
-                _startup.Sessions.GetActiveAsync, StartSessionAsync);
+                _startup.Sessions.GetActiveAsync, _startup.Sessions.GetDurationsAsync, StartSessionAsync);
             _quickOverlay.ErrorOccurred += exception => _startup?.Logger.Error("Quick overlay operation failed.", exception);
             _shell = new BackgroundShell(integration, ShutdownSessionsAsync);
             _shell.ActivationRequested += OnShellActivation;

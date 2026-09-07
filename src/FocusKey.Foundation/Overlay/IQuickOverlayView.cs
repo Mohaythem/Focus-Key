@@ -2,7 +2,11 @@ using FocusKey.Foundation.Sessions;
 
 namespace FocusKey.Foundation.Overlay;
 
-public sealed record QuickOverlayState(SessionType Selected, bool IsBusy, bool CanStart, string? Feedback);
+public sealed record QuickOverlayState(SessionType Selected, bool IsBusy, bool CanStart, string? Feedback)
+{
+    /// <summary>The current persisted values to display, or null while they are being loaded.</summary>
+    public SessionDurations? Durations { get; init; }
+}
 
 /// <summary>One reusable native utility window. Calls and events belong to the UI thread.</summary>
 public interface IQuickOverlayView : IDisposable

@@ -4,6 +4,7 @@ using FocusKey.Foundation.Sessions;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
@@ -56,6 +57,10 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
     public void Render(QuickOverlayState state)
     {
         _state = state;
+        WorkDuration.Text = QuickOverlayDurationFormatter.Format(state.Durations?.Work);
+        BreakDuration.Text = QuickOverlayDurationFormatter.Format(state.Durations?.Break);
+        AutomationProperties.SetName(WorkCard, $"Work, {WorkDuration.Text}");
+        AutomationProperties.SetName(BreakCard, $"Break, {BreakDuration.Text}");
         PaintCard(WorkCard, WorkDuration, state.Selected == SessionType.Work, 0x18, 0x37, 0x39);
         PaintCard(BreakCard, BreakDuration, state.Selected == SessionType.Break, 0x43, 0x47, 0x63);
         // Keep focusable cards available for navigation while their controller ignores selection

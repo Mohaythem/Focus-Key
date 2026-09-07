@@ -5,6 +5,7 @@ using FocusKey.Foundation;
 using FocusKey.Foundation.Data;
 using FocusKey.Foundation.Logging;
 using FocusKey.Foundation.Sessions;
+using FocusKey.Foundation.Settings;
 
 return await ShellProbe.RunAsync(args);
 
@@ -31,7 +32,9 @@ internal static class ShellProbe
                 "hold-hotkey" => HoldHotkey(),
                 "seed" => await SeedAsync(args),
                 "seed-reports" => await SeedReportsAsync(args),
+                "set-durations" => await SetDurationsAsync(args),
                 "inspect" => await InspectAsync(args),
+                "start-configured" => await StartConfiguredAsync(args),
                 "start-short" => await StartShortAsync(args),
                 "reevaluate" => PostClockSignal(ParsePid(args), false),
                 "resume" => PostClockSignal(ParsePid(args), true),
@@ -115,7 +118,27 @@ internal static class ShellProbe
         AppPaths paths = GuardedPaths(args[1]);
         var repository = new SqliteSessionRepository(new SqliteConnectionFactory(paths.DatabaseFile));
         var rows = await repository.GetStartedBetweenAsync(DateTimeOffset.MinValue, DateTimeOffset.MaxValue);
-        foreach (var row in rows) Console.WriteLine($"{row.Id} {row.Type} {row.Status} started={row.StartedAt:O} plannedEnd={row.PlannedEndAt:O} ended={row.EndedAt:O}");
+        foreach (var row in rows) Console.WriteLine($"{row.Id} {row.Type} {row.Status} started={row.StartedAt:O} duration={row.PlannedDuration.TotalSeconds:0}s plannedEnd={row.PlannedEndAt:O} ended={row.EndedAt:O}");
+        return 0;
+    }
+
+    private static async Task<int> SetDurationsAsync(string[] args)
+    {
+        if (args.Length != 4 || !int.TryParse(args[2], out int workSeconds) || workSeconds <= 0 ||
+            !int.TryParse(args[3], out int breakSeconds) || breakSeconds <= 0)
+            throw new ArgumentException("Usage: set-durations <dataRoot> <workSeconds> <breakSeconds>");
+        AppPaths paths = GuardedPaths(args[1]);
+        if (!File.Exists(paths.DatabaseFile)) throw new ArgumentException("Use an initialized isolated smoke data root.");
+        var settings = new SettingsService(new SqliteSettingsRepository(
+            new SqliteConnectionFactory(paths.DatabaseFile)));
+        ApplicationSettings current = await settings.LoadAsync();
+        ApplicationSettings updated = current with
+        {
+            WorkDuration = TimeSpan.FromSeconds(workSeconds),
+            BreakDuration = TimeSpan.FromSeconds(breakSeconds),
+        };
+        await settings.SaveAsync(updated);
+        Console.WriteLine($"work={workSeconds}s break={breakSeconds}s");
         return 0;
     }
 
@@ -171,6 +194,24 @@ internal static class ShellProbe
         return PostClockSignal(pid, false);
     }
 
+    private static async Task<int> StartConfiguredAsync(string[] args)
+    {
+        if (args.Length != 4 || !int.TryParse(args[1], out int pid) || pid <= 0 ||
+            args[3] is not ("work" or "break"))
+            throw new ArgumentException("Usage: start-configured <pid> <dataRoot> <work|break>");
+        AppPaths paths = GuardedPaths(args[2]);
+        if (!File.Exists(paths.DatabaseFile) || FindWindows(pid).Count != 1)
+            throw new ArgumentException("Use the isolated data root belonging to a running smoke app.");
+        var connections = new SqliteConnectionFactory(paths.DatabaseFile);
+        var settings = new SettingsService(new SqliteSettingsRepository(connections));
+        var engine = new SessionEngine(new SqliteSessionRepository(connections), TimeProvider.System,
+            durationProvider: new SettingsSessionDurationProvider(settings));
+        SessionRecord session = await engine.StartAsync(
+            args[3] == "work" ? SessionType.Work : SessionType.Break);
+        Console.WriteLine($"{session.Id} {session.Type} duration={session.PlannedDuration.TotalSeconds:0}s plannedEnd={session.PlannedEndAt:O}");
+        return PostClockSignal(pid, false);
+    }
+
     private static int PostClockSignal(int pid, bool resume)
     {
         var windows = FindWindows(pid);
@@ -190,7 +231,7 @@ internal static class ShellProbe
     }
     private static DateTimeOffset WholeSecond(DateTimeOffset value) => new(value.Ticks - value.Ticks % TimeSpan.TicksPerSecond, TimeSpan.Zero);
     private static int ParsePid(string[] args) => args.Length == 2 && int.TryParse(args[1], out int pid) && pid > 0 ? pid : throw new ArgumentException("Usage: <probe|open|exit> <pid>");
-    private static int Usage() { Console.Error.WriteLine("Usage: probe|open|exit|reevaluate|resume <pid> | hotkey-free | hold-hotkey | seed <dataRoot> <future|due> | seed-reports <freshDataRoot> | inspect <dataRoot> | start-short <pid> <dataRoot> <work|break> <seconds 1..120>"); return 2; }
+    private static int Usage() { Console.Error.WriteLine("Usage: probe|open|exit|reevaluate|resume <pid> | hotkey-free | hold-hotkey | seed <dataRoot> <future|due> | seed-reports <freshDataRoot> | set-durations <dataRoot> <workSeconds> <breakSeconds> | inspect <dataRoot> | start-configured <pid> <dataRoot> <work|break> | start-short <pid> <dataRoot> <work|break> <seconds 1..120>"); return 2; }
     private static Win32Exception LastError(string message) => new(Marshal.GetLastWin32Error(), message);
 
     private static List<IntPtr> FindWindows(int pid)

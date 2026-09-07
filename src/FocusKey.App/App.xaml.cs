@@ -57,7 +57,7 @@ public partial class App : Application
             _startup = await FoundationBootstrap.RunAsync();
             _startup.Logger.Info("Single-instance shell ownership acquired.");
             _window = new MainWindow(_startup, StopSessionAsync,
-                exception => _startup?.Logger.Error("Today operation failed.", exception));
+                exception => _startup?.Logger.Error("Main-page operation failed.", exception));
             _window.ExitRequested += OnExplicitExitRequested;
             _window.AppWindow.Closing += OnAppWindowClosing;
             _window.Closed += OnMainWindowClosed;
@@ -68,7 +68,7 @@ public partial class App : Application
             integration.ClockChangedOrResumed += () =>
             {
                 TimeZoneInfo.ClearCachedData();
-                _window?.RefreshToday();
+                _window?.RefreshPages();
             };
             _quickOverlay = new QuickOverlayController(() => new QuickOverlayWindow(),
                 _startup.Sessions.GetActiveAsync, StartSessionAsync);
@@ -138,13 +138,14 @@ public partial class App : Application
     private async Task<SessionRecord> StartSessionAsync(SessionType type, CancellationToken cancellationToken)
     {
         SessionRecord session = await _completion!.StartAsync(type, cancellationToken);
-        _window?.RefreshToday();
+        _window?.RefreshPages();
         return session;
     }
 
     private async Task<SessionOutcome> StopSessionAsync(SessionId expectedId, CancellationToken cancellationToken)
     {
         SessionOutcome result = await _completion!.StopAsync(expectedId, cancellationToken);
+        _window?.RefreshPages();
         if (_quickOverlay is not null) await _quickOverlay.RefreshIfVisibleAsync();
         return result;
     }
@@ -181,7 +182,7 @@ public partial class App : Application
                 {
                     if (!_isExiting)
                     {
-                        _window?.RefreshToday();
+                        _window?.RefreshPages();
                         if (_quickOverlay is not null) await _quickOverlay.RefreshIfVisibleAsync();
                     }
                 }

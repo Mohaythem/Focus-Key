@@ -16,6 +16,7 @@
             <StackPanel Spacing="16">
                 <TextBlock x:Name="PageTitle" Text="Today" FontSize="26" FontWeight="SemiBold"/>
                 <TextBlock x:Name="Placeholder" Visibility="Collapsed" TextWrapping="Wrap"/>
+                <ContentControl x:Name="ReportsHost" Visibility="Collapsed"/>
                 <StackPanel x:Name="TodayPanel" Spacing="16">
                     <TextBlock x:Name="DayLabel" TextWrapping="Wrap"/>
                     <StackPanel Orientation="Horizontal" Spacing="12">

@@ -4,6 +4,7 @@ using FocusKey.Foundation.Data;
 using FocusKey.Foundation.Logging;
 using FocusKey.Foundation.Sessions;
 using FocusKey.Foundation.Today;
+using FocusKey.Foundation.Reports;
 
 namespace FocusKey.Startup;
 
@@ -49,6 +50,7 @@ internal static class FoundationBootstrap
                 Database = database,
                 Sessions = sessions,
                 Today = new TodayService(repository),
+                Reports = new ReportsService(repository),
             };
         }
         catch (Exception exception)

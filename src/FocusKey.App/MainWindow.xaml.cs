@@ -7,10 +7,11 @@ using Windows.Graphics;
 
 namespace FocusKey;
 
-/// <summary>Functional Today surface. Reports and Settings are navigation placeholders only.</summary>
+/// <summary>Functional Today and Reports surfaces. Settings remains a placeholder.</summary>
 public sealed partial class MainWindow : Window
 {
     private readonly TodayController _today;
+    private readonly ReportsView _reports;
     private readonly DispatcherQueueTimer _displayTimer;
     private bool _visible;
     internal event Action? ExitRequested;
@@ -19,13 +20,15 @@ public sealed partial class MainWindow : Window
         Func<SessionId, CancellationToken, Task<SessionOutcome>> stop, Action<Exception> report)
     {
         InitializeComponent();
+        _reports = new ReportsView(startup.Reports, report);
+        ReportsHost.Content = _reports;
         AppWindow.Resize(new SizeInt32(900, 720));
         _today = new TodayController(startup.Today.ReadAsync, stop, report);
         _today.Changed += Render;
         _displayTimer = DispatcherQueue.CreateTimer();
         _displayTimer.IsRepeating = false;
         _displayTimer.Tick += OnDisplayTick;
-        Closed += (_, _) => { _visible = false; _displayTimer.Stop(); _today.Dispose(); };
+        Closed += (_, _) => { _visible = false; _displayTimer.Stop(); _today.Dispose(); _reports.Dispose(); };
         Render();
         startup.Logger.Info("Today main window created.");
     }
@@ -33,6 +36,7 @@ public sealed partial class MainWindow : Window
     internal async void OpenToday()
     {
         _visible = true;
+        _reports.Hide();
         await _today.OpenAsync();
     }
 
@@ -41,13 +45,22 @@ public sealed partial class MainWindow : Window
         _visible = false;
         _displayTimer.Stop();
         _today.Hide();
+        _reports.Hide();
     }
 
-    internal void RefreshToday() => DispatcherQueue.TryEnqueue(async () => await _today.RefreshAsync());
+    internal void RefreshPages() => DispatcherQueue.TryEnqueue(async () =>
+    {
+        await _today.RefreshAsync();
+        await _reports.RefreshAsync();
+    });
 
-    private async void OnTodayClick(object sender, RoutedEventArgs args) => await _today.NavigateAsync(MainPage.Today);
-    private async void OnReportsClick(object sender, RoutedEventArgs args) => await _today.NavigateAsync(MainPage.Reports);
-    private async void OnSettingsClick(object sender, RoutedEventArgs args) => await _today.NavigateAsync(MainPage.Settings);
+    private async void OnTodayClick(object sender, RoutedEventArgs args) { _reports.Hide(); await _today.NavigateAsync(MainPage.Today); }
+    private async void OnReportsClick(object sender, RoutedEventArgs args)
+    {
+        await _today.NavigateAsync(MainPage.Reports);
+        await _reports.OpenAsync();
+    }
+    private async void OnSettingsClick(object sender, RoutedEventArgs args) { _reports.Hide(); await _today.NavigateAsync(MainPage.Settings); }
     private async void OnRefreshClick(object sender, RoutedEventArgs args) => await _today.RefreshAsync();
     private async void OnStopClick(object sender, RoutedEventArgs args) => await _today.StopAsync();
     private void OnExitClick(object sender, RoutedEventArgs args) => ExitRequested?.Invoke();
@@ -60,7 +73,8 @@ public sealed partial class MainWindow : Window
         SettingsNav.IsChecked = _today.Page == MainPage.Settings;
         PageTitle.Text = _today.Page.ToString();
         TodayPanel.Visibility = isToday ? Visibility.Visible : Visibility.Collapsed;
-        Placeholder.Visibility = isToday ? Visibility.Collapsed : Visibility.Visible;
+        Placeholder.Visibility = _today.Page == MainPage.Settings ? Visibility.Visible : Visibility.Collapsed;
+        ReportsHost.Visibility = _today.Page == MainPage.Reports ? Visibility.Visible : Visibility.Collapsed;
         Placeholder.Text = $"{_today.Page} is not implemented yet.";
         LoadStatus.Text = _today.IsRefreshing ? "Loading…" : _today.IsStopping ? "Stopping…" : string.Empty;
         RefreshButton.IsEnabled = !_today.IsRefreshing && !_today.IsStopping;

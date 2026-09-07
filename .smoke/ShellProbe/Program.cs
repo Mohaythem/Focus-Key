@@ -30,6 +30,7 @@ internal static class ShellProbe
                 "hotkey-free" => HotkeyFree(),
                 "hold-hotkey" => HoldHotkey(),
                 "seed" => await SeedAsync(args),
+                "seed-reports" => await SeedReportsAsync(args),
                 "inspect" => await InspectAsync(args),
                 "start-short" => await StartShortAsync(args),
                 "reevaluate" => PostClockSignal(ParsePid(args), false),
@@ -118,6 +119,36 @@ internal static class ShellProbe
         return 0;
     }
 
+    private static async Task<int> SeedReportsAsync(string[] args)
+    {
+        if (args.Length != 2) throw new ArgumentException("Usage: seed-reports <freshDataRoot>");
+        AppPaths paths = GuardedPaths(args[1]);
+        if (Directory.Exists(paths.RootDirectory)) throw new ArgumentException("Reports fixture requires a fresh isolated root.");
+        paths.EnsureCreated();
+        var factory = new SqliteConnectionFactory(paths.DatabaseFile);
+        new DatabaseBootstrapper(factory, NullAppLogger.Instance).Initialize();
+        var repository = new SqliteSessionRepository(factory);
+        var zone = TimeZoneInfo.Local;
+        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, zone).DateTime);
+        async Task Add(DateOnly date, int minute, SessionType type, SessionStatus status, int length)
+        {
+            var local = date.ToDateTime(TimeOnly.MinValue).AddMinutes(minute);
+            var start = TimeZoneInfo.ConvertTimeToUtc(local, zone);
+            var stamp = new DateTimeOffset(start);
+            await repository.AddAsync(new SessionRecord { Id = SessionId.New(), Type = type, Status = status,
+                StartedAt = stamp, CreatedAt = stamp, PlannedDuration = TimeSpan.FromMinutes(length),
+                EndedAt = stamp.AddMinutes(status == SessionStatus.Completed ? length : 1) });
+        }
+        await Add(today, 0, SessionType.Work, SessionStatus.Completed, 30);
+        await Add(today, 30, SessionType.Break, SessionStatus.Completed, 10);
+        await Add(today, 40, SessionType.Work, SessionStatus.Stopped, 30);
+        await Add(today, 42, SessionType.Break, SessionStatus.Interrupted, 10);
+        await Add(today.AddDays(-7), 0, SessionType.Work, SessionStatus.Completed, 60);
+        await Add(new DateOnly(today.Year, today.Month, 1).AddDays(-1), 0, SessionType.Work, SessionStatus.Completed, 90);
+        Console.WriteLine($"Reports fixture local date {today:yyyy-MM-dd}: Work 30m, Break 10m, 1 completed each, 1 Stopped, 1 Interrupted, 50% completion. Prior week +60m, prior month +90m.");
+        return 0;
+    }
+
     private static async Task<int> StartShortAsync(string[] args)
     {
         if (args.Length != 5 || !int.TryParse(args[1], out int pid) || pid <= 0 ||
@@ -159,7 +190,7 @@ internal static class ShellProbe
     }
     private static DateTimeOffset WholeSecond(DateTimeOffset value) => new(value.Ticks - value.Ticks % TimeSpan.TicksPerSecond, TimeSpan.Zero);
     private static int ParsePid(string[] args) => args.Length == 2 && int.TryParse(args[1], out int pid) && pid > 0 ? pid : throw new ArgumentException("Usage: <probe|open|exit> <pid>");
-    private static int Usage() { Console.Error.WriteLine("Usage: probe|open|exit|reevaluate|resume <pid> | hotkey-free | hold-hotkey | seed <dataRoot> <future|due> | inspect <dataRoot> | start-short <pid> <dataRoot> <work|break> <seconds 1..120>"); return 2; }
+    private static int Usage() { Console.Error.WriteLine("Usage: probe|open|exit|reevaluate|resume <pid> | hotkey-free | hold-hotkey | seed <dataRoot> <future|due> | seed-reports <freshDataRoot> | inspect <dataRoot> | start-short <pid> <dataRoot> <work|break> <seconds 1..120>"); return 2; }
     private static Win32Exception LastError(string message) => new(Marshal.GetLastWin32Error(), message);
 
     private static List<IntPtr> FindWindows(int pid)

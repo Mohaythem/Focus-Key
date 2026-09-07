@@ -21,6 +21,7 @@ internal sealed class StartupContext : IDisposable
     public required TodayService Today { get; init; }
     public required ReportsService Reports { get; init; }
     public required SettingsService Settings { get; init; }
+    public required AppearanceCoordinator Appearance { get; init; }
 
     public void Dispose() => Logger.Dispose();
 }

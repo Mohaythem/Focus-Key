@@ -1,4 +1,5 @@
 using FocusKey.Foundation.Sessions;
+using FocusKey.Foundation.Settings;
 using FocusKey.Foundation.Today;
 using FocusKey.Startup;
 using Microsoft.UI.Dispatching;
@@ -15,6 +16,9 @@ public sealed partial class MainWindow : Window
     private readonly DispatcherQueueTimer _displayTimer;
     private bool _visible;
     internal event Action? ExitRequested;
+
+    internal void ApplyAppearance(Appearance appearance) =>
+        WindowAppearance.Apply(MainSurface, AppWindow, appearance);
 
     internal MainWindow(StartupContext startup,
         Func<SessionId, CancellationToken, Task<SessionOutcome>> stop, Action<Exception> report)

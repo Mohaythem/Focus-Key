@@ -13,6 +13,8 @@ internal static class ShellProbe
 {
     private const string ClassPrefix = "FocusKey.Shell.";
     private const uint WM_COMMAND = 0x0111;
+    private const uint WM_HOTKEY = 0x0312;
+    private const int FOCUS_KEY_HOTKEY_ID = 0x464B;
     private const uint MOD_SHIFT = 0x0004;
     private const uint MOD_NOREPEAT = 0x4000;
     private const uint VK_F3 = 0x72;
@@ -26,6 +28,7 @@ internal static class ShellProbe
             {
                 "probe" => Probe(ParsePid(args)),
                 "open" => PostCommand(ParsePid(args), 1),
+                "hotkey" => PostHotkey(ParsePid(args)),
                 "exit" => PostCommand(ParsePid(args), 2),
                 "menu" => OpenMenu(ParsePid(args)),
                 "hotkey-free" => HotkeyFree(),
@@ -33,6 +36,7 @@ internal static class ShellProbe
                 "seed" => await SeedAsync(args),
                 "seed-reports" => await SeedReportsAsync(args),
                 "set-durations" => await SetDurationsAsync(args),
+                "set-appearance" => await SetAppearanceAsync(args),
                 "inspect" => await InspectAsync(args),
                 "start-configured" => await StartConfiguredAsync(args),
                 "start-short" => await StartShortAsync(args),
@@ -67,6 +71,16 @@ internal static class ShellProbe
         if (windows.Count != 1) throw new InvalidOperationException($"Expected exactly one {ClassPrefix} top-level window for PID {pid}, found {windows.Count}.");
         if (!PostMessage(windows[0], WM_COMMAND, (IntPtr)command, IntPtr.Zero)) throw LastError("PostMessage failed.");
         Console.WriteLine($"posted command={command} pid={pid} hwnd=0x{windows[0].ToInt64():X}");
+        return 0;
+    }
+
+    private static int PostHotkey(int pid)
+    {
+        var windows = FindWindows(pid);
+        if (windows.Count != 1) throw new InvalidOperationException("Expected one shell window.");
+        if (!PostMessage(windows[0], WM_HOTKEY, (IntPtr)FOCUS_KEY_HOTKEY_ID, IntPtr.Zero))
+            throw LastError("Could not post the Focus Key hotkey message.");
+        Console.WriteLine($"posted hotkey pid={pid}");
         return 0;
     }
 
@@ -139,6 +153,26 @@ internal static class ShellProbe
         };
         await settings.SaveAsync(updated);
         Console.WriteLine($"work={workSeconds}s break={breakSeconds}s");
+        return 0;
+    }
+
+    private static async Task<int> SetAppearanceAsync(string[] args)
+    {
+        if (args.Length != 3)
+            throw new ArgumentException("Usage: set-appearance <dataRoot> <system|light|dark>");
+        Appearance appearance = args[2].ToLowerInvariant() switch
+        {
+            "system" => Appearance.System,
+            "light" => Appearance.Light,
+            "dark" => Appearance.Dark,
+            _ => throw new ArgumentException("Appearance must be system, light, or dark."),
+        };
+        AppPaths paths = GuardedPaths(args[1]);
+        if (!File.Exists(paths.DatabaseFile)) throw new ArgumentException("Use an initialized isolated smoke data root.");
+        var settings = new SettingsService(new SqliteSettingsRepository(
+            new SqliteConnectionFactory(paths.DatabaseFile)));
+        await settings.UpdateAppearanceAsync(appearance);
+        Console.WriteLine($"appearance={appearance}");
         return 0;
     }
 
@@ -231,7 +265,7 @@ internal static class ShellProbe
     }
     private static DateTimeOffset WholeSecond(DateTimeOffset value) => new(value.Ticks - value.Ticks % TimeSpan.TicksPerSecond, TimeSpan.Zero);
     private static int ParsePid(string[] args) => args.Length == 2 && int.TryParse(args[1], out int pid) && pid > 0 ? pid : throw new ArgumentException("Usage: <probe|open|exit> <pid>");
-    private static int Usage() { Console.Error.WriteLine("Usage: probe|open|exit|reevaluate|resume <pid> | hotkey-free | hold-hotkey | seed <dataRoot> <future|due> | seed-reports <freshDataRoot> | set-durations <dataRoot> <workSeconds> <breakSeconds> | inspect <dataRoot> | start-configured <pid> <dataRoot> <work|break> | start-short <pid> <dataRoot> <work|break> <seconds 1..120>"); return 2; }
+    private static int Usage() { Console.Error.WriteLine("Usage: probe|open|hotkey|exit|reevaluate|resume <pid> | hotkey-free | hold-hotkey | seed <dataRoot> <future|due> | seed-reports <freshDataRoot> | set-durations <dataRoot> <workSeconds> <breakSeconds> | set-appearance <dataRoot> <system|light|dark> | inspect <dataRoot> | start-configured <pid> <dataRoot> <work|break> | start-short <pid> <dataRoot> <work|break> <seconds 1..120>"); return 2; }
     private static Win32Exception LastError(string message) => new(Marshal.GetLastWin32Error(), message);
 
     private static List<IntPtr> FindWindows(int pid)

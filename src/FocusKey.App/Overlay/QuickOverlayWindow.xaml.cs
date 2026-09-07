@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using FocusKey.Foundation.Overlay;
 using FocusKey.Foundation.Sessions;
+using FocusKey.Foundation.Settings;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
@@ -33,8 +34,6 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
         presenter.SetBorderAndTitleBar(false, false);
         AppWindow.SetPresenter(presenter);
         AppWindow.IsShownInSwitchers = false;
-        uint borderColor = 0x0024241e;
-        DwmSetWindowAttribute(WindowNative.GetWindowHandle(this), 34, ref borderColor, sizeof(uint));
         Surface.PreviewKeyDown += OnPreviewKeyDown;
         Surface.Loaded += (_, _) => { ResizeAndCenter(); FocusSelection(); };
         AppWindow.Closing += (_, args) =>
@@ -53,6 +52,20 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
     public event Action<SessionType>? SelectionRequested;
     public event Action? StartRequested;
     public event Action? DismissRequested;
+
+    internal void ApplyAppearance(Appearance appearance)
+    {
+        WindowAppearance.Apply(Surface, AppWindow, appearance);
+        uint borderColor = appearance switch
+        {
+            Appearance.System => 0xFFFFFFFF,
+            Appearance.Light => 0x00DEDEDE,
+            Appearance.Dark => 0x0024241E,
+            _ => throw new ArgumentOutOfRangeException(nameof(appearance), appearance, "Unsupported appearance."),
+        };
+        DwmSetWindowAttribute(WindowNative.GetWindowHandle(this), 34, ref borderColor, sizeof(uint));
+        Render(_state);
+    }
 
     public void Render(QuickOverlayState state)
     {

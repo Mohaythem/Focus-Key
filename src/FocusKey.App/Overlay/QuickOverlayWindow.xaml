@@ -9,21 +9,20 @@
         x:Name="Surface"
         Width="420"
         Padding="24"
-        Background="#111616"
-        BorderBrush="#1e2424"
+        Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
+        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
         BorderThickness="1"
-        CornerRadius="6"
-        RequestedTheme="Dark">
+        CornerRadius="6">
         <Border.Resources>
             <!-- Keep WinUI's native button template and focus visuals while
                  preventing the default accent blue from changing this palette. -->
-            <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#1e2424" />
-            <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#252d2d" />
-            <SolidColorBrush x:Key="ButtonBackgroundDisabled" Color="#111616" />
+            <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="{ThemeResource ControlFillColorSecondary}" />
+            <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="{ThemeResource ControlFillColorTertiary}" />
+            <SolidColorBrush x:Key="ButtonBackgroundDisabled" Color="{ThemeResource ControlFillColorDisabled}" />
             <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="#f0f4f4" />
             <SolidColorBrush x:Key="ButtonForegroundPressed" Color="#f0f4f4" />
-            <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#1e2424" />
-            <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="#252d2d" />
+            <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="{ThemeResource ControlStrokeColorDefault}" />
+            <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="{ThemeResource ControlStrokeColorSecondary}" />
         </Border.Resources>
 
         <StackPanel
@@ -33,7 +32,7 @@
             <TextBlock
                 Text="FOCUS KEY"
                 FontSize="12"
-                Foreground="#909b9b"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                 CharacterSpacing="50"
                 Margin="0,0,0,20" />
 
@@ -123,7 +122,7 @@
                 x:Name="FeedbackText"
                 Text=""
                 Visibility="Collapsed"
-                Foreground="#909b9b"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                 FontSize="12"
                 TextWrapping="Wrap"
                 Margin="0,12,0,0"
@@ -135,8 +134,8 @@
                 Margin="0,16,0,0">
                 <StackPanel Orientation="Horizontal" Margin="0,0,16,0">
                     <Border
-                        Background="#1a1f1f"
-                        BorderBrush="#252d2d"
+                        Background="{ThemeResource ControlFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
                         BorderThickness="1"
                         CornerRadius="3"
                         Padding="5,1">
@@ -144,19 +143,19 @@
                             Text="←→"
                             FontFamily="Consolas"
                             FontSize="10"
-                            Foreground="#909b9b" />
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     </Border>
                     <TextBlock
                         Text="Select"
                         FontSize="10"
-                        Foreground="#5a6666"
+                        Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                         VerticalAlignment="Center"
                         Margin="5,0,0,0" />
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Margin="0,0,16,0">
                     <Border
-                        Background="#1a1f1f"
-                        BorderBrush="#252d2d"
+                        Background="{ThemeResource ControlFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
                         BorderThickness="1"
                         CornerRadius="3"
                         Padding="5,1">
@@ -164,19 +163,19 @@
                             Text="↵"
                             FontFamily="Consolas"
                             FontSize="10"
-                            Foreground="#909b9b" />
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     </Border>
                     <TextBlock
                         Text="Start"
                         FontSize="10"
-                        Foreground="#5a6666"
+                        Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                         VerticalAlignment="Center"
                         Margin="5,0,0,0" />
                 </StackPanel>
                 <StackPanel Orientation="Horizontal">
                     <Border
-                        Background="#1a1f1f"
-                        BorderBrush="#252d2d"
+                        Background="{ThemeResource ControlFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
                         BorderThickness="1"
                         CornerRadius="3"
                         Padding="5,1">
@@ -184,12 +183,12 @@
                             Text="Esc"
                             FontFamily="Consolas"
                             FontSize="10"
-                            Foreground="#909b9b" />
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     </Border>
                     <TextBlock
                         Text="Close"
                         FontSize="10"
-                        Foreground="#5a6666"
+                        Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                         VerticalAlignment="Center"
                         Margin="5,0,0,0" />
                 </StackPanel>

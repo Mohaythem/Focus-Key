@@ -2,7 +2,8 @@
 <Window x:Class="FocusKey.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Focus Key">
-    <Grid Padding="24" ColumnSpacing="24">
+    <Grid x:Name="MainSurface" Padding="24" ColumnSpacing="24"
+          Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
         <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
         <StackPanel Spacing="12">
             <TextBlock Text="Focus Key" FontSize="22" FontWeight="SemiBold"/>

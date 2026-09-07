@@ -1,6 +1,7 @@
 using FocusKey.Foundation.Sessions;
 using FocusKey.Foundation.Shell;
 using FocusKey.Foundation.Overlay;
+using FocusKey.Foundation.Settings;
 using FocusKey.Overlay;
 using FocusKey.Shell;
 using FocusKey.Startup;
@@ -23,8 +24,10 @@ public partial class App : Application
     private BackgroundShell? _shell;
     private InstanceActivationSignal? _activationSignal;
     private QuickOverlayController? _quickOverlay;
+    private QuickOverlayWindow? _quickOverlayWindow;
     private CompletionCoordinator? _completion;
     private bool _isExiting;
+    private Appearance? _appliedAppearance;
 
     public App()
     {
@@ -58,6 +61,8 @@ public partial class App : Application
             _startup.Logger.Info("Single-instance shell ownership acquired.");
             _window = new MainWindow(_startup, StopSessionAsync,
                 exception => _startup?.Logger.Error("Main-page operation failed.", exception));
+            _startup.Appearance.Changed += OnAppearanceChanged;
+            ApplyAppearance(_startup.Appearance.Current);
             _window.ExitRequested += OnExplicitExitRequested;
             _window.AppWindow.Closing += OnAppWindowClosing;
             _window.Closed += OnMainWindowClosed;
@@ -70,7 +75,7 @@ public partial class App : Application
                 TimeZoneInfo.ClearCachedData();
                 _window?.RefreshPages();
             };
-            _quickOverlay = new QuickOverlayController(() => new QuickOverlayWindow(),
+            _quickOverlay = new QuickOverlayController(CreateQuickOverlay,
                 _startup.Sessions.GetActiveAsync, _startup.Sessions.GetDurationsAsync, StartSessionAsync);
             _quickOverlay.ErrorOccurred += exception => _startup?.Logger.Error("Quick overlay operation failed.", exception);
             _shell = new BackgroundShell(integration, ShutdownSessionsAsync);
@@ -112,15 +117,56 @@ public partial class App : Application
     private async void OnShellActivation(ShellActivationKind kind)
     {
         _startup?.Logger.Info($"Shell activation: {kind}.");
-        if (kind == ShellActivationKind.ShowWindow)
+        try
         {
-            ShowWindow();
+            if (_startup is not null)
+            {
+                await _startup.Appearance.RefreshAsync();
+                ApplyAppearance(_startup.Appearance.Current);
+            }
+            if (kind == ShellActivationKind.ShowWindow)
+            {
+                ShowWindow();
+            }
+            else if (_quickOverlay is not null)
+            {
+                await _quickOverlay.HandleActivationAsync(kind);
+            }
         }
-        else if (_quickOverlay is not null)
+        catch (Exception exception)
         {
-            try { await _quickOverlay.HandleActivationAsync(kind); }
-            catch (Exception exception) { OnShellError(exception); }
+            OnShellError(exception);
         }
+    }
+
+    private IQuickOverlayView CreateQuickOverlay()
+    {
+        var window = new QuickOverlayWindow();
+        window.ApplyAppearance(_startup!.Appearance.Current);
+        _quickOverlayWindow = window;
+        _startup.Logger.Info($"Quick overlay created with appearance {_startup.Appearance.Current}.");
+        return window;
+    }
+
+    private void OnAppearanceChanged(Appearance appearance)
+    {
+        if (_window is null) return;
+        if (_window.DispatcherQueue.HasThreadAccess)
+        {
+            ApplyAppearance(appearance);
+            return;
+        }
+        if (!_window.DispatcherQueue.TryEnqueue(() => ApplyAppearance(appearance)))
+            _startup?.Logger.Warning($"Could not dispatch appearance {appearance} to native surfaces.");
+    }
+
+    private void ApplyAppearance(Appearance appearance)
+    {
+        _window?.ApplyAppearance(appearance);
+        _quickOverlayWindow?.ApplyAppearance(appearance);
+        if (_appliedAppearance == appearance) return;
+        _appliedAppearance = appearance;
+        _startup?.Logger.Info($"Appearance applied to native surfaces: {appearance}.");
     }
 
     private void ShowWindow()
@@ -230,6 +276,7 @@ public partial class App : Application
 
     private void ReleaseResources()
     {
+        if (_startup is not null) _startup.Appearance.Changed -= OnAppearanceChanged;
         _completion?.Dispose();
         _quickOverlay?.Dispose();
         _shell?.Dispose();

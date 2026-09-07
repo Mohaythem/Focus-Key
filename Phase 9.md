@@ -2,8 +2,8 @@
 
 Workspace: `D:\Focus Key`. Branch: `native/phased-rewrite`.
 
-Phase 9 is in progress. This document records completed sub-phases 9.1 and 9.2. A real Settings UI,
-appearance and color application are not included yet.
+Phase 9 is in progress. This document records completed sub-phases 9.1, 9.2 and 9.3. A real
+Settings UI and custom Work/Break color application are not included yet.
 
 ## Phase 9.1 — Settings Foundation & Persistence
 
@@ -231,3 +231,97 @@ record is the required documentation-only follow-up commit on the same branch. O
 pre-existing untracked `chat_history.txt` remains outside the commits.
 
 PHASE 9.2 COMPLETE — PHASE 9 REMAINS IN PROGRESS.
+
+## Phase 9.3 — Runtime Appearance / Theme
+
+Status: PASS — implementation and verification complete.
+
+### Scope and architecture
+
+Work started from the verified Phase 9.2 delivery commit
+`1de30fc29f671f6c70932e4aee75431f760576f1`. Phase 9.3 makes the existing persisted Appearance
+setting functional on the current native surfaces. It does not add Settings controls or apply the
+persisted Work/Break colors.
+
+`AppearanceCoordinator` is the process-wide runtime boundary over the existing `SettingsService`.
+It loads the authoritative persisted appearance at startup, serializes updates and explicit
+refreshes, keeps the last validated value for newly created surfaces, and publishes changes to the
+application shell. It introduces no second configuration store and performs no polling.
+
+The application refreshes appearance on normal tray/main-window and hotkey activation. This lets a
+durable change made while the application is running take effect at the next existing lifecycle
+boundary. An in-process `AppearanceCoordinator.UpdateAsync` publishes immediately, which is the
+path a later Settings UI can use. Application event handling dispatches safely to the WinUI thread.
+
+### System, Light and Dark semantics
+
+- `System` maps to WinUI `ElementTheme.Default`. Theme resources therefore follow the effective
+  Windows/app theme, and native title-bar color overrides are cleared so Windows owns the result.
+- `Light` maps to `ElementTheme.Light` and applies a matching light native title bar.
+- `Dark` maps to `ElementTheme.Dark` and applies a matching dark native title bar.
+
+The main root covers Today, Reports and the Settings placeholder, including all controls created by
+`ReportsView`. The Quick Overlay root now uses WinUI `ThemeResource` values for its surface, border,
+secondary text, keycaps and control states instead of its former forced Dark root and fixed dark
+surface colors. Its existing Work/Break identity colors remain unchanged for Phase 9.4. The overlay
+receives the current appearance before first display, receives runtime changes while hidden or
+visible, and uses the current value when reopened. Its native border also follows System, Light or
+Dark.
+
+### Tests and verification
+
+10 deterministic test cases in eight test methods use isolated SQLite files. They cover:
+
+- uninitialized access safety and the fresh-database System default;
+- persisted System, Light and Dark startup values through a restarted repository/service;
+- ordered runtime Light, Dark and System updates with durable persistence;
+- explicit refresh after an external durable change;
+- no duplicate notification when appearance is unchanged;
+- invalid and cancelled updates preserving runtime and persistence;
+- appearance updates preserving Work/Break durations and both saved colors.
+
+Final verification on 2026-09-07:
+
+- Restore: PASS; all projects up to date.
+- Full solution build: PASS; **0 warnings, 0 errors**.
+- Complete test suite: PASS; **400 passed, 0 failed, 0 skipped** (390 baseline + 10 new cases).
+- Runtime appearance smoke `.smoke/p9-3-runtime-20260907`: PASS. A fresh isolated native app
+  started in System, switched live to Light through main-window activation, switched live to Dark
+  while creating the Quick Overlay, returned live to System, exited cleanly, then restarted from the
+  same isolated database in persisted Dark. Application logs confirmed each applied value and the
+  overlay's Dark creation.
+- Native shell smoke `.smoke/p9-3-final-shell-20260907`: PASS; two clean isolated launches, tray,
+  hide/open, competing-instance handling, exit and hotkey release passed.
+- Completion regression `.smoke/p9-3-final-completion-20260907`: PASS; hidden Work/Break completion,
+  repeat clock/resume idempotency, notification submission and silent Interrupted shutdown passed.
+- Normal/default user data was never opened. Only isolated test and `.smoke` databases were used.
+
+### Files changed
+
+- `src/FocusKey.Foundation/Settings/AppearanceCoordinator.cs`
+- `src/FocusKey.App/Startup/FoundationBootstrap.cs`
+- `src/FocusKey.App/Startup/StartupContext.cs`
+- `src/FocusKey.App/WindowAppearance.cs`
+- `src/FocusKey.App/App.xaml.cs`
+- `src/FocusKey.App/MainWindow.xaml`
+- `src/FocusKey.App/MainWindow.xaml.cs`
+- `src/FocusKey.App/Overlay/QuickOverlayWindow.xaml`
+- `src/FocusKey.App/Overlay/QuickOverlayWindow.xaml.cs`
+- `tests/FocusKey.Foundation.Tests/Settings/AppearanceCoordinatorTests.cs`
+- `.smoke/ShellProbe/Program.cs`
+- this root `Phase 9.md`
+
+### Limitations and deferred work
+
+Phase 9.3 deliberately provides no user-facing setting control. Runtime smoke changes use the
+isolated ShellProbe, while the coordinator's update API is ready for the later Settings page. Custom
+Work/Break color application remains Phase 9.4 work. The final Settings page, final theme palette,
+pixel-level styling, animation and responsive polish remain deferred to Phase 9.5 and Phase 12 as
+authorized later. Mini Timer and Phase 10+ functionality were not implemented.
+
+### Git delivery
+
+Implementation commit: `PENDING`. Remote verification and the documentation follow-up commit will
+be recorded after the verified implementation is pushed.
+
+PHASE 9.3 COMPLETE — PHASE 9 REMAINS IN PROGRESS.

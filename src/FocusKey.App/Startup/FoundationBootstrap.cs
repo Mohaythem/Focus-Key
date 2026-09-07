@@ -43,8 +43,9 @@ internal static class FoundationBootstrap
                 durationProvider: new SettingsSessionDurationProvider(settings));
             SessionRecoveryResult recovery = await sessions.InitializeAsync(cancellationToken).ConfigureAwait(false);
             logger.Info($"Session startup recovery: {recovery.Kind}.");
-            await settings.LoadAsync(cancellationToken).ConfigureAwait(false);
-            logger.Info("Application settings loaded and validated.");
+            var appearance = new AppearanceCoordinator(settings);
+            Appearance initialAppearance = await appearance.InitializeAsync(cancellationToken).ConfigureAwait(false);
+            logger.Info($"Application settings loaded and validated; appearance is {initialAppearance}.");
 
             logger.Info("Foundation initialization complete.");
 
@@ -57,6 +58,7 @@ internal static class FoundationBootstrap
                 Today = new TodayService(repository),
                 Reports = new ReportsService(repository),
                 Settings = settings,
+                Appearance = appearance,
             };
         }
         catch (Exception exception)

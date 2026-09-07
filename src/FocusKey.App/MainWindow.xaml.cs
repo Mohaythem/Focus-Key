@@ -8,11 +8,12 @@ using Windows.Graphics;
 
 namespace FocusKey;
 
-/// <summary>Functional Today and Reports surfaces. Settings remains a placeholder.</summary>
+/// <summary>Functional Today, Reports and Settings surfaces.</summary>
 public sealed partial class MainWindow : Window
 {
     private readonly TodayController _today;
     private readonly ReportsView _reports;
+    private readonly SettingsView _settings;
     private readonly DispatcherQueueTimer _displayTimer;
     private bool _visible;
     private SessionColors _colors = SessionColors.From(ApplicationSettings.Default);
@@ -28,11 +29,14 @@ public sealed partial class MainWindow : Window
         WindowAppearance.Apply(MainSurface, AppWindow, appearance);
 
     internal MainWindow(StartupContext startup,
-        Func<SessionId, CancellationToken, Task<SessionOutcome>> stop, Action<Exception> report)
+        Func<SessionId, CancellationToken, Task<SessionOutcome>> stop, Action<Exception> report,
+        Func<Task> refreshSettings)
     {
         InitializeComponent();
         _reports = new ReportsView(startup.Reports, report);
         ReportsHost.Content = _reports;
+        _settings = new SettingsView(startup.Settings, refreshSettings, report);
+        SettingsHost.Content = _settings;
         AppWindow.Resize(new SizeInt32(900, 720));
         _today = new TodayController(startup.Today.ReadAsync, stop, report);
         _today.Changed += Render;
@@ -71,7 +75,12 @@ public sealed partial class MainWindow : Window
         await _today.NavigateAsync(MainPage.Reports);
         await _reports.OpenAsync();
     }
-    private async void OnSettingsClick(object sender, RoutedEventArgs args) { _reports.Hide(); await _today.NavigateAsync(MainPage.Settings); }
+    private async void OnSettingsClick(object sender, RoutedEventArgs args)
+    {
+        _reports.Hide();
+        await _today.NavigateAsync(MainPage.Settings);
+        await _settings.OpenAsync();
+    }
     private async void OnRefreshClick(object sender, RoutedEventArgs args) => await _today.RefreshAsync();
     private async void OnStopClick(object sender, RoutedEventArgs args) => await _today.StopAsync();
     private void OnExitClick(object sender, RoutedEventArgs args) => ExitRequested?.Invoke();
@@ -84,9 +93,8 @@ public sealed partial class MainWindow : Window
         SettingsNav.IsChecked = _today.Page == MainPage.Settings;
         PageTitle.Text = _today.Page.ToString();
         TodayPanel.Visibility = isToday ? Visibility.Visible : Visibility.Collapsed;
-        Placeholder.Visibility = _today.Page == MainPage.Settings ? Visibility.Visible : Visibility.Collapsed;
+        SettingsHost.Visibility = _today.Page == MainPage.Settings ? Visibility.Visible : Visibility.Collapsed;
         ReportsHost.Visibility = _today.Page == MainPage.Reports ? Visibility.Visible : Visibility.Collapsed;
-        Placeholder.Text = $"{_today.Page} is not implemented yet.";
         LoadStatus.Text = _today.IsRefreshing ? "Loading…" : _today.IsStopping ? "Stopping…" : string.Empty;
         RefreshButton.IsEnabled = !_today.IsRefreshing && !_today.IsStopping;
         ErrorText.Text = _today.Error ?? string.Empty;

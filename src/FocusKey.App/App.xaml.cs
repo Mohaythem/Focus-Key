@@ -60,7 +60,7 @@ public partial class App : Application
             _startup = await FoundationBootstrap.RunAsync();
             _startup.Logger.Info("Single-instance shell ownership acquired.");
             _window = new MainWindow(_startup, StopSessionAsync,
-                exception => _startup?.Logger.Error("Main-page operation failed.", exception));
+                exception => _startup?.Logger.Error("Main-page operation failed.", exception), RefreshSettingsAsync);
             _startup.Appearance.Changed += OnAppearanceChanged;
             _startup.Appearance.ColorsChanged += OnColorsChanged;
             ApplyAppearance(_startup.Appearance.Current);
@@ -162,6 +162,13 @@ public partial class App : Application
         }
         if (!_window.DispatcherQueue.TryEnqueue(() => ApplyAppearance(appearance)))
             _startup?.Logger.Warning($"Could not dispatch appearance {appearance} to native surfaces.");
+    }
+
+    private async Task RefreshSettingsAsync()
+    {
+        if (_startup is null || _isExiting) return;
+        await _startup.Appearance.RefreshAsync();
+        if (_quickOverlay is not null) await _quickOverlay.RefreshIfVisibleAsync();
     }
 
     private void OnColorsChanged(SessionColors colors)

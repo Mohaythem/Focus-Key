@@ -401,3 +401,91 @@ This delivery record is the documentation-only follow-up on the same branch. The
 untracked `chat_history.txt` remains preserved outside the commits.
 
 PHASE 9.4 COMPLETE — PHASE 9 REMAINS IN PROGRESS.
+
+## Phase 9.5 — Functional Settings Page
+
+### UX and architecture
+
+Replaced the Settings placeholder with five compact native rows, following the reference's row-based
+structure without importing its out-of-scope preferences. Work and Break each have whole-minute and
+0–59 second inputs, preserving every supported whole-second duration rather than silently rounding
+existing settings. Appearance uses a native System/Light/Dark ComboBox. Each color row has an accessible
+swatch button that opens the WinUI ColorPicker spectrum, brightness slider and RGB/hex controls.
+Alpha is disabled because the persisted representation is opaque canonical `#RRGGBB`.
+
+An explicit **Save settings** action atomically saves the complete draft through SettingsService.
+**Reload saved values** discards edits. Reopening Settings reloads persistence; the page explicitly
+explains that unsaved edits are discarded on reopening. Draft colors do not change runtime colors.
+Swatches use the chosen color, while their labels retain native theme foreground/background behavior.
+
+SettingsPageController owns load/save/busy/error presentation state outside WinUI. The existing service
+and domain model remain authoritative for persistence and validation. Duration parsing rejects missing,
+negative, fractional and overflowing values, and seconds outside 0–59. Domain validation rejects zero
+total duration, invalid appearance/color and unsupported ranges before writing. Controls are disabled
+during operations, and duplicate save/reload requests cannot overtake a pending save. An accepted save
+is not canceled by navigation, avoiding an ambiguous canceled-but-committed result.
+
+After persistence succeeds, App refreshes the existing AppearanceCoordinator and visible Quick Overlay.
+Appearance and colors propagate through the Phase 9.3–9.4 events; duration reads continue through the
+Phase 9.2 provider. No SQLite queries, session rules or alternative settings store were added to UI code.
+Running and historical records are untouched. Whole-form Save intentionally uses the existing
+whole-record update semantics; there is no cross-process draft merge or conflict editor.
+
+A load failure disables Save until a successful reload. A save failure retains both the previous saved
+snapshot and the user's edits, reports failure, and allows retry. A runtime refresh failure after a
+successful commit explicitly says settings were saved and offers Save again to retry applying them.
+Errors are logged through the existing application logger. Native control names, a polite live status,
+focus outlines, Tab/Enter navigation and Escape dismissal are retained.
+
+### Verification (2026-09-08 local date)
+
+- Restore passed; full build passed with **0 warnings / 0 errors**.
+- Complete suite: **432 passed, 0 failed, 0 skipped** (413 baseline + 19 new tests).
+- Added deterministic controller coverage for all five saved values in System/Light/Dark, runtime
+  refresh, reopen and restart via a new SQLite factory; invalid text and domain values; load/write
+  failure and retry; committed-save/runtime-refresh failure distinction; duplicate in-flight operations;
+  exact seconds; unchanged running/history records and custom durations for subsequent Work/Break starts.
+- Native Settings path verified with computer-use screenshots and keyboard interaction in
+  `.smoke/p95-ui-20260907`: persisted values loaded; zero Work duration rejected; Work changed to 42m,
+  Break to 10m05s; Light chosen via keyboard; both colors selected through the actual spectrum;
+  Escape closed each flyout; Tab reached Save and Enter saved all five settings.
+- Native Light theme applied immediately. Quick Overlay visibly showed **42:00 / 10:05** and selected
+  colors **#165220 / #63621E**, with readable text. Starting Work persisted 2520 seconds. Saving 43m
+  while it ran left its original duration and planned end unchanged, confirmed through repository inspection.
+- After graceful exit/restart, the native Settings page visibly loaded **43m / 10m05s / Light /
+  #165220 / #63621E**. The earlier System/dark-effective page and Light page were both visually inspected.
+- Native shell smoke passed two clean launches, close-to-hide/reopen, tray, single-instance and hotkey
+  cleanup: `.smoke/p4-fe4718d814f84c6a80ff2eb1427b3258`.
+- Native completion smoke passed Work/Break completion, duplicate-signal suppression and silent
+  Interrupted shutdown: `.smoke/p6-eb8196c47e1744b8941b2f8ab66746fd`.
+- Native appearance/color regression matrix passed Light/Dark/System, refresh and restart:
+  `.smoke/p94-7511dfa1b54a46ac930dde8371e1ed45`. These matrix checks use native callbacks/logs;
+  screenshot evidence is limited to the explicitly described Settings and overlay interactions.
+- Failure injection is deterministic controller-test coverage, not a claimed manually induced native
+  disk failure. Native automation's direct UIA value setter was unsupported and its focus reports were
+  sometimes stale; ordinary keyboard input and screenshots verified the interactions instead.
+- Normal user data was not opened. Specification, ZIP and chat history hashes remained unchanged.
+
+### Files changed
+
+- `src/FocusKey.Foundation/Settings/SettingsPageController.cs`
+- `src/FocusKey.App/SettingsView.cs`
+- `src/FocusKey.App/App.xaml.cs`
+- `src/FocusKey.App/MainWindow.xaml`
+- `src/FocusKey.App/MainWindow.xaml.cs`
+- `tests/FocusKey.Foundation.Tests/Settings/SettingsPageControllerTests.cs`
+- `Phase 9.md`
+
+### Limitations and delivery
+
+The inputs use decimal ASCII whole numbers and the native picker's built-in keyboard/accessibility
+support; full localization and screen-reader product certification were not added. Save temporarily
+disables controls, so native focus may move to navigation while saving; the live status reports the
+result. Final responsive behavior, visual fidelity and polish remain Phase 12 work. Phase 9.6 remains
+unstarted for its separately authorized scope. No Mini Timer, extra preferences or Phase 10+ features
+were implemented. Phase 9 as a whole remains in progress.
+
+Implementation commit and verified remote SHA will be recorded after pushing the reviewed work on
+`native/phased-rewrite`, in a documentation-only follow-up commit.
+
+PHASE 9.5 COMPLETE — PHASE 9 REMAINS IN PROGRESS.

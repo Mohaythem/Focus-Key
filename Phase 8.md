@@ -114,8 +114,10 @@ Final verification on 2026-09-07:
 
 ## Git delivery
 
-The verified implementation will be committed and pushed to `origin/native/phased-rewrite`.
-Its remotely verified SHA will be recorded here in the required documentation follow-up commit.
+Implementation commit: `b23242060072983a16dcbeece556a17bfbddd2d3`.
+Pushed successfully to `origin/native/phased-rewrite`; `git ls-remote` returned that exact SHA
+on 2026-09-07. This record is the required documentation-only follow-up commit on the same branch.
+Only the preserved, pre-existing untracked `chat_history.txt` remains outside the commits.
 
 ## Files changed
 

@@ -1,4 +1,5 @@
 using FocusKey.Foundation.Reports;
+using FocusKey.Foundation.Settings;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
@@ -13,6 +14,8 @@ internal sealed class ReportsView : UserControl, IDisposable
     private readonly TextBlock _status = Text();
     private readonly StackPanel _results = new() { Spacing = 16 };
     private bool _rendering;
+    private SessionColors _colors = SessionColors.From(ApplicationSettings.Default);
+    internal void ApplyColors(SessionColors colors) { _colors = colors; Render(); }
 
     internal ReportsView(ReportsService service, Action<Exception> report)
     {
@@ -108,9 +111,10 @@ internal sealed class ReportsView : UserControl, IDisposable
         button.Click += async (_, _) => await action();
         return button;
     }
-    private static ProgressBar Bar(double value, double max, string name)
+    private ProgressBar Bar(double value, double max, string name)
     {
         var bar = new ProgressBar { Minimum = 0, Maximum = max, Value = value };
+        bar.Foreground = SessionColorBrush.Create(name == "Work" ? _colors.Work : _colors.Break);
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(bar, $"{name}: {value:0} seconds");
         return bar;
     }

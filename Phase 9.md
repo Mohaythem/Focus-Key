@@ -327,3 +327,75 @@ record is the required documentation-only follow-up commit on the same branch. O
 pre-existing untracked `chat_history.txt` remains outside the commits.
 
 PHASE 9.3 COMPLETE — PHASE 9 REMAINS IN PROGRESS.
+
+## Phase 9.4 — Runtime Work & Break Colors
+
+### Implementation and decisions
+
+The existing AppearanceCoordinator now publishes an immutable SessionColors snapshot alongside
+appearance, from the same validated settings load. Independent change events avoid coupling theme
+selection to color selection. No schema, session engine, duration provider or report calculations changed.
+SettingsService and its SQLite repository remain the only persisted source of truth. Defaults remain
+Work `#183739` and Break `#434763`; canonical RGB validation is unchanged.
+
+Startup applies the loaded colors. Saving through SettingsService followed by coordinator RefreshAsync
+applies runtime changes. Existing tray/open and hotkey activation boundaries perform that refresh;
+external saves are observed at the next such activation, without polling or restart. Newly created
+overlays receive the current snapshot, and existing hidden surfaces are updated too. Future Settings UI
+must save through the service and refresh the coordinator. No Settings UI was added.
+
+Affected native surfaces: Quick Overlay Work/Break cards and selected-type Start button; Today running
+session progress; Reports Work/Break trend bars. General surfaces and text retain theme resources.
+Reports recolors its cached snapshot without a database read. Colors never modify session records.
+
+Overlay foreground is opaque black or white, whichever has greater contrast against the exact saved
+RGB using sRGB relative luminance. Labels, duration text and button interaction states use this choice.
+Selection uses border thickness instead of fading text. Button-state brushes are owned by the overlay
+and retain identity across updates. Native verification caught and fixed an initial attempt to mutate
+a shared read-only WinUI brush. The failed isolated run and logs were retained; its already-shut-down
+shell process was stopped to release the executable before rebuilding.
+
+### Tests and verification (2026-09-07)
+
+- Restore passed; final full build: **0 warnings / 0 errors**.
+- Full suite: **413 passed, 0 failed, 0 skipped** (400 baseline plus 13 color tests).
+- Deterministic tests cover defaults, seven representative contrast cases, invalid default HexColor,
+  unchanged refresh, separate appearance/color notifications, custom colors in all appearance modes,
+  independent persisted updates, restart via a new SQLite factory, and canceled refresh.
+- Native shell smoke: two clean launches, tray ownership, close-to-hide, reopen, competing launch,
+  explicit exit and hotkey release passed (`.smoke/p94-shell-20260907`).
+- Native color smoke passed with seeded isolated Reports data: default startup, black/white and
+  dark/yellow custom pairs across Light/Dark/System, activation refresh, overlay reuse and new overlay
+  after restart (`.smoke/p94-7e997023586641cb8d23336c9a309a7a`).
+- Native completion smoke passed: hidden Work/Break completion, repeated signals without duplicate UX,
+  silent Interrupted shutdown (`.smoke/p6-cc6428c075364422a8fe644f573f9b70`).
+- Native smoke verifies successful application callbacks and shell behavior, not rendered pixels or
+  manual hover/focus inspection. No visual screenshot verification is claimed.
+- Final diff reviewed; protected specification, ZIP and chat history hashes remained unchanged.
+
+### Files changed
+
+- `src/FocusKey.Foundation/Settings/AppearanceCoordinator.cs`
+- `src/FocusKey.Foundation/Settings/SessionColors.cs`
+- `src/FocusKey.App/App.xaml.cs`
+- `src/FocusKey.App/SessionColorBrush.cs`
+- `src/FocusKey.App/MainWindow.xaml.cs`
+- `src/FocusKey.App/ReportsView.cs`
+- `src/FocusKey.App/Overlay/QuickOverlayWindow.xaml`
+- `src/FocusKey.App/Overlay/QuickOverlayWindow.xaml.cs`
+- `tests/FocusKey.Foundation.Tests/Settings/SessionColorsTests.cs`
+- `.smoke/ShellProbe/Program.cs`
+- `.smoke/run-colors-smoke.ps1`
+- `Phase 9.md`
+
+### Limitations and delivery
+
+No color picker or final Settings page; those remain for Phase 9.5. Final design, advanced palettes,
+animations and polish remain deferred. Very low-contrast progress fills can blend with the background,
+but their adjacent native text labels retain readable theme colors and convey the same data. No Mini
+Timer or Phase 10+ work was implemented. Normal user data was not opened.
+
+Implementation commit and verified remote SHA will be recorded in the documentation-only follow-up
+after pushing this verified implementation on `native/phased-rewrite`.
+
+PHASE 9.4 COMPLETE — PHASE 9 REMAINS IN PROGRESS.

@@ -1,7 +1,7 @@
 namespace FocusKey.Foundation.Settings;
 
 /// <summary>
-/// Owns the process-wide runtime appearance value while keeping the persisted settings record as
+/// Owns process-wide runtime appearance and session colors while keeping the persisted settings record as
 /// its source of truth. Refresh is explicit and updates are serialized; no database polling occurs.
 /// </summary>
 public sealed class AppearanceCoordinator(SettingsService settings)
@@ -10,6 +10,13 @@ public sealed class AppearanceCoordinator(SettingsService settings)
     private readonly SemaphoreSlim _operations = new(1, 1);
     private readonly object _state = new();
     private Appearance? _current;
+    private SessionColors? _colors;
+
+    public event Action<SessionColors>? ColorsChanged;
+    public SessionColors Colors
+    {
+        get { lock (_state) return _colors ?? throw new InvalidOperationException("Initialize appearance before reading colors."); }
+    }
 
     public event Action<Appearance>? Changed;
 
@@ -31,7 +38,7 @@ public sealed class AppearanceCoordinator(SettingsService settings)
         try
         {
             ApplicationSettings current = await _settings.LoadAsync(cancellationToken).ConfigureAwait(false);
-            return PublishIfChanged(current.Appearance);
+            return PublishIfChanged(current);
         }
         finally { _operations.Release(); }
     }
@@ -47,20 +54,26 @@ public sealed class AppearanceCoordinator(SettingsService settings)
         {
             ApplicationSettings updated = await _settings.UpdateAppearanceAsync(appearance, cancellationToken)
                 .ConfigureAwait(false);
-            return PublishIfChanged(updated.Appearance);
+            return PublishIfChanged(updated);
         }
         finally { _operations.Release(); }
     }
 
-    private Appearance PublishIfChanged(Appearance appearance)
+    private Appearance PublishIfChanged(ApplicationSettings settings)
     {
+        Appearance appearance = settings.Appearance;
+        SessionColors colors = SessionColors.From(settings);
         bool changed;
+        bool colorsChanged;
         lock (_state)
         {
             changed = _current != appearance;
             _current = appearance;
+            colorsChanged = _colors != colors;
+            _colors = colors;
         }
         if (changed) Changed?.Invoke(appearance);
+        if (colorsChanged) ColorsChanged?.Invoke(colors);
         return appearance;
     }
 }

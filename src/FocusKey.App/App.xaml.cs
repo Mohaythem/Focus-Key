@@ -62,7 +62,9 @@ public partial class App : Application
             _window = new MainWindow(_startup, StopSessionAsync,
                 exception => _startup?.Logger.Error("Main-page operation failed.", exception));
             _startup.Appearance.Changed += OnAppearanceChanged;
+            _startup.Appearance.ColorsChanged += OnColorsChanged;
             ApplyAppearance(_startup.Appearance.Current);
+            ApplyColors();
             _window.ExitRequested += OnExplicitExitRequested;
             _window.AppWindow.Closing += OnAppWindowClosing;
             _window.Closed += OnMainWindowClosed;
@@ -123,6 +125,7 @@ public partial class App : Application
             {
                 await _startup.Appearance.RefreshAsync();
                 ApplyAppearance(_startup.Appearance.Current);
+                ApplyColors();
             }
             if (kind == ShellActivationKind.ShowWindow)
             {
@@ -143,8 +146,9 @@ public partial class App : Application
     {
         var window = new QuickOverlayWindow();
         window.ApplyAppearance(_startup!.Appearance.Current);
+        window.ApplyColors(_startup.Appearance.Colors);
         _quickOverlayWindow = window;
-        _startup.Logger.Info($"Quick overlay created with appearance {_startup.Appearance.Current}.");
+        _startup.Logger.Info($"Quick overlay created with appearance {_startup.Appearance.Current}; Work {_startup.Appearance.Colors.Work}, Break {_startup.Appearance.Colors.Break}.");
         return window;
     }
 
@@ -158,6 +162,23 @@ public partial class App : Application
         }
         if (!_window.DispatcherQueue.TryEnqueue(() => ApplyAppearance(appearance)))
             _startup?.Logger.Warning($"Could not dispatch appearance {appearance} to native surfaces.");
+    }
+
+    private void OnColorsChanged(SessionColors colors)
+    {
+        if (_window is null) return;
+        if (_window.DispatcherQueue.HasThreadAccess) ApplyColors();
+        else if (!_window.DispatcherQueue.TryEnqueue(ApplyColors))
+            _startup?.Logger.Warning("Could not dispatch session colors to native surfaces.");
+    }
+
+    private void ApplyColors()
+    {
+        if (_startup is null || _isExiting) return;
+        var colors = _startup.Appearance.Colors;
+        _window?.ApplyColors(colors);
+        _quickOverlayWindow?.ApplyColors(colors);
+        _startup.Logger.Info($"Session colors applied: Work {colors.Work}, Break {colors.Break}; foregrounds {SessionColors.Foreground(colors.Work)}, {SessionColors.Foreground(colors.Break)}.");
     }
 
     private void ApplyAppearance(Appearance appearance)
@@ -277,6 +298,7 @@ public partial class App : Application
     private void ReleaseResources()
     {
         if (_startup is not null) _startup.Appearance.Changed -= OnAppearanceChanged;
+        if (_startup is not null) _startup.Appearance.ColorsChanged -= OnColorsChanged;
         _completion?.Dispose();
         _quickOverlay?.Dispose();
         _shell?.Dispose();

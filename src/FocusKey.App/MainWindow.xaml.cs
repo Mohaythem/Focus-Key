@@ -15,6 +15,13 @@ public sealed partial class MainWindow : Window
     private readonly ReportsView _reports;
     private readonly DispatcherQueueTimer _displayTimer;
     private bool _visible;
+    private SessionColors _colors = SessionColors.From(ApplicationSettings.Default);
+    internal void ApplyColors(SessionColors colors)
+    {
+        _colors = colors;
+        _reports.ApplyColors(colors);
+        RenderRunning();
+    }
     internal event Action? ExitRequested;
 
     internal void ApplyAppearance(Appearance appearance) =>
@@ -116,6 +123,7 @@ public sealed partial class MainWindow : Window
         RunningText.Text = snapshot.HasReachedPlannedEnd ? $"{running.Type} · Finishing…" :
             $"{running.Type} · {(long)remaining.TotalMinutes:00}:{remaining.Seconds:00} remaining";
         SessionProgress.Value = 100 * snapshot.Elapsed.TotalSeconds / snapshot.PlannedDuration.TotalSeconds;
+        SessionProgress.Foreground = SessionColorBrush.Create(running.Type == SessionType.Work ? _colors.Work : _colors.Break);
         SessionProgress.Visibility = StopButton.Visibility = Visibility.Visible;
         StopButton.IsEnabled = !_today.IsRefreshing && !_today.IsStopping && _today.Error is null;
     }

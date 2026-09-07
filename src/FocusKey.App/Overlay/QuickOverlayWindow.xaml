@@ -56,18 +56,16 @@
                     Click="OnWorkClicked">
                     <StackPanel Spacing="0">
                         <TextBlock
-                            Text="Work"
+                            x:Name="WorkLabel" Text="Work"
                             FontSize="13"
                             FontWeight="Medium"
-                            Foreground="#f0f4f4"
                             Margin="0,0,0,6" />
                         <TextBlock
                             x:Name="WorkDuration"
                             Text="--:--"
                             FontFamily="Consolas"
                             FontSize="24"
-                            FontWeight="Normal"
-                            Foreground="#f0f4f4" />
+                            FontWeight="Normal" />
                     </StackPanel>
                 </Button>
 
@@ -85,18 +83,16 @@
                     Click="OnBreakClicked">
                     <StackPanel Spacing="0">
                         <TextBlock
-                            Text="Break"
+                            x:Name="BreakLabel" Text="Break"
                             FontSize="13"
                             FontWeight="Medium"
-                            Foreground="#f0f4f4"
                             Margin="0,0,0,6" />
                         <TextBlock
                             x:Name="BreakDuration"
                             Text="--:--"
                             FontFamily="Consolas"
                             FontSize="24"
-                            FontWeight="Normal"
-                            Foreground="#f0f4f4" />
+                            FontWeight="Normal" />
                     </StackPanel>
                 </Button>
             </Grid>
@@ -114,8 +110,6 @@
                 UseSystemFocusVisuals="True"
                 TabIndex="2"
                 AutomationProperties.Name="Start"
-                Background="#183739"
-                Foreground="#f0f4f4"
                 Click="OnStartClicked" />
 
             <TextBlock

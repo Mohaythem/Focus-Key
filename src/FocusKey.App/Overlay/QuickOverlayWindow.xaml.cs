@@ -22,6 +22,9 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
     private DisplayArea? _display;
     private bool _visible;
     private bool _closing;
+    private readonly Dictionary<(Button, string), SolidColorBrush> _stateBrushes = new();
+    private SessionColors _colors = SessionColors.From(ApplicationSettings.Default);
+    internal void ApplyColors(SessionColors colors) { _colors = colors; Render(_state); }
 
     public QuickOverlayWindow()
     {
@@ -74,13 +77,13 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
         BreakDuration.Text = QuickOverlayDurationFormatter.Format(state.Durations?.Break);
         AutomationProperties.SetName(WorkCard, $"Work, {WorkDuration.Text}");
         AutomationProperties.SetName(BreakCard, $"Break, {BreakDuration.Text}");
-        PaintCard(WorkCard, WorkDuration, state.Selected == SessionType.Work, 0x18, 0x37, 0x39);
-        PaintCard(BreakCard, BreakDuration, state.Selected == SessionType.Break, 0x43, 0x47, 0x63);
+        PaintCard(WorkCard, WorkLabel, WorkDuration, state.Selected == SessionType.Work, _colors.Work);
+        PaintCard(BreakCard, BreakLabel, BreakDuration, state.Selected == SessionType.Break, _colors.Break);
         // Keep focusable cards available for navigation while their controller ignores selection
         // during loading/saving or an existing session. Start is explicitly disabled.
         StartButton.IsEnabled = state.CanStart && !state.IsBusy;
         StartButton.Content = state.IsBusy ? "Please wait…" : "Start";
-        StartButton.Background = state.Selected == SessionType.Work ? Brush(0x18, 0x37, 0x39) : Brush(0x43, 0x47, 0x63);
+        PaintButton(StartButton, state.Selected == SessionType.Work ? _colors.Work : _colors.Break);
         FeedbackText.Text = state.Feedback ?? string.Empty;
         FeedbackText.Visibility = state.Feedback is null ? Visibility.Collapsed : Visibility.Visible;
         if (_visible) ResizeAndCenter();
@@ -164,19 +167,38 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
         // Space and Tab retain the native Button keyboard/focus behavior.
     }
 
-    private static void PaintCard(Button card, TextBlock duration, bool selected, byte r, byte g, byte b)
+    private void PaintCard(Button card, TextBlock label, TextBlock duration, bool selected, HexColor color)
     {
-        card.Background = selected ? Brush(r, g, b) : Brush((byte)Math.Max(0, r - 20), (byte)Math.Max(0, g - 20), (byte)Math.Max(0, b - 20));
-        card.BorderBrush = selected ? Brush(r, g, b) : Brush(0x1e, 0x24, 0x24);
-        card.Resources["ButtonBackgroundPointerOver"] = card.Background;
-        card.Resources["ButtonBackgroundPressed"] = card.Background;
-        card.Resources["ButtonBorderBrushPointerOver"] = card.BorderBrush;
-        card.Resources["ButtonBorderBrushPressed"] = card.BorderBrush;
-        card.Opacity = selected ? 1 : 0.6;
-        duration.Foreground = selected ? Brush(0xf0, 0xf4, 0xf4) : Brush(0x90, 0x9b, 0x9b);
+        PaintButton(card, color);
+        card.BorderThickness = new Thickness(selected ? 3 : 1);
+        label.Foreground = duration.Foreground = card.Foreground;
     }
 
-    private static SolidColorBrush Brush(byte r, byte g, byte b) => new(Windows.UI.Color.FromArgb(255, r, g, b));
+    private void PaintButton(Button button, HexColor color)
+    {
+        button.Background = SessionColorBrush.Create(color);
+        button.Foreground = SessionColorBrush.Create(SessionColors.Foreground(color));
+        button.BorderBrush = button.Foreground;
+        foreach (string state in new[] { "PointerOver", "Pressed", "Disabled" })
+        {
+            UpdateResource(button, $"ButtonBackground{state}", (SolidColorBrush)button.Background);
+            UpdateResource(button, $"ButtonForeground{state}", (SolidColorBrush)button.Foreground);
+            UpdateResource(button, $"ButtonBorderBrush{state}", (SolidColorBrush)button.BorderBrush);
+        }
+    }
+
+    private void UpdateResource(Button button, string key, SolidColorBrush value)
+    {
+        // Keep resource identity so already-materialized native visual states also update.
+        if (_stateBrushes.TryGetValue((button, key), out var existing))
+            existing.Color = value.Color;
+        else
+        {
+            var owned = new SolidColorBrush(value.Color);
+            _stateBrushes.Add((button, key), owned);
+            button.Resources[key] = owned;
+        }
+    }
     [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] private static extern uint GetDpiForWindow(IntPtr window);
     [DllImport("dwmapi.dll")] private static extern int DwmSetWindowAttribute(IntPtr window, uint attribute, ref uint value, int size);

@@ -37,6 +37,7 @@ internal static class ShellProbe
                 "seed-reports" => await SeedReportsAsync(args),
                 "set-durations" => await SetDurationsAsync(args),
                 "set-appearance" => await SetAppearanceAsync(args),
+                "set-colors" => await SetColorsAsync(args),
                 "inspect" => await InspectAsync(args),
                 "start-configured" => await StartConfiguredAsync(args),
                 "start-short" => await StartShortAsync(args),
@@ -153,6 +154,19 @@ internal static class ShellProbe
         };
         await settings.SaveAsync(updated);
         Console.WriteLine($"work={workSeconds}s break={breakSeconds}s");
+        return 0;
+    }
+
+    private static async Task<int> SetColorsAsync(string[] args)
+    {
+        if (args.Length != 4) throw new ArgumentException("Usage: set-colors <dataRoot> <#RRGGBB work> <#RRGGBB break>");
+        var work = HexColor.Parse(args[2]);
+        var rest = HexColor.Parse(args[3]);
+        AppPaths paths = GuardedPaths(args[1]);
+        if (!File.Exists(paths.DatabaseFile)) throw new ArgumentException("Use an initialized isolated smoke data root.");
+        var settings = new SettingsService(new SqliteSettingsRepository(new SqliteConnectionFactory(paths.DatabaseFile)));
+        await settings.SaveAsync((await settings.LoadAsync()) with { WorkColor = work, BreakColor = rest });
+        Console.WriteLine($"Work={work} Break={rest}");
         return 0;
     }
 

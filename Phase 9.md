@@ -128,8 +128,9 @@ later authorized sub-phase. Phase 9 itself is deliberately not marked complete.
 
 ### Git delivery
 
-The verified Phase 9.1 implementation will be committed and pushed to
-`origin/native/phased-rewrite`. Its remotely verified SHA will be recorded here in a documentation-
-only follow-up commit.
+Implementation commit: `52351fcdc64d8d33e4dd863429c5ec7add3d2c2e`.
+Pushed successfully to `origin/native/phased-rewrite`; `git ls-remote` returned that exact SHA on
+2026-09-07. This delivery record is the required documentation-only follow-up commit on the same
+branch. Only the preserved, pre-existing untracked `chat_history.txt` remains outside the commits.
 
 PHASE 9.1 COMPLETE — PHASE 9 REMAINS IN PROGRESS.

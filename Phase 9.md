@@ -225,7 +225,9 @@ explicit; no repair/reset UI was added. No Phase 10 or later functionality was i
 
 ### Git delivery
 
-Implementation commit: `PENDING`. Remote verification and the documentation follow-up commit will
-be recorded after the verified implementation is pushed.
+Implementation commit: `71fef3b562579677944736a999b8019031dc80a2`. Pushed successfully to
+`origin/native/phased-rewrite`; `git ls-remote` returned that exact SHA on 2026-09-07. This delivery
+record is the required documentation-only follow-up commit on the same branch. Only the preserved,
+pre-existing untracked `chat_history.txt` remains outside the commits.
 
 PHASE 9.2 COMPLETE — PHASE 9 REMAINS IN PROGRESS.

@@ -321,7 +321,9 @@ authorized later. Mini Timer and Phase 10+ functionality were not implemented.
 
 ### Git delivery
 
-Implementation commit: `PENDING`. Remote verification and the documentation follow-up commit will
-be recorded after the verified implementation is pushed.
+Implementation commit: `39c6d9508431424dda7f5276bb6031d9dd2cb436`. Pushed successfully to
+`origin/native/phased-rewrite`; `git ls-remote` returned that exact SHA on 2026-09-07. This delivery
+record is the required documentation-only follow-up commit on the same branch. Only the preserved,
+pre-existing untracked `chat_history.txt` remains outside the commits.
 
 PHASE 9.3 COMPLETE — PHASE 9 REMAINS IN PROGRESS.

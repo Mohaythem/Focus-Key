@@ -103,7 +103,7 @@ public sealed class DatabaseBootstrapperTests
         Initialize(databaseFile);
 
         // A new table may only appear here together with the migration that introduces it.
-        Assert.Equal(["schema_migrations", "sessions"], UserTables(databaseFile));
+        Assert.Equal(["application_settings", "schema_migrations", "sessions"], UserTables(databaseFile));
     }
 
     [Fact]

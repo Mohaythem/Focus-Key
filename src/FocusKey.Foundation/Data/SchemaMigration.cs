@@ -65,5 +65,31 @@ public static class SchemaMigrations
                 CREATE INDEX ix_sessions_started_at_utc
                     ON sessions (started_at_utc);
                 """),
+
+        new SchemaMigration(
+            Version: 3,
+            Name: "application_settings",
+            Sql: """
+                CREATE TABLE application_settings (
+                    singleton              INTEGER NOT NULL PRIMARY KEY,
+                    work_duration_seconds  INTEGER NOT NULL,
+                    break_duration_seconds INTEGER NOT NULL,
+                    appearance             TEXT    NOT NULL,
+                    work_color             TEXT    NOT NULL,
+                    break_color            TEXT    NOT NULL,
+
+                    CHECK (singleton = 1),
+                    CHECK (work_duration_seconds > 0),
+                    CHECK (break_duration_seconds > 0),
+                    CHECK (appearance IN ('system', 'light', 'dark')),
+                    CHECK (length(work_color) = 7 AND work_color GLOB '#[0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F]'),
+                    CHECK (length(break_color) = 7 AND break_color GLOB '#[0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F]')
+                ) STRICT;
+
+                INSERT INTO application_settings (
+                    singleton, work_duration_seconds, break_duration_seconds,
+                    appearance, work_color, break_color)
+                VALUES (1, 1800, 600, 'system', '#183739', '#434763');
+                """),
     ];
 }

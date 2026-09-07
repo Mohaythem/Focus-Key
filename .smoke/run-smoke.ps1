@@ -10,7 +10,7 @@ $previousDataRoot = [Environment]::GetEnvironmentVariable('FOCUSKEY_DATA_ROOT', 
 function Wait-Until([scriptblock]$Condition, [int]$TimeoutSeconds, [string]$Message) { $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds); do { if (& $Condition) { return }; Start-Sleep -Milliseconds 200 } while ([DateTime]::UtcNow -lt $deadline); throw $Message }
 function Read-Log { if (Test-Path -LiteralPath $logFile) { [string](Get-Content -LiteralPath $logFile -Raw) } else { [string]'' } }
 function Invoke-Probe([string[]]$Arguments) { & $probe @Arguments; if ($LASTEXITCODE -ne 0) { throw "ShellProbe $($Arguments -join ' ') failed with exit code $LASTEXITCODE." } }
-function Assert-Database { if (-not (Test-Path -LiteralPath $databaseFile -PathType Leaf)) { throw "Database was not created: $databaseFile" }; $bytes = New-Object byte[] 64; $stream = [IO.File]::Open($databaseFile, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite); try { if ($stream.Read($bytes, 0, 64) -ne 64) { throw 'Database is truncated.' } } finally { $stream.Dispose() }; if ([Text.Encoding]::ASCII.GetString($bytes, 0, 15) -ne 'SQLite format 3') { throw 'Database is not SQLite.' }; $version = ([int64]$bytes[60] * 16777216) + ([int64]$bytes[61] * 65536) + ([int64]$bytes[62] * 256) + $bytes[63]; if ($version -ne 2) { throw "Database schema version is $version, expected 2." } }
+function Assert-Database { if (-not (Test-Path -LiteralPath $databaseFile -PathType Leaf)) { throw "Database was not created: $databaseFile" }; $bytes = New-Object byte[] 64; $stream = [IO.File]::Open($databaseFile, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite); try { if ($stream.Read($bytes, 0, 64) -ne 64) { throw 'Database is truncated.' } } finally { $stream.Dispose() }; if ([Text.Encoding]::ASCII.GetString($bytes, 0, 15) -ne 'SQLite format 3') { throw 'Database is not SQLite.' }; $version = ([int64]$bytes[60] * 16777216) + ([int64]$bytes[61] * 65536) + ([int64]$bytes[62] * 256) + $bytes[63]; if ($version -ne 3) { throw "Database schema version is $version, expected 3." } }
 try {
     if ([string]::IsNullOrWhiteSpace($DataRootName) -or [IO.Path]::IsPathRooted($DataRootName) -or $DataRootName -match '(^|[\\/])\.\.([\\/]|$)') { throw 'DataRootName must be a relative child of .smoke.' }
     $dataRoot = [IO.Path]::GetFullPath((Join-Path $smokeRoot $DataRootName)); $prefix = $smokeRoot.TrimEnd('\','/') + [IO.Path]::DirectorySeparatorChar
@@ -24,11 +24,11 @@ try {
     Wait-Until { $process.Refresh(); -not $process.HasExited -and $process.MainWindowHandle -ne 0 } 30 'Focus Key did not create a ready window.'
     Wait-Until { (Read-Log) -match 'Foundation initialization complete\.' } 30 'Foundation did not initialize.'
     Wait-Until { (Read-Log) -match 'Shell ready: tray added; Shift \+ F3 registered\.' } 30 'Shell did not become ready.'
-    if ((Read-Log) -notmatch 'Database ready at schema version 2\.' -or (Read-Log) -notmatch 'Session startup recovery: NoActiveSession\.') { throw 'First launch did not confirm schema and startup recovery.' }
+    if ((Read-Log) -notmatch 'Database ready at schema version 3\.' -or (Read-Log) -notmatch 'Session startup recovery: NoActiveSession\.') { throw 'First launch did not confirm schema and startup recovery.' }
     Invoke-Probe -Arguments @('probe', [string]$process.Id)
     # The on-disk header can lag committed schema changes while WAL is open.
     # Check it after graceful exit/checkpoint; live schema is verified by bootstrap logs.
-    if ((Read-Log) -notmatch 'Applied database migration 1 \(schema_metadata\)\.' -or (Read-Log) -notmatch 'Applied database migration 2 \(sessions\)\.') { throw 'Fresh database did not apply both expected migrations.' }
+    if ((Read-Log) -notmatch 'Applied database migration 1 \(schema_metadata\)\.' -or (Read-Log) -notmatch 'Applied database migration 2 \(sessions\)\.' -or (Read-Log) -notmatch 'Applied database migration 3 \(application_settings\)\.') { throw 'Fresh database did not apply all expected migrations.' }
     $beforeHide = Read-Log; if (-not $process.CloseMainWindow()) { throw 'Could not request window close.' }
     Wait-Until { (Read-Log).Length -gt $beforeHide.Length -and (Read-Log) -match 'Main window hidden; shell remains running\.' } 10 'Window close was not converted to hide.'
     $process.Refresh(); if ($process.HasExited) { throw 'Process exited when main window was closed.' }; Invoke-Probe -Arguments @('open', [string]$process.Id)

@@ -5,6 +5,7 @@ using FocusKey.Foundation.Logging;
 using FocusKey.Foundation.Sessions;
 using FocusKey.Foundation.Today;
 using FocusKey.Foundation.Reports;
+using FocusKey.Foundation.Settings;
 
 namespace FocusKey.Startup;
 
@@ -40,6 +41,9 @@ internal static class FoundationBootstrap
             var sessions = new SessionCoordinator(repository);
             SessionRecoveryResult recovery = await sessions.InitializeAsync(cancellationToken).ConfigureAwait(false);
             logger.Info($"Session startup recovery: {recovery.Kind}.");
+            var settings = new SettingsService(new SqliteSettingsRepository(connections));
+            await settings.LoadAsync(cancellationToken).ConfigureAwait(false);
+            logger.Info("Application settings loaded and validated.");
 
             logger.Info("Foundation initialization complete.");
 
@@ -51,6 +55,7 @@ internal static class FoundationBootstrap
                 Sessions = sessions,
                 Today = new TodayService(repository),
                 Reports = new ReportsService(repository),
+                Settings = settings,
             };
         }
         catch (Exception exception)

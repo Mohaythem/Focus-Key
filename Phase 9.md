@@ -485,7 +485,9 @@ result. Final responsive behavior, visual fidelity and polish remain Phase 12 wo
 unstarted for its separately authorized scope. No Mini Timer, extra preferences or Phase 10+ features
 were implemented. Phase 9 as a whole remains in progress.
 
-Implementation commit and verified remote SHA will be recorded after pushing the reviewed work on
-`native/phased-rewrite`, in a documentation-only follow-up commit.
+Implementation commit: `3f84878c3730430047dd61ff3d258084ae579f4e`. Pushed to
+`origin/native/phased-rewrite`; `git ls-remote` returned that exact SHA on 2026-09-08 local date.
+This delivery record is the documentation-only follow-up on the same branch. The pre-existing
+untracked `chat_history.txt` remains preserved outside the commits.
 
 PHASE 9.5 COMPLETE — PHASE 9 REMAINS IN PROGRESS.

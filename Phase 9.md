@@ -395,7 +395,9 @@ animations and polish remain deferred. Very low-contrast progress fills can blen
 but their adjacent native text labels retain readable theme colors and convey the same data. No Mini
 Timer or Phase 10+ work was implemented. Normal user data was not opened.
 
-Implementation commit and verified remote SHA will be recorded in the documentation-only follow-up
-after pushing this verified implementation on `native/phased-rewrite`.
+Implementation commit: `65898a6ce3d3adeda60e1d4a1460f1e612cfe905`. Pushed to
+`origin/native/phased-rewrite`; `git ls-remote` returned that exact SHA on 2026-09-07.
+This delivery record is the documentation-only follow-up on the same branch. The pre-existing
+untracked `chat_history.txt` remains preserved outside the commits.
 
 PHASE 9.4 COMPLETE — PHASE 9 REMAINS IN PROGRESS.

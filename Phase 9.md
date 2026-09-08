@@ -2,8 +2,7 @@
 
 Workspace: `D:\Focus Key`. Branch: `native/phased-rewrite`.
 
-Phase 9 is in progress. This document records completed sub-phases 9.1, 9.2 and 9.3. A real
-Settings UI and custom Work/Break color application are not included yet.
+Phase 9 is complete. This document records sub-phases 9.1–9.6. The final behavior is described in Phase 9.6 below; earlier sections describe their historical delivery state.
 
 ## Phase 9.1 — Settings Foundation & Persistence
 
@@ -582,5 +581,11 @@ NO PHASE 10 OR LATER PRODUCT FUNCTIONALITY WAS IMPLEMENTED IN PHASE 9.
 
 ### Git delivery
 
-Implementation and verification are on `native/phased-rewrite`. The exact pushed implementation SHA
-will be recorded in the documentation-only delivery follow-up after remote verification.
+Implementation and verification are on `native/phased-rewrite`.
+
+Implementation commit: `5631283c033e2fb7a17d9bb4e735e8dcd6616ee4`.
+Pushed to `origin/native/phased-rewrite`; `git ls-remote` returned that exact SHA on 2026-09-09
+local date. This documentation-only follow-up records the verified implementation delivery and
+corrects the document's historical introductory status. Its own SHA is available in Git history and
+the final delivery report, avoiding a self-referential commit hash. No implementation changed after
+final verification. The pre-existing untracked `chat_history.txt` remains preserved outside commits.

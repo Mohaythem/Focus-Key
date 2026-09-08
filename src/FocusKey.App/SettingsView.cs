@@ -83,6 +83,14 @@ internal sealed class SettingsView : UserControl
     {
         foreach (var box in new[] { minutes, seconds })
         {
+            box.TextChanging += (_, _) =>
+            {
+                string normalized = SettingsPageController.NormalizeDigits(box.Text);
+                if (normalized == box.Text) return;
+                int start = box.SelectionStart, length = box.SelectionLength;
+                box.Text = normalized;
+                box.Select(Math.Min(start, normalized.Length), Math.Min(length, normalized.Length - Math.Min(start, normalized.Length)));
+            };
             box.TextChanged += (_, _) =>
             {
                 if (!_applying) { if (work) _workDirty = true; else _breakDirty = true; Render(); }
@@ -186,7 +194,7 @@ internal sealed class SettingsView : UserControl
         var scope = new InputScope();
         scope.Names.Add(new InputScopeName { NameValue = InputScopeNameValue.Number });
         var box = new TextBox { Width = 85, FontFamily = new FontFamily("Segoe UI"),
-            Language = "en-US", FlowDirection = FlowDirection.LeftToRight, InputScope = scope };
+            Language = "en-US", FlowDirection = FlowDirection.LeftToRight, TextReadingOrder = TextReadingOrder.UseFlowDirection, TextAlignment = TextAlignment.Left, InputScope = scope };
         AutomationProperties.SetName(box, name);
         return box;
     }

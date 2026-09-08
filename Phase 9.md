@@ -589,3 +589,39 @@ local date. This documentation-only follow-up records the verified implementatio
 corrects the document's historical introductory status. Its own SHA is available in Git history and
 the final delivery report, avoiding a self-referential commit hash. No implementation changed after
 final verification. The pre-existing untracked `chat_history.txt` remains preserved outside commits.
+
+## Phase 9.6 follow-up — English duration digits
+
+This follow-up starts from verified remote `7b4c71664e0ffc35cb5c8b5c38e87c092620e6cf`,
+which already contains the completed auto-save integration. No phase restart or schema change was needed.
+
+Duration editors now normalize decimal digit characters to ASCII in TextChanging, before rendering,
+while preserving selection. Arabic-Indic `٣٠` and Persian `۳۰` become `30`. The same normalization
+runs at the controller parsing boundary, so non-UI input cannot bypass it. Separators, signs, fractions
+and invalid durations remain rejected. Explicit en-US, Segoe UI, left-to-right flow and UseFlowDirection reading order prevent locale-driven presentation; loaded values use invariant formatting. SQLite continues
+to store numeric durations rather than localized strings. Auto-save and runtime coordination are unchanged.
+
+Verification: full build passed with zero warnings/errors; restore was unnecessary because dependencies
+were unchanged. **226 targeted tests passed, zero failed/skipped** using the filter
+`FullyQualifiedName~Settings|FullyQualifiedName~QuickOverlay|FullyQualifiedName~SessionEngine|FullyQualifiedName~Completion|FullyQualifiedName~Today|FullyQualifiedName~Reports`.
+Nine new cases cover unchanged English input, Arabic-Indic/Persian/fullwidth input, normalization
+idempotency, retained separator validation, and SQLite save/restart under ar-EG, fa-IR and en-US.
+The entire suite was deliberately not rerun for this scoped editor/parser change.
+Native shell smoke passed: `.smoke/p4-60bdc85a246b494b8adc017d3a732eec`.
+Native digit-entry verification passed in `.smoke/p96-digits-20260909`: the user confirmed Arabic-Indic paste immediately displays English digits throughout editing and reopening. Restart database inspection recorded Work 1800s and Break 600s.
+
+Changed files: SettingsView.cs, SettingsPageController.cs, SettingsPageControllerTests.cs and this document.
+This supersedes the earlier ASCII-input-only limitation: localized decimal digits are accepted and
+normalized; broader UI localization and Phase 12 visual refinement remain deferred. The preceding
+Phase 9 PASS markers and auto-save verification remain applicable; this follow-up is now PASS. Protected specification, ZIP and chat-history hashes remain unchanged.
+
+The first native attempt still shaped digits as Arabic despite normalized text and explicit language.
+Direct inspection confirmed this. Setting TextReadingOrder.UseFlowDirection and TextAlignment.Left
+on the four duration fields resolved the observed rendering issue; the native user check then passed.
+The build was repeated successfully (zero warnings/errors), followed by all 35 SettingsPageController
+cases passing. Final shell smoke also passed on that build:
+`.smoke/p4-2084d32cecd2498c852f08788a2aedbb`. The 35-case rerun overlaps the earlier 226-case run;
+it is not an additional unique-test count. Nine added cases bring discovered suite size to 448, but
+only the explicitly listed targeted tests were executed in this follow-up. No normal user data changed.
+
+The exact implementation SHA will be recorded after push verification in a documentation-only follow-up.

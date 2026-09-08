@@ -171,6 +171,48 @@ public sealed class SettingsPageControllerTests
     public void DurationInputPreservesSeconds() =>
         Assert.Equal(TimeSpan.FromSeconds(2525), SettingsPageController.Duration("42", "5"));
 
+    [Theory]
+    [InlineData("30", "30")]
+    [InlineData("٣٠", "30")]
+    [InlineData("۳۰", "30")]
+    [InlineData("１２3٤", "1234")]
+    [InlineData("٠١٢٣٤٥٦٧٨٩", "0123456789")]
+    [InlineData("٣.٥", "3.5")]
+    public void DecimalDigitsNormalizeToAscii(string input, string expected)
+    {
+        Assert.Equal(expected, SettingsPageController.NormalizeDigits(input));
+        Assert.Equal(expected, SettingsPageController.NormalizeDigits(expected));
+    }
+
+    [Theory]
+    [InlineData("ar-EG")]
+    [InlineData("fa-IR")]
+    [InlineData("en-US")]
+    public async Task LocalizedInputPersistsAndReopensAsInvariantDuration(string culture)
+    {
+        var previous = System.Globalization.CultureInfo.CurrentCulture;
+        try
+        {
+            System.Globalization.CultureInfo.CurrentCulture = new(culture);
+            using var store = new SessionStore();
+            var page = new SettingsPageController(new(new SqliteSettingsRepository(store.Connections)),
+                () => Task.CompletedTask, _ => Assert.Fail("Unexpected failure"));
+            await page.LoadAsync();
+            await page.UpdateDurationAsync(true, "٣٠", "٠٥");
+            await page.UpdateDurationAsync(false, "۱۰", "۰");
+            var restarted = new SettingsPageController(new(new SqliteSettingsRepository(
+                new Foundation.Data.SqliteConnectionFactory(store.DatabaseFile))), () => Task.CompletedTask, _ => Assert.Fail("Unexpected failure"));
+            await restarted.LoadAsync();
+            Assert.Equal(TimeSpan.FromSeconds(1805), restarted.Saved!.WorkDuration);
+            Assert.Equal(TimeSpan.FromMinutes(10), restarted.Saved.BreakDuration);
+            Assert.Equal("30", (restarted.Saved.WorkDuration.Ticks / TimeSpan.TicksPerMinute).ToString(System.Globalization.CultureInfo.InvariantCulture));
+            await restarted.UpdateDurationAsync(true, "٣.٥", "٠");
+            Assert.Equal(TimeSpan.FromSeconds(1805), restarted.Saved.WorkDuration);
+            Assert.Contains("invalid value", restarted.Message);
+        }
+        finally { System.Globalization.CultureInfo.CurrentCulture = previous; }
+    }
+
     private static async Task SetAll(SettingsPageController page, ApplicationSettings value)
     {
         await page.UpdateDurationAsync(true, ((long)value.WorkDuration.TotalMinutes).ToString(), value.WorkDuration.Seconds.ToString());

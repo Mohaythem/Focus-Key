@@ -108,10 +108,17 @@ public sealed class SettingsPageController(SettingsService settings, Func<Task> 
         return previous;
     }
 
+    /// <summary>Normalize decimal digit characters without accepting separators or signs.</summary>
+    public static string NormalizeDigits(string text) => string.Concat(text.Select(character =>
+    {
+        int digit = CharUnicodeInfo.GetDecimalDigitValue(character);
+        return digit >= 0 ? (char)('0' + digit) : character;
+    }));
+
     public static TimeSpan Duration(string minutes, string seconds)
     {
-        if (!long.TryParse(minutes, NumberStyles.None, CultureInfo.InvariantCulture, out long m) ||
-            !int.TryParse(seconds, NumberStyles.None, CultureInfo.InvariantCulture, out int s) || s > 59)
+        if (!long.TryParse(NormalizeDigits(minutes), NumberStyles.None, CultureInfo.InvariantCulture, out long m) ||
+            !int.TryParse(NormalizeDigits(seconds), NumberStyles.None, CultureInfo.InvariantCulture, out int s) || s > 59)
             throw new ArgumentException("Enter whole minutes and seconds between 0 and 59.");
         return TimeSpan.FromTicks(checked(checked(m * 60 + s) * TimeSpan.TicksPerSecond));
     }

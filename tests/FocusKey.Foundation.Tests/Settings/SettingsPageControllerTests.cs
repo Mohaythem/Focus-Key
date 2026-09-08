@@ -26,7 +26,7 @@ public sealed class SettingsPageControllerTests
         await page.LoadAsync();
         Assert.Equal(ApplicationSettings.Default, page.Saved);
         var expected = Custom with { Appearance = appearance };
-        await page.SaveAsync(() => expected);
+        await SetAll(page, expected);
         Assert.Equal(expected, page.Saved);
         Assert.Equal(appearance, runtime.Current);
         Assert.Equal(SessionColors.From(expected), runtime.Colors);
@@ -52,11 +52,12 @@ public sealed class SettingsPageControllerTests
         int refreshes = 0;
         var page = new SettingsPageController(new(repo), () => { refreshes++; return Task.CompletedTask; }, _ => { });
         await page.LoadAsync();
-        await page.SaveAsync(() => Custom with { WorkDuration = SettingsPageController.Duration(minutes, seconds) });
+        refreshes = 0;
+        await page.UpdateDurationAsync(true, minutes, seconds);
         Assert.Equal(ApplicationSettings.Default, page.Saved);
         Assert.Equal(0, repo.Saves);
         Assert.Equal(0, refreshes);
-        Assert.Contains("Check your input", page.Message);
+        Assert.Contains("invalid value", page.Message);
     }
 
     [Theory]
@@ -68,11 +69,11 @@ public sealed class SettingsPageControllerTests
         var repo = new FakeRepository();
         var page = new SettingsPageController(new(repo), () => Task.CompletedTask, _ => { });
         await page.LoadAsync();
-        await page.SaveAsync(() => invalid switch
+        await (invalid switch
         {
-            0 => Custom with { WorkDuration = TimeSpan.Zero },
-            1 => Custom with { Appearance = (Appearance)99 },
-            _ => Custom with { WorkColor = default }
+            0 => page.UpdateDurationAsync(true, "0", "0"),
+            1 => page.UpdateAppearanceAsync((Appearance)99),
+            _ => page.UpdateWorkColorAsync(default)
         });
         Assert.Equal(0, repo.Saves);
         Assert.Equal(ApplicationSettings.Default, page.Saved);
@@ -85,14 +86,15 @@ public sealed class SettingsPageControllerTests
         int refreshes = 0;
         var page = new SettingsPageController(new(repo), () => { refreshes++; return Task.CompletedTask; }, _ => { });
         await page.LoadAsync();
-        await page.SaveAsync(() => Custom);
+        refreshes = 0;
+        await page.UpdateWorkColorAsync(Custom.WorkColor);
         Assert.Equal(ApplicationSettings.Default, page.Saved);
-        Assert.Contains("Could not save", page.Message);
+        Assert.Contains("could not save", page.Message);
         Assert.Equal(0, refreshes);
         Assert.False(page.IsBusy);
         repo.FailSave = false;
-        await page.SaveAsync(() => Custom);
-        Assert.Equal(Custom, repo.Value);
+        await page.UpdateWorkColorAsync(Custom.WorkColor);
+        Assert.Equal(ApplicationSettings.Default with { WorkColor = Custom.WorkColor }, repo.Value);
         Assert.Equal(1, refreshes);
     }
 
@@ -102,7 +104,7 @@ public sealed class SettingsPageControllerTests
         var repo = new FakeRepository();
         var page = new SettingsPageController(new(repo), () => throw new IOException(), _ => { });
         await page.LoadAsync();
-        await page.SaveAsync(() => Custom);
+        await SetAll(page, Custom);
         Assert.Equal(Custom, page.Saved);
         Assert.Equal(Custom, repo.Value);
         Assert.Contains("Settings saved, but", page.Message);
@@ -118,7 +120,7 @@ public sealed class SettingsPageControllerTests
         repo.FailLoad = true;
         await page.LoadAsync();
         Assert.Null(page.Saved);
-        await page.SaveAsync(() => Custom);
+        await page.UpdateWorkColorAsync(Custom.WorkColor);
         Assert.Equal(0, repo.Saves);
         repo.FailLoad = false;
         repo.Value = Custom;
@@ -127,19 +129,20 @@ public sealed class SettingsPageControllerTests
     }
 
     [Fact]
-    public async Task DuplicateSaveAndReloadCannotOvertakePendingWrite()
+    public async Task ReloadWaitsForPendingUpdatesAndLatestValueWins()
     {
         var repo = new FakeRepository { Pending = new(TaskCreationOptions.RunContinuationsAsynchronously) };
         var page = new SettingsPageController(new(repo), () => Task.CompletedTask, _ => { });
         await page.LoadAsync();
-        Task pending = page.SaveAsync(() => Custom);
+        Task pending = page.UpdateWorkColorAsync(Custom.WorkColor);
         Assert.True(page.IsBusy);
-        await page.SaveAsync(() => ApplicationSettings.Default);
-        await page.LoadAsync();
+        Task latest = page.UpdateWorkColorAsync(HexColor.Parse("#ABCDEF"));
+        Task reload = page.LoadAsync();
+        Assert.False(reload.IsCompleted);
         repo.Pending.SetResult();
-        await pending;
-        Assert.Equal(1, repo.Saves);
-        Assert.Equal(Custom, page.Saved);
+        await Task.WhenAll(pending, latest, reload);
+        Assert.Equal(2, repo.Saves);
+        Assert.Equal("#ABCDEF", page.Saved!.WorkColor.Value);
     }
 
     [Fact]
@@ -155,7 +158,7 @@ public sealed class SettingsPageControllerTests
         var running = await engine.StartAsync(SessionType.Work);
         var page = new SettingsPageController(service, () => Task.CompletedTask, _ => Assert.Fail("Unexpected failure"));
         await page.LoadAsync();
-        await page.SaveAsync(() => Custom);
+        await SetAll(page, Custom);
         Assert.Equal(running, await store.Repository.GetAsync(running.Id));
         Assert.Equal(historical, await store.Repository.GetAsync(historical.Id));
         await engine.StopAsync();
@@ -167,6 +170,135 @@ public sealed class SettingsPageControllerTests
     [Fact]
     public void DurationInputPreservesSeconds() =>
         Assert.Equal(TimeSpan.FromSeconds(2525), SettingsPageController.Duration("42", "5"));
+
+    private static async Task SetAll(SettingsPageController page, ApplicationSettings value)
+    {
+        await page.UpdateDurationAsync(true, ((long)value.WorkDuration.TotalMinutes).ToString(), value.WorkDuration.Seconds.ToString());
+        await page.UpdateDurationAsync(false, ((long)value.BreakDuration.TotalMinutes).ToString(), value.BreakDuration.Seconds.ToString());
+        await page.UpdateAppearanceAsync(value.Appearance);
+        await page.UpdateWorkColorAsync(value.WorkColor);
+        await page.UpdateBreakColorAsync(value.BreakColor);
+    }
+
+    [Fact]
+    public async Task RapidColorsCoalesceAndOnlyLatestSelectionSettles()
+    {
+        var repo = new FakeRepository { Pending = new(TaskCreationOptions.RunContinuationsAsynchronously) };
+        var page = new SettingsPageController(new(repo), () => Task.CompletedTask, _ => { });
+        await page.LoadAsync();
+        var settled = new List<HexColor>();
+        page.Settled += (field, saved) => { if (field == SettingsField.WorkColor) settled.Add(saved.WorkColor); };
+        var first = page.UpdateWorkColorAsync(HexColor.Parse("#111111"));
+        var skipped = page.UpdateWorkColorAsync(HexColor.Parse("#222222"));
+        var last = page.UpdateWorkColorAsync(HexColor.Parse("#FFFFFF"));
+        Task drain = page.DrainAsync();
+        Assert.False(drain.IsCompleted);
+        repo.Pending.SetResult();
+        await Task.WhenAll(first, skipped, last, drain);
+        Assert.Equal(2, repo.Saves);
+        Assert.Equal([HexColor.Parse("#FFFFFF")], settled);
+        Assert.Equal("#FFFFFF", page.Saved!.WorkColor.Value);
+        Assert.False(page.IsBusy);
+    }
+
+    [Fact]
+    public async Task RapidDifferentFieldsMergeWithoutOverwritingEachOther()
+    {
+        var repo = new FakeRepository { Pending = new(TaskCreationOptions.RunContinuationsAsynchronously) };
+        var page = new SettingsPageController(new(repo), () => Task.CompletedTask, _ => { });
+        await page.LoadAsync();
+        Task a = page.UpdateDurationAsync(true, "42", "5");
+        Task b = page.UpdateDurationAsync(false, "5", "5");
+        Task c = page.UpdateAppearanceAsync(Appearance.Dark);
+        Task d = page.UpdateWorkColorAsync(Custom.WorkColor);
+        Task e = page.UpdateBreakColorAsync(Custom.BreakColor);
+        repo.Pending.SetResult();
+        await Task.WhenAll(a, b, c, d, e);
+        Assert.Equal(Custom, repo.Value);
+        Assert.Equal(Custom, page.Saved);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task CancellationOnlyAppliesBeforeAcceptance(bool before)
+    {
+        var repo = new FakeRepository { Pending = new(TaskCreationOptions.RunContinuationsAsynchronously) };
+        var page = new SettingsPageController(new(repo), () => Task.CompletedTask, _ => { });
+        await page.LoadAsync();
+        using var canceled = new CancellationTokenSource();
+        if (before) canceled.Cancel();
+        Task change = page.UpdateAppearanceAsync(Appearance.Dark, canceled.Token);
+        canceled.Cancel();
+        repo.Pending.SetResult();
+        if (before)
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => change);
+            Assert.Equal(0, repo.Saves);
+        }
+        else
+        {
+            await change;
+            Assert.Equal(Appearance.Dark, page.Saved!.Appearance);
+            Assert.Equal(Appearance.Dark, repo.Value.Appearance);
+        }
+        Assert.False(page.IsBusy);
+    }
+
+    [Fact]
+    public async Task SQLiteFailureRollsBackOnlyFailedFieldThenRecovers()
+    {
+        using var store = new SessionStore();
+        var service = new SettingsService(new SqliteSettingsRepository(store.Connections));
+        var runtime = new AppearanceCoordinator(service);
+        var page = new SettingsPageController(service, async () => { await runtime.RefreshAsync(); }, _ => { });
+        await page.LoadAsync();
+        store.ExecuteRaw("CREATE TRIGGER reject_work_color BEFORE UPDATE OF work_color ON application_settings WHEN NEW.work_color = '#FFFFFF' BEGIN SELECT RAISE(ABORT, 'isolated failure'); END;");
+        var settled = new List<(SettingsField, ApplicationSettings)>();
+        page.Settled += (field, saved) => settled.Add((field, saved));
+        await page.UpdateWorkColorAsync(Custom.WorkColor);
+        await page.UpdateAppearanceAsync(Appearance.Dark);
+        await page.UpdateBreakColorAsync(HexColor.Parse("#FFFF00"));
+        Assert.Equal(ApplicationSettings.Default.WorkColor, settled[0].Item2.WorkColor);
+        Assert.Equal(SettingsField.WorkColor, settled[0].Item1);
+        Assert.Equal(ApplicationSettings.Default.WorkColor, runtime.Colors.Work);
+        Assert.Equal(HexColor.Parse("#FFFF00"), runtime.Colors.Break);
+        Assert.Equal(Appearance.Dark, runtime.Current);
+        Assert.Equal(await service.LoadAsync(), page.Saved);
+        Assert.Contains("could not save", page.Message); // Other successful fields don't hide a failure.
+        store.ExecuteRaw("DROP TRIGGER reject_work_color;");
+        await page.UpdateWorkColorAsync(Custom.WorkColor);
+        Assert.Equal(Custom.WorkColor, runtime.Colors.Work);
+        Assert.DoesNotContain("could not save", page.Message);
+    }
+
+    [Fact]
+    public async Task RuntimeRetryDoesNotRewritePersistence()
+    {
+        var repo = new FakeRepository();
+        bool fail = true;
+        var page = new SettingsPageController(new(repo), () => fail ? Task.FromException(new IOException()) : Task.CompletedTask, _ => { });
+        await page.LoadAsync();
+        await page.UpdateAppearanceAsync(Appearance.Dark);
+        Assert.Contains("live apply failed", page.Message);
+        fail = false;
+        await page.LoadAsync();
+        Assert.Equal(1, repo.Saves);
+        Assert.Equal(Appearance.Dark, page.Saved!.Appearance);
+        Assert.DoesNotContain("failed", page.Message);
+    }
+
+    [Fact]
+    public async Task IndividualUpdatePreservesUnrelatedExternalSavedValues()
+    {
+        using var store = new SessionStore();
+        var service = new SettingsService(new SqliteSettingsRepository(store.Connections));
+        var page = new SettingsPageController(service, () => Task.CompletedTask, _ => { });
+        await page.LoadAsync();
+        await service.UpdateBreakDurationAsync(TimeSpan.FromMinutes(17));
+        await page.UpdateWorkColorAsync(Custom.WorkColor);
+        Assert.Equal(TimeSpan.FromMinutes(17), (await service.LoadAsync()).BreakDuration);
+    }
 
     private sealed class FakeRepository : ISettingsRepository
     {

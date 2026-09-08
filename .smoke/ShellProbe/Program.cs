@@ -37,6 +37,8 @@ internal static class ShellProbe
                 "seed-reports" => await SeedReportsAsync(args),
                 "set-durations" => await SetDurationsAsync(args),
                 "set-appearance" => await SetAppearanceAsync(args),
+                "inspect-settings" => await InspectSettingsAsync(args),
+                "settings-write-failure" => SettingsWriteFailure(args),
                 "set-colors" => await SetColorsAsync(args),
                 "inspect" => await InspectAsync(args),
                 "start-configured" => await StartConfiguredAsync(args),
@@ -154,6 +156,32 @@ internal static class ShellProbe
         };
         await settings.SaveAsync(updated);
         Console.WriteLine($"work={workSeconds}s break={breakSeconds}s");
+        return 0;
+    }
+
+    private static async Task<int> InspectSettingsAsync(string[] args)
+    {
+        if (args.Length != 2) throw new ArgumentException("Usage: inspect-settings <isolatedDataRoot>");
+        var paths = GuardedPaths(args[1]);
+        if (!File.Exists(paths.DatabaseFile)) throw new ArgumentException("Use an initialized smoke database.");
+        var settings = await new SettingsService(new SqliteSettingsRepository(new SqliteConnectionFactory(paths.DatabaseFile))).LoadAsync();
+        Console.WriteLine($"Work={settings.WorkDuration.TotalSeconds}s Break={settings.BreakDuration.TotalSeconds}s Appearance={settings.Appearance} WorkColor={settings.WorkColor} BreakColor={settings.BreakColor}");
+        return 0;
+    }
+
+    private static int SettingsWriteFailure(string[] args)
+    {
+        if (args.Length != 3 || args[2] is not ("on" or "off"))
+            throw new ArgumentException("Usage: settings-write-failure <isolatedDataRoot> <on|off>");
+        var paths = GuardedPaths(args[1]);
+        if (!File.Exists(paths.DatabaseFile)) throw new ArgumentException("Use an initialized smoke database.");
+        using var connection = new SqliteConnectionFactory(paths.DatabaseFile).OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = args[2] == "on"
+            ? "CREATE TRIGGER IF NOT EXISTS smoke_reject_settings BEFORE UPDATE ON application_settings BEGIN SELECT RAISE(ABORT, 'isolated settings smoke failure'); END;"
+            : "DROP TRIGGER IF EXISTS smoke_reject_settings;";
+        command.ExecuteNonQuery();
+        Console.WriteLine($"Settings write failure {args[2]} in isolated database.");
         return 0;
     }
 

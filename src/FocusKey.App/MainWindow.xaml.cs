@@ -50,6 +50,7 @@ public sealed partial class MainWindow : Window
 
     internal async void OpenToday()
     {
+        _settings.CommitPendingDurations();
         _visible = true;
         _reports.Hide();
         await _today.OpenAsync();
@@ -57,6 +58,7 @@ public sealed partial class MainWindow : Window
 
     internal void HideToday()
     {
+        _settings.CommitPendingDurations();
         _visible = false;
         _displayTimer.Stop();
         _today.Hide();
@@ -69,14 +71,24 @@ public sealed partial class MainWindow : Window
         await _reports.RefreshAsync();
     });
 
-    private async void OnTodayClick(object sender, RoutedEventArgs args) { _reports.Hide(); await _today.NavigateAsync(MainPage.Today); }
+    internal Task FlushSettingsAsync()
+    {
+        _settings.CommitPendingDurations();
+        _settings.IsEnabled = false;
+        return _settings.FlushAsync();
+    }
+    internal void ResumeSettings() => _settings.IsEnabled = true;
+
+    private async void OnTodayClick(object sender, RoutedEventArgs args) { _settings.CommitPendingDurations(); _reports.Hide(); await _today.NavigateAsync(MainPage.Today); }
     private async void OnReportsClick(object sender, RoutedEventArgs args)
     {
+        _settings.CommitPendingDurations();
         await _today.NavigateAsync(MainPage.Reports);
         await _reports.OpenAsync();
     }
     private async void OnSettingsClick(object sender, RoutedEventArgs args)
     {
+        _settings.CommitPendingDurations();
         _reports.Hide();
         await _today.NavigateAsync(MainPage.Settings);
         await _settings.OpenAsync();

@@ -491,3 +491,96 @@ This delivery record is the documentation-only follow-up on the same branch. The
 untracked `chat_history.txt` remains preserved outside the commits.
 
 PHASE 9.5 COMPLETE — PHASE 9 REMAINS IN PROGRESS.
+
+## Phase 9.6 — Settings Integration, Auto-save & Final Verification
+
+Status: PASS. Verified 2026-09-09 local date.
+
+### Implementation and integration decisions
+
+Normal changes no longer require Save. Appearance and both color pickers save on selection and
+apply after persistence succeeds. Duration rows save on Enter, leaving the row, navigation, window
+hiding, or graceful exit. Moving between minutes and seconds does not commit a partially edited
+pair. Uncommitted duration edits have an explicit status message. Reload remains a retry/reload action.
+
+The existing SettingsService and single SQLite settings record remain authoritative. No schema,
+session engine, report calculation, or parallel configuration store was added. The UI-thread controller
+serializes accepted operations in invocation order and coalesces superseded queued changes to the
+same field. Individual service updates merge with persisted settings, preserving other fields. A newer
+selection is never reset by an older save completing. SQLite work runs off the UI thread; controls
+remain usable during saves, avoiding lost focus on every color change.
+
+Validation/write failures restore the affected field to its last successfully persisted value and show
+feedback. Errors remain visible when another field succeeds. A committed save whose runtime refresh
+fails is reported separately; Reload retries live application without rewriting persistence. The native
+refresh explicitly reapplies appearance/colors even when the coordinator's cached value is unchanged.
+Cancellation is honored before acceptance; accepted writes drain instead of being canceled at an
+ambiguous commit point. Graceful exit commits pending duration edits, disables further input, and
+awaits accepted operations. A failed session shutdown restores the Settings editor.
+
+Running and historical sessions retain their original durations. Future sessions read saved durations.
+Existing runtime coordinators continue to cover the main window, Today, Reports and Quick Overlay;
+System/Light/Dark and Work/Break colors remain independent. No database polling was introduced.
+
+Native verification found square/missing glyphs in duration fields after editing. Numeric editors now
+explicitly use Segoe UI, en-US, left-to-right flow and numeric input scope. The user confirmed numbers
+remain readable after editing in the rebuilt application. This is a verified mitigation; no claim is made
+about a proven upstream WinUI defect.
+
+### Tests and verification
+
+- Restore passed. Full solution build: **0 warnings, 0 errors**.
+- Complete test suite: **439 passed, 0 failed, 0 skipped** (432 baseline, seven additional cases).
+- Existing controller tests now exercise individual auto-save operations. Added coverage proves rapid
+  same-field coalescing, ordered multi-field merging, cancellation before/after acceptance, real SQLite
+  write-failure rollback and retry, retained failure feedback, runtime retry without another write, and
+  preservation of unrelated externally saved fields. Existing restart, running/history immutability,
+  duration, appearance, color, recovery, completion, Today and Reports tests remain green.
+- Native Settings checks used only `.smoke/p96-ui-20260908`. Work 41 minutes auto-saved; Light applied
+  immediately. An isolated SQLite trigger rejected an appearance update: persisted/runtime Light stayed
+  intact and the editor reported rollback. The trigger was removed. Restart loaded persisted settings.
+  The user confirmed the rebuilt numeric inputs and both color pickers work without Save. Final database
+  inspection recorded Work 2460 seconds, Break 1500 seconds, Dark, Work #183739 and Break #434763.
+  The final colors equal defaults; that final inspection alone is not evidence of custom-color selection.
+- Final native shell smoke PASS: `.smoke/p4-d57d394b922b4441a64e8c68db02ce9a` — two clean launches,
+  tray integration, close/hide/reopen, single-instance behavior and hotkey cleanup.
+- Final native completion smoke PASS: `.smoke/p6-b5c7adda1aca4be38a1a75882202ea4b` — hidden Work/Break
+  completion, duplicate-signal suppression and silent Interrupted shutdown.
+- Final native appearance/color matrix PASS: `.smoke/p94-01c677928806443f9eb52e10fc9c86ca` — custom
+  light/dark colors in Light/Dark/System, live refresh, overlay creation/reuse and restart, with Reports
+  fixture data. These checks verify native callbacks/logs, not rendered pixels; manual Settings evidence
+  and prior phase visual verification complement them.
+- Final source review and whitespace diff check passed. Normal user data was not accessed.
+  Specification, ZIP and chat-history hashes are unchanged; untracked chat history is not committed.
+
+### Files changed
+
+- `src/FocusKey.Foundation/Settings/SettingsPageController.cs`
+- `src/FocusKey.App/SettingsView.cs`
+- `src/FocusKey.App/MainWindow.xaml.cs`
+- `src/FocusKey.App/App.xaml.cs`
+- `tests/FocusKey.Foundation.Tests/Settings/SettingsPageControllerTests.cs`
+- `.smoke/ShellProbe/Program.cs` — guarded isolated settings inspection and failure injection.
+- `Phase 9.md`
+
+### Final Phase 9 summary and limitations
+
+9.1 established validated durable settings and schema migration; 9.2 connected runtime durations;
+9.3 connected System/Light/Dark appearance; 9.4 connected semantic Work/Break colors with readable
+foregrounds; 9.5 added the functional native editor; 9.6 replaces its explicit Save interaction with
+coherent auto-save, live application, failure handling and shutdown draining.
+
+Duration entry uses ASCII whole minutes/seconds and commits at row boundaries or Enter, rather than
+saving invalid intermediate keystrokes. The controller is deliberately UI-thread owned. Abrupt process
+termination cannot guarantee uncommitted edits or queued writes; graceful shutdown drains them.
+Full localization, screen-reader certification, final responsive layout, typography and visual polish
+remain deferred to Phase 12. No new preferences, Mini Timer or later-phase product features were added.
+
+PHASE 9 PASS.
+
+NO PHASE 10 OR LATER PRODUCT FUNCTIONALITY WAS IMPLEMENTED IN PHASE 9.
+
+### Git delivery
+
+Implementation and verification are on `native/phased-rewrite`. The exact pushed implementation SHA
+will be recorded in the documentation-only delivery follow-up after remote verification.

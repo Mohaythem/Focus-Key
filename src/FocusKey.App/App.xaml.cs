@@ -167,7 +167,11 @@ public partial class App : Application
     private async Task RefreshSettingsAsync()
     {
         if (_startup is null || _isExiting) return;
-        await _startup.Appearance.RefreshAsync();
+        var startup = _startup;
+        await Task.Run(() => startup.Appearance.RefreshAsync());
+        if (_startup is null || _isExiting) return;
+        ApplyAppearance(_startup.Appearance.Current);
+        ApplyColors();
         if (_quickOverlay is not null) await _quickOverlay.RefreshIfVisibleAsync();
     }
 
@@ -226,6 +230,7 @@ public partial class App : Application
 
     private async Task ShutdownSessionsAsync()
     {
+        if (_window is not null) await _window.FlushSettingsAsync();
         _quickOverlay?.Dismiss();
         _window?.HideToday();
         if (_startup is null) return;
@@ -237,7 +242,7 @@ public partial class App : Application
                 : await _startup.Sessions.ShutdownAsync();
             _startup.Logger.Info($"Session shutdown: {result.Kind}.");
         }
-        catch { _isExiting = false; _window?.OpenToday(); throw; }
+        catch { _isExiting = false; _window?.ResumeSettings(); _window?.OpenToday(); throw; }
     }
 
     private Task NotifyCompletedAsync(WindowsShellIntegration integration, SessionRecord session)

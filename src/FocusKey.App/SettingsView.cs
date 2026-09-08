@@ -4,7 +4,9 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using Windows.System;
 
 namespace FocusKey;
 
@@ -23,10 +25,10 @@ internal sealed class SettingsView : UserControl
     private readonly ColorPicker _breakColor = Picker("Break color picker");
     private readonly Button _workButton = new();
     private readonly Button _breakButton = new();
-    private readonly Button _save = new() { Content = "Save settings" };
     private readonly Button _reload = new() { Content = "Reload saved values" };
     private readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap };
-    private ApplicationSettings? _displayed;
+    private bool _applying;
+    private bool _workDirty, _breakDirty;
 
     internal SettingsView(SettingsService settings, Func<Task> refresh, Action<Exception> report)
     {
@@ -42,45 +44,103 @@ internal sealed class SettingsView : UserControl
         _fields.Children.Add(Row("Work color", _workButton));
         _fields.Children.Add(Row("Break color", _breakButton));
         var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-        actions.Children.Add(_save);
         actions.Children.Add(_reload);
         var panel = new StackPanel { Spacing = 16 };
-        panel.Children.Add(new TextBlock { Text = "Changes apply when saved. Durations affect future sessions only.\nReopening this page discards unsaved edits.", TextWrapping = TextWrapping.Wrap });
+        panel.Children.Add(new TextBlock { Text = "Theme and colors save and apply automatically.\nDurations save when you leave the row or press Enter, and affect future sessions only.", TextWrapping = TextWrapping.Wrap });
         _editor.Content = _fields;
         panel.Children.Add(_editor);
         panel.Children.Add(actions);
         panel.Children.Add(_status);
         Content = panel;
-        _save.Click += async (_, _) => await _controller.SaveAsync(ReadDraft);
         _reload.Click += async (_, _) => await OpenAsync();
+        _appearance.SelectionChanged += async (_, _) =>
+        {
+            if (!_applying) await _controller.UpdateAppearanceAsync((Appearance)_appearance.SelectedIndex);
+        };
+        _workColor.ColorChanged += async (_, _) =>
+        {
+            if (!_applying) await _controller.UpdateWorkColorAsync(ColorValue(_workColor));
+        };
+        _breakColor.ColorChanged += async (_, _) =>
+        {
+            if (!_applying) await _controller.UpdateBreakColorAsync(ColorValue(_breakColor));
+        };
+        WireDuration(_workMinutes, _workSeconds, true);
+        WireDuration(_breakMinutes, _breakSeconds, false);
+        _controller.Loaded += saved =>
+        {
+            _workDirty = _breakDirty = false;
+            foreach (var field in Enum.GetValues<SettingsField>()) SetField(field, saved);
+        };
+        _controller.Settled += SetField;
         _controller.Changed += Render;
         Render();
     }
 
     internal Task OpenAsync() => _controller.LoadAsync();
 
-    private ApplicationSettings ReadDraft() => new()
+    private void WireDuration(TextBox minutes, TextBox seconds, bool work)
     {
-        WorkDuration = SettingsPageController.Duration(_workMinutes.Text, _workSeconds.Text),
-        BreakDuration = SettingsPageController.Duration(_breakMinutes.Text, _breakSeconds.Text),
-        Appearance = (Appearance)_appearance.SelectedIndex,
-        WorkColor = ColorValue(_workColor), BreakColor = ColorValue(_breakColor),
-    };
+        foreach (var box in new[] { minutes, seconds })
+        {
+            box.TextChanged += (_, _) =>
+            {
+                if (!_applying) { if (work) _workDirty = true; else _breakDirty = true; Render(); }
+            };
+            box.KeyDown += async (_, args) =>
+            {
+                if (args.Key == VirtualKey.Enter) { args.Handled = true; await CommitDurationAsync(work); }
+            };
+            box.LostFocus += (_, _) => DispatcherQueue.TryEnqueue(async () =>
+            {
+                var focused = XamlRoot is null ? null : FocusManager.GetFocusedElement(XamlRoot);
+                if (!ReferenceEquals(focused, minutes) && !ReferenceEquals(focused, seconds)) await CommitDurationAsync(work);
+            });
+        }
+    }
+
+    private Task CommitDurationAsync(bool work)
+    {
+        if (work ? !_workDirty : !_breakDirty) return Task.CompletedTask;
+        if (work) _workDirty = false; else _breakDirty = false;
+        return _controller.UpdateDurationAsync(work, work ? _workMinutes.Text : _breakMinutes.Text,
+            work ? _workSeconds.Text : _breakSeconds.Text);
+    }
+
+    internal void CommitPendingDurations()
+    {
+        _ = CommitDurationAsync(true);
+        _ = CommitDurationAsync(false);
+    }
+
+    internal async Task FlushAsync()
+    {
+        CommitPendingDurations();
+        await _controller.DrainAsync();
+    }
+
+    private void SetField(SettingsField field, ApplicationSettings saved)
+    {
+        _applying = true;
+        try
+        {
+            switch (field)
+            {
+                case SettingsField.WorkDuration when !_workDirty: SetDuration(saved.WorkDuration, _workMinutes, _workSeconds); break;
+                case SettingsField.BreakDuration when !_breakDirty: SetDuration(saved.BreakDuration, _breakMinutes, _breakSeconds); break;
+                case SettingsField.Appearance: _appearance.SelectedIndex = (int)saved.Appearance; break;
+                case SettingsField.WorkColor: _workColor.Color = SessionColorBrush.Create(saved.WorkColor).Color; break;
+                case SettingsField.BreakColor: _breakColor.Color = SessionColorBrush.Create(saved.BreakColor).Color; break;
+            }
+        }
+        finally { _applying = false; }
+    }
 
     private void Render()
     {
-        if (_controller.Saved is { } saved && !ReferenceEquals(saved, _displayed))
-        {
-            SetDuration(saved.WorkDuration, _workMinutes, _workSeconds);
-            SetDuration(saved.BreakDuration, _breakMinutes, _breakSeconds);
-            _appearance.SelectedIndex = (int)saved.Appearance;
-            _workColor.Color = SessionColorBrush.Create(saved.WorkColor).Color;
-            _breakColor.Color = SessionColorBrush.Create(saved.BreakColor).Color;
-        }
-        _displayed = _controller.Saved;
-        _editor.IsEnabled = _save.IsEnabled = !_controller.IsBusy && _controller.Saved is not null;
-        _reload.IsEnabled = !_controller.IsBusy;
-        _status.Text = _controller.Message;
+        _editor.IsEnabled = !_controller.IsLoading && _controller.Saved is not null;
+        _reload.IsEnabled = !_controller.IsLoading;
+        _status.Text = (_workDirty || _breakDirty ? "Duration edit not yet applied. Leave the row or press Enter. " : "") + _controller.Message;
     }
 
     private static void SetDuration(TimeSpan duration, TextBox minutes, TextBox seconds)
@@ -122,7 +182,11 @@ internal sealed class SettingsView : UserControl
 
     private static TextBox Number(string name)
     {
-        var box = new TextBox { Width = 85 };
+        // Numeric editors use an explicit font/language instead of keyboard-dependent font fallback.
+        var scope = new InputScope();
+        scope.Names.Add(new InputScopeName { NameValue = InputScopeNameValue.Number });
+        var box = new TextBox { Width = 85, FontFamily = new FontFamily("Segoe UI"),
+            Language = "en-US", FlowDirection = FlowDirection.LeftToRight, InputScope = scope };
         AutomationProperties.SetName(box, name);
         return box;
     }

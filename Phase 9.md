@@ -624,4 +624,4 @@ cases passing. Final shell smoke also passed on that build:
 it is not an additional unique-test count. Nine added cases bring discovered suite size to 448, but
 only the explicitly listed targeted tests were executed in this follow-up. No normal user data changed.
 
-The exact implementation SHA will be recorded after push verification in a documentation-only follow-up.
+Follow-up implementation commit: `c895e66e9cfd77b4ac28c7c9f879ccc653d09784`. Pushed to `origin/native/phased-rewrite`; the remote returned that exact SHA on 2026-09-09 local date. This documentation-only commit records delivery; its own SHA is recorded in Git history and the final report.

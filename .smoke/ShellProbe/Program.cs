@@ -31,6 +31,8 @@ internal static class ShellProbe
                 "mini" => PostCommand(ParsePid(args), 3),
                 "mini-probe" => ProbeMini(ParsePid(args), false),
                 "mini-hide" => ProbeMini(ParsePid(args), true),
+                "overlay-probe" => ProbeMini(ParsePid(args), false, true),
+                "overlay-hide" => ProbeMini(ParsePid(args), true, true),
                 "hotkey" => PostHotkey(ParsePid(args)),
                 "exit" => PostCommand(ParsePid(args), 2),
                 "menu" => OpenMenu(ParsePid(args)),
@@ -71,15 +73,16 @@ internal static class ShellProbe
         return 0;
     }
 
-    private static int ProbeMini(int pid, bool hide)
+    private static int ProbeMini(int pid, bool hide, bool overlay = false)
     {
+        string expectedTitle = overlay ? "Focus Key — Quick Overlay" : "Focus Key Mini Timer";
         var matches = new List<IntPtr>();
         EnumWindows((window, _) =>
         {
             GetWindowThreadProcessId(window, out uint owner);
             var title = new StringBuilder(256);
             GetWindowText(window, title, title.Capacity);
-            if (owner == pid && title.ToString() == "Focus Key Mini Timer") matches.Add(window);
+            if (owner == pid && title.ToString() == expectedTitle) matches.Add(window);
             return true;
         }, IntPtr.Zero);
         if (matches.Count != 1) throw new InvalidOperationException($"Expected one Mini Timer, found {matches.Count}.");

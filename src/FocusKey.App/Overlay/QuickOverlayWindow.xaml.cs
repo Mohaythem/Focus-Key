@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using FocusKey.Foundation.Overlay;
 using FocusKey.Foundation.Sessions;
 using FocusKey.Foundation.Settings;
+using FocusKey.Foundation.MiniTimer;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
@@ -22,13 +23,19 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
     private DisplayArea? _display;
     private bool _visible;
     private bool _closing;
+    private readonly Microsoft.UI.Dispatching.DispatcherQueueTimer _displayTimer;
+    private readonly Action<string>? _trace;
     private readonly Dictionary<(Button, string), SolidColorBrush> _stateBrushes = new();
     private SessionColors _colors = SessionColors.From(ApplicationSettings.Default);
     internal void ApplyColors(SessionColors colors) { _colors = colors; Render(_state); }
 
-    public QuickOverlayWindow()
+    public QuickOverlayWindow(Action<string>? trace = null)
     {
+        _trace = trace;
         InitializeComponent();
+        _displayTimer = DispatcherQueue.CreateTimer();
+        _displayTimer.Interval = TimeSpan.FromSeconds(1);
+        _displayTimer.Tick += (_, _) => RenderCountdown();
         var presenter = OverlappedPresenter.Create();
         presenter.IsResizable = false;
         presenter.IsMinimizable = false;
@@ -54,6 +61,7 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
 
     public event Action<SessionType>? SelectionRequested;
     public event Action? StartRequested;
+    public event Action? StopRequested;
     public event Action? DismissRequested;
 
     internal void ApplyAppearance(Appearance appearance)
@@ -72,7 +80,27 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
 
     public void Render(QuickOverlayState state)
     {
+        bool changedMode = (_state.Active is null) != (state.Active is null);
+        if (_state.Active?.Id != state.Active?.Id || _state.IsBusy != state.IsBusy || _state.CanStart != state.CanStart)
+            _trace?.Invoke(state.Active is { } observed
+                ? $"Quick overlay state: {observed.Type} timer; id={observed.Id}; plannedEnd={observed.PlannedEndAt:O}; busy={state.IsBusy}."
+                : $"Quick overlay state: selection; ready={state.CanStart}; busy={state.IsBusy}.");
         _state = state;
+        bool active = state.Active is not null;
+        SelectionCards.Visibility = StartButton.Visibility = SelectionHint.Visibility = active ? Visibility.Collapsed : Visibility.Visible;
+        ActiveCard.Visibility = StopButton.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
+        ActionHint.Text = active ? "Stop" : "Start";
+        StopButton.IsEnabled = active && !state.IsBusy;
+        StopButton.Content = state.IsBusy ? "Please wait…" : "Stop";
+        if (state.Active is { } session)
+        {
+            var color = session.Type == SessionType.Work ? _colors.Work : _colors.Break;
+            ActiveCard.Background = SessionColorBrush.Create(color);
+            ActiveType.Foreground = ActiveRemaining.Foreground = SessionColorBrush.Create(SessionColors.Foreground(color));
+            ActiveType.Text = session.Type.ToString();
+            PaintButton(StopButton, color);
+        }
+        RenderCountdown();
         WorkDuration.Text = QuickOverlayDurationFormatter.Format(state.Durations?.Work);
         BreakDuration.Text = QuickOverlayDurationFormatter.Format(state.Durations?.Break);
         AutomationProperties.SetName(WorkCard, $"Work, {WorkDuration.Text}");
@@ -87,6 +115,17 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
         FeedbackText.Text = state.Feedback ?? string.Empty;
         FeedbackText.Visibility = state.Feedback is null ? Visibility.Collapsed : Visibility.Visible;
         if (_visible) ResizeAndCenter();
+        if (_visible && changedMode) FocusSelection();
+    }
+
+    private void RenderCountdown()
+    {
+        if (_closing) return;
+        TimeSpan remaining = MiniTimerController.RemainingAt(_state.Active, TimeProvider.System.GetUtcNow());
+        ActiveRemaining.Text = MiniTimerController.Format(remaining);
+        AutomationProperties.SetName(ActiveRemaining, $"{_state.Active?.Type}, {ActiveRemaining.Text} remaining");
+        if (_visible && _state.Active is not null && remaining > TimeSpan.Zero) _displayTimer.Start();
+        else _displayTimer.Stop();
     }
 
     public void ShowAndFocus()
@@ -105,11 +144,13 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
         AppWindow.Show();
         Activate();
         FocusSelection();
+        RenderCountdown();
     }
 
     public void Hide()
     {
         _visible = false;
+        _displayTimer.Stop();
         if (!_closing) AppWindow.Hide();
     }
 
@@ -118,11 +159,12 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
         if (_closing) return;
         _visible = false;
         _closing = true;
+        _displayTimer.Stop();
         Close();
     }
 
     private void FocusSelection() =>
-        (_state.Selected == SessionType.Work ? WorkCard : BreakCard).Focus(FocusState.Keyboard);
+        (_state.Active is not null ? StopButton : _state.Selected == SessionType.Work ? WorkCard : BreakCard).Focus(FocusState.Keyboard);
 
     private void ResizeAndCenter()
     {
@@ -143,6 +185,7 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
     private void OnWorkClicked(object sender, RoutedEventArgs args) => SelectionRequested?.Invoke(SessionType.Work);
     private void OnBreakClicked(object sender, RoutedEventArgs args) => SelectionRequested?.Invoke(SessionType.Break);
     private void OnStartClicked(object sender, RoutedEventArgs args) => StartRequested?.Invoke();
+    private void OnStopClicked(object sender, RoutedEventArgs args) => StopRequested?.Invoke();
 
     private void OnPreviewKeyDown(object sender, KeyRoutedEventArgs args)
     {
@@ -155,13 +198,16 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
             case VirtualKey.Left:
             case VirtualKey.Right:
                 args.Handled = true;
+                if (_state.Active is not null) break;
                 SelectionRequested?.Invoke(args.Key == VirtualKey.Left ? SessionType.Work : SessionType.Break);
                 FocusSelection();
                 break;
             case VirtualKey.Enter:
                 // Handle once at the preview stage, avoiding an additional native Button click.
                 args.Handled = true;
-                StartRequested?.Invoke();
+                if (args.KeyStatus.WasKeyDown) break;
+                if (_state.Active is not null) StopRequested?.Invoke();
+                else StartRequested?.Invoke();
                 break;
         }
         // Space and Tab retain the native Button keyboard/focus behavior.

@@ -113,3 +113,69 @@ Implementation commit: `fa34934a863d0f7bf1a188fe7197139e52b00a2d`.
 Pushed to `origin/native/phased-rewrite`; `git ls-remote` returned that exact SHA on 2026-09-09.
 This documentation-only follow-up records the verified delivery. Its own SHA is available in Git history
 and the final report, avoiding a self-referential commit hash. No implementation changed after verification.
+
+## Phase 10.1 — Unified Quick Overlay + Active Timer UX
+
+Status: PASS. Baseline: `0da7cb91bb118322e874990c874fde568c0a7553`.
+
+Shift+F3 is now the primary quick surface for both selection and an active session. Start keeps the
+same window open and changes it to Work/Break, deadline-derived remaining time and Stop. Opening
+while running reconstructs that state. Stop and durable natural completion return to selection
+without starting another session. Escape and focus loss hide the surface; repeated activation reuses it.
+Native keyboard focus follows the mode, and held Enter cannot immediately stop the session it started.
+
+The standalone Mini Timer remains an optional companion: its pin-able window stays visible across
+focus changes, unlike the transient overlay. It is never required for Start, countdown or Stop.
+Both surfaces reuse the existing coordinator and Phase 10 RemainingAt/Format calculation. The overlay's
+one-second display callback only renders the cached immutable deadline, stops when hidden/idle/at zero,
+and never queries SQLite or completes a session. Existing application lifecycle/completion/settings
+signals refresh authoritative observations. Appearance and readable Work/Break accents use the existing
+settings infrastructure. No schema, settings, engine or recovery policy changed.
+
+Accepted Start/Stop operations survive hiding. Duplicate actions are guarded, stale observations are
+discarded, and Stop targets the displayed session ID so it cannot stop a replacement session. A Start
+race displays the actual winning session. Failed observations disable stale actions until reopening;
+failed mutations retain retry feedback. Hidden operations never force the overlay back open.
+
+### Phase 10.1 verification — 2026-09-09
+
+- 104 targeted tests passed, 0 failed, 0 skipped. Filter: QuickOverlay, MiniTimer,
+  CompletionCoordinator, SessionCoordinator, BackgroundShell, Appearance and SessionColors.
+  Full suite intentionally not run; session/persistence core behavior is unchanged.
+- Deterministic coverage includes Work/Break same-view transitions, custom deadlines, Stop,
+  natural completion with PlannedEndAt retained, stale Stop against a replacement, concurrent Start
+  winner reconciliation, duplicate Stop, hide/reopen during pending writes, failures and retry.
+  Real SQLite is used for relevant lifecycle cases; no real-time waits in unit tests.
+- Full solution build: 0 warnings / 0 errors. Restore unnecessary; dependencies unchanged.
+- Unified native overlay smoke PASS: `.smoke/p101-f499428cad5b4e10b836127c5becb789`.
+  Work/Break custom durations, active hide/reopen and repeated hotkey, identical native window handle,
+  natural completion to selection, System/Light/Dark, custom colors, restart and cleanup verified.
+- Adjacent native smoke PASS: shell `.smoke/p4-3e89b4614dc444b199df569488af4545`,
+  completion `.smoke/p6-af53ea5baf4148aeb22544bafd355f2d`, and retained Mini Timer
+  `.smoke/p10-24657374345e4f01a007c7dadc24e090`.
+- Manual isolated check in `.smoke/p101-ui-20260909`: user confirmed all requested Start/timer,
+  Stop/selection, completion and Escape/Shift+F3 reopening transitions worked. Native diagnostic
+  logs additionally show real overlay Start/Stop transitions. Scripted smoke uses isolated probe
+  session creation; manual verification establishes the actual interactive Start flow.
+- All data roots are isolated. Protected specification/reference/history files remain unchanged.
+
+### Phase 10.1 files changed
+
+- `src/FocusKey.Foundation/Overlay/IQuickOverlayView.cs`
+- `src/FocusKey.Foundation/Overlay/QuickOverlayController.cs`
+- `src/FocusKey.Foundation/MiniTimer/MiniTimerController.cs`
+- `src/FocusKey.App/Overlay/QuickOverlayWindow.xaml`
+- `src/FocusKey.App/Overlay/QuickOverlayWindow.xaml.cs`
+- `src/FocusKey.App/App.xaml.cs`
+- `tests/FocusKey.Foundation.Tests/Overlay/QuickOverlayControllerTests.cs`
+- `.smoke/ShellProbe/Program.cs`
+- `.smoke/run-overlay-timer-smoke.ps1`
+- `Phase 10.md`
+
+### Phase 10.1 limitations and delivery
+
+The functional mode switch retains the existing compact overlay size; animation, final spacing and
+visual refinement remain Phase 12 work. A countdown can show zero until the existing completion
+coordinator durably completes it. External database edits without an application signal are not polled.
+Standalone Mini Timer visibility/pin/position remain process-local as documented for Phase 10.
+No Phase 11 work was started. Implementation and remote verification SHAs are recorded below after push.

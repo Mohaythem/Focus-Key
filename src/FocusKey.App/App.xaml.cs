@@ -80,9 +80,10 @@ public partial class App : Application
                 TimeZoneInfo.ClearCachedData();
                 _window?.RefreshPages();
                 _ = RefreshMiniTimerAsync();
+                if (_quickOverlay is not null) _ = _quickOverlay.RefreshIfVisibleAsync();
             };
             _quickOverlay = new QuickOverlayController(CreateQuickOverlay,
-                _startup.Sessions.GetActiveAsync, _startup.Sessions.GetDurationsAsync, StartSessionAsync);
+                _startup.Sessions.GetActiveAsync, _startup.Sessions.GetDurationsAsync, StartSessionAsync, StopSessionAsync);
             _quickOverlay.ErrorOccurred += exception => _startup?.Logger.Error("Quick overlay operation failed.", exception);
             _shell = new BackgroundShell(integration, ShutdownSessionsAsync);
             _shell.ActivationRequested += OnShellActivation;
@@ -163,7 +164,7 @@ public partial class App : Application
 
     private IQuickOverlayView CreateQuickOverlay()
     {
-        var window = new QuickOverlayWindow();
+        var window = new QuickOverlayWindow(message => _startup?.Logger.Info(message));
         window.ApplyAppearance(_startup!.Appearance.Current);
         window.ApplyColors(_startup.Appearance.Colors);
         _quickOverlayWindow = window;

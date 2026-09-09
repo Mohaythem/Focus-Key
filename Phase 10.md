@@ -109,4 +109,7 @@ their baseline hashes and are excluded from this change.
 
 NO PHASE 11 OR LATER PRODUCT FUNCTIONALITY WAS IMPLEMENTED IN PHASE 10.
 
-Implementation and remote delivery SHAs will be recorded after final verification and push.
+Implementation commit: `fa34934a863d0f7bf1a188fe7197139e52b00a2d`.
+Pushed to `origin/native/phased-rewrite`; `git ls-remote` returned that exact SHA on 2026-09-09.
+This documentation-only follow-up records the verified delivery. Its own SHA is available in Git history
+and the final report, avoiding a self-referential commit hash. No implementation changed after verification.

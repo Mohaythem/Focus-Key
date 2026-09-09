@@ -179,3 +179,8 @@ visual refinement remain Phase 12 work. A countdown can show zero until the exis
 coordinator durably completes it. External database edits without an application signal are not polled.
 Standalone Mini Timer visibility/pin/position remain process-local as documented for Phase 10.
 No Phase 11 work was started. Implementation and remote verification SHAs are recorded below after push.
+
+Phase 10.1 implementation commit: `2bf149a4fffc78e95bb1a0c532a57edaa1593120`.
+Pushed to `origin/native/phased-rewrite`; `git ls-remote` verified that exact SHA on 2026-09-09.
+This documentation-only follow-up records the verified implementation SHA; its own SHA is available
+in Git history and the final report, avoiding a self-referential hash. No product code changed after verification.

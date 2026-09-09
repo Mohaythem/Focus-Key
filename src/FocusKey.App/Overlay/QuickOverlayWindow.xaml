@@ -9,34 +9,43 @@
         x:Name="Surface"
         Width="420"
         Padding="24"
-        Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
+        Background="{ThemeResource FkOverlay}"
         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
         BorderThickness="1"
-        CornerRadius="6">
-        <Border.Resources>
-            <!-- Keep WinUI's native button template and focus visuals while
-                 preventing the default accent blue from changing this palette. -->
-            <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="{ThemeResource ControlFillColorSecondary}" />
-            <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="{ThemeResource ControlFillColorTertiary}" />
-            <SolidColorBrush x:Key="ButtonBackgroundDisabled" Color="{ThemeResource ControlFillColorDisabled}" />
-            <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="#f0f4f4" />
-            <SolidColorBrush x:Key="ButtonForegroundPressed" Color="#f0f4f4" />
-            <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="{ThemeResource ControlStrokeColorDefault}" />
-            <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="{ThemeResource ControlStrokeColorSecondary}" />
-        </Border.Resources>
+        CornerRadius="8">
 
         <StackPanel
             x:Name="RootPanel"
             Spacing="0"
             TabFocusNavigation="Cycle">
-            <TextBlock
-                Text="FOCUS KEY"
-                FontSize="12"
-                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                CharacterSpacing="50"
-                Margin="0,0,0,20" />
+            <Grid Margin="0,0,0,18">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock
+                    Text="FOCUS KEY"
+                    FontSize="11"
+                    FontWeight="SemiBold"
+                    Foreground="{ThemeResource FkSecondary}"
+                    CharacterSpacing="60"
+                    VerticalAlignment="Center" />
+                <Border
+                    Grid.Column="1"
+                    Padding="6,2"
+                    CornerRadius="3"
+                    Background="{ThemeResource FkSurface2}"
+                    BorderBrush="{ThemeResource FkBorder}"
+                    BorderThickness="1">
+                    <TextBlock
+                        Text="Shift + F3"
+                        FontFamily="Consolas"
+                        FontSize="10"
+                        Foreground="{ThemeResource FkDim}" />
+                </Border>
+            </Grid>
 
-            <Grid x:Name="SelectionCards" Margin="0,0,0,20" ColumnSpacing="10">
+            <Grid x:Name="SelectionCards" Margin="0,0,0,16" ColumnSpacing="10">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="*" />
@@ -45,80 +54,119 @@
                 <Button
                     x:Name="WorkCard"
                     Grid.Column="0"
-                    Padding="18,20"
-                    CornerRadius="4"
-                    HorizontalContentAlignment="Stretch"
-                    VerticalContentAlignment="Center"
-                    HorizontalAlignment="Stretch"
+                    Style="{StaticResource FkOverlayCard}"
                     UseSystemFocusVisuals="True"
                     TabIndex="0"
                     AutomationProperties.Name="Work"
                     Click="OnWorkClicked">
-                    <StackPanel Spacing="0">
-                        <TextBlock
-                            x:Name="WorkLabel" Text="Work"
-                            FontSize="13"
-                            FontWeight="Medium"
-                            Margin="0,0,0,6" />
+                    <StackPanel Spacing="4">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <Ellipse x:Name="WorkDot" Width="6" Height="6" VerticalAlignment="Center" />
+                            <TextBlock
+                                x:Name="WorkLabel" Text="Work"
+                                FontSize="13"
+                                FontWeight="Medium"
+                                Foreground="{ThemeResource FkForeground}" />
+                        </StackPanel>
                         <TextBlock
                             x:Name="WorkDuration"
                             Text="--:--"
                             FontFamily="Consolas"
-                            FontSize="24"
-                            FontWeight="Normal" />
+                            FontSize="22"
+                            FontWeight="Normal"
+                            Foreground="{ThemeResource FkForeground}" />
                     </StackPanel>
                 </Button>
 
                 <Button
                     x:Name="BreakCard"
                     Grid.Column="1"
-                    Padding="18,20"
-                    CornerRadius="4"
-                    HorizontalContentAlignment="Stretch"
-                    VerticalContentAlignment="Center"
-                    HorizontalAlignment="Stretch"
+                    Style="{StaticResource FkOverlayCard}"
                     UseSystemFocusVisuals="True"
                     TabIndex="1"
                     AutomationProperties.Name="Break"
                     Click="OnBreakClicked">
-                    <StackPanel Spacing="0">
-                        <TextBlock
-                            x:Name="BreakLabel" Text="Break"
-                            FontSize="13"
-                            FontWeight="Medium"
-                            Margin="0,0,0,6" />
+                    <StackPanel Spacing="4">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <Ellipse x:Name="BreakDot" Width="6" Height="6" VerticalAlignment="Center" />
+                            <TextBlock
+                                x:Name="BreakLabel" Text="Break"
+                                FontSize="13"
+                                FontWeight="Medium"
+                                Foreground="{ThemeResource FkForeground}" />
+                        </StackPanel>
                         <TextBlock
                             x:Name="BreakDuration"
                             Text="--:--"
                             FontFamily="Consolas"
-                            FontSize="24"
-                            FontWeight="Normal" />
+                            FontSize="22"
+                            FontWeight="Normal"
+                            Foreground="{ThemeResource FkForeground}" />
                     </StackPanel>
                 </Button>
             </Grid>
 
-            <Border x:Name="ActiveCard" Visibility="Collapsed" Padding="18,14" Margin="0,0,0,20" CornerRadius="4">
-                <StackPanel>
-                    <TextBlock x:Name="ActiveType" FontSize="14"/>
-                    <TextBlock x:Name="ActiveRemaining" FontSize="40" FontFamily="Consolas"
-                        Language="en-US" FlowDirection="LeftToRight" TextReadingOrder="UseFlowDirection"/>
+            <!-- Active Countdown Card: refined Fluent presentation -->
+            <Border
+                x:Name="ActiveCard"
+                Visibility="Collapsed"
+                Padding="20,18"
+                Margin="0,0,0,16"
+                CornerRadius="6"
+                Background="{ThemeResource FkSurface2}"
+                BorderBrush="{ThemeResource FkBorder}"
+                BorderThickness="1">
+                <StackPanel Spacing="4" HorizontalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center" Margin="0,0,0,6">
+                        <Ellipse x:Name="ActiveBadgeDot" Width="6" Height="6" VerticalAlignment="Center"/>
+                        <TextBlock
+                            x:Name="ActiveType"
+                            FontSize="11"
+                            FontWeight="SemiBold"
+                            CharacterSpacing="60"
+                            Foreground="{ThemeResource FkSecondary}"/>
+                    </StackPanel>
+                    <TextBlock
+                        x:Name="ActiveRemaining"
+                        FontSize="46"
+                        FontFamily="Consolas"
+                        FontWeight="Normal"
+                        HorizontalAlignment="Center"
+                        Foreground="{ThemeResource FkForeground}"
+                        Language="en-US"
+                        FlowDirection="LeftToRight"
+                        TextReadingOrder="UseFlowDirection"/>
+                    <TextBlock
+                        x:Name="RemainingLabel"
+                        Text="remaining"
+                        FontSize="11"
+                        Foreground="{ThemeResource FkDim}"
+                        HorizontalAlignment="Center"
+                        Margin="0,2,0,0"/>
                 </StackPanel>
             </Border>
 
-            <Button x:Name="StopButton" Content="Stop" Visibility="Collapsed" Padding="10"
-                CornerRadius="4" BorderThickness="0" FontSize="13" HorizontalAlignment="Stretch"
-                HorizontalContentAlignment="Center" UseSystemFocusVisuals="True" Click="OnStopClicked"/>
+            <!-- Stop Button: WinUI native button with explicit height and centering -->
+            <Button
+                x:Name="StopButton"
+                Content="Stop"
+                Visibility="Collapsed"
+                Style="{StaticResource FkOverlayStopButton}"
+                UseSystemFocusVisuals="True"
+                Click="OnStopClicked"/>
 
+            <!-- Start Button: WinUI native button with explicit height and centering -->
             <Button
                 x:Name="StartButton"
                 Content="Start"
-                Padding="10"
+                Height="36"
+                Padding="16,0"
                 CornerRadius="4"
-                BorderThickness="0"
                 FontSize="13"
                 FontWeight="Medium"
                 HorizontalAlignment="Stretch"
                 HorizontalContentAlignment="Center"
+                VerticalContentAlignment="Center"
                 UseSystemFocusVisuals="True"
                 TabIndex="2"
                 AutomationProperties.Name="Start"
@@ -128,10 +176,10 @@
                 x:Name="FeedbackText"
                 Text=""
                 Visibility="Collapsed"
-                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Foreground="{ThemeResource FkSecondary}"
                 FontSize="12"
                 TextWrapping="Wrap"
-                Margin="0,12,0,0"
+                Margin="0,10,0,0"
                 AutomationProperties.LiveSetting="Polite" />
 
             <StackPanel
@@ -149,12 +197,12 @@
                             Text="←→"
                             FontFamily="Consolas"
                             FontSize="10"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            Foreground="{ThemeResource FkSecondary}" />
                     </Border>
                     <TextBlock
                         Text="Select"
                         FontSize="10"
-                        Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                        Foreground="{ThemeResource FkSecondary}"
                         VerticalAlignment="Center"
                         Margin="5,0,0,0" />
                 </StackPanel>
@@ -169,12 +217,12 @@
                             Text="↵"
                             FontFamily="Consolas"
                             FontSize="10"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            Foreground="{ThemeResource FkSecondary}" />
                     </Border>
                     <TextBlock
                         x:Name="ActionHint" Text="Start"
                         FontSize="10"
-                        Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                        Foreground="{ThemeResource FkSecondary}"
                         VerticalAlignment="Center"
                         Margin="5,0,0,0" />
                 </StackPanel>
@@ -189,12 +237,12 @@
                             Text="Esc"
                             FontFamily="Consolas"
                             FontSize="10"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            Foreground="{ThemeResource FkSecondary}" />
                     </Border>
                     <TextBlock
                         Text="Close"
                         FontSize="10"
-                        Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                        Foreground="{ThemeResource FkSecondary}"
                         VerticalAlignment="Center"
                         Margin="5,0,0,0" />
                 </StackPanel>
@@ -202,3 +250,5 @@
         </StackPanel>
     </Border>
 </Window>
+
+

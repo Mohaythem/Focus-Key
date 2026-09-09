@@ -21,17 +21,28 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
             throw new InvalidDataException("The authoritative application settings record is missing.");
         try
         {
-            var settings = new ApplicationSettings
-            {
-                WorkDuration = TimeSpan.FromSeconds(reader.GetInt64(0)),
-                BreakDuration = TimeSpan.FromSeconds(reader.GetInt64(1)),
-                Appearance = AppearanceText.Parse(reader.GetString(2)),
-                WorkColor = ParsePersistedColor(reader.GetString(3), "work_color"),
-                BreakColor = ParsePersistedColor(reader.GetString(4), "break_color"),
-            };
-            settings.Validate();
+            var workDuration = TimeSpan.FromSeconds(reader.GetInt64(0));
+            var breakDuration = TimeSpan.FromSeconds(reader.GetInt64(1));
+            var appearance = AppearanceText.Parse(reader.GetString(2));
+            var workColor = ParsePersistedColor(reader.GetString(3), "work_color");
+            var breakColor = ParsePersistedColor(reader.GetString(4), "break_color");
             if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
                 throw new InvalidDataException("More than one authoritative application settings record exists.");
+            await reader.CloseAsync().ConfigureAwait(false);
+
+            var (lightTheme, darkTheme) = await LoadThemeSettingsAsync(connection, cancellationToken).ConfigureAwait(false);
+
+            var settings = new ApplicationSettings
+            {
+                WorkDuration = workDuration,
+                BreakDuration = breakDuration,
+                Appearance = appearance,
+                WorkColor = workColor,
+                BreakColor = breakColor,
+                LightTheme = lightTheme,
+                DarkTheme = darkTheme,
+            };
+            settings.Validate();
             return settings;
         }
         catch (InvalidDataException) { throw; }
@@ -46,6 +57,7 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
         ArgumentNullException.ThrowIfNull(settings);
         settings.Validate();
         await using SqliteConnection connection = await _connections.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureThemeTableAsync(connection, cancellationToken).ConfigureAwait(false);
         await using SqliteTransaction transaction = connection.BeginTransaction(deferred: false);
         await using SqliteCommand command = connection.CreateCommand();
         command.Transaction = transaction;
@@ -59,6 +71,8 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
                 break_color = $breakColor
             WHERE singleton = 1;
             """;
+        var light = settings.LightTheme ?? ThemeConfiguration.DefaultLight;
+        var dark = settings.DarkTheme ?? ThemeConfiguration.DefaultDark;
         command.Parameters.AddWithValue("$work", checked((long)settings.WorkDuration.TotalSeconds));
         command.Parameters.AddWithValue("$break", checked((long)settings.BreakDuration.TotalSeconds));
         command.Parameters.AddWithValue("$appearance", AppearanceText.Format(settings.Appearance));
@@ -66,7 +80,88 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
         command.Parameters.AddWithValue("$breakColor", settings.BreakColor.Value);
         if (await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
             throw new InvalidDataException("The authoritative application settings record is missing.");
+
+        command.CommandText =
+            """
+            UPDATE theme_settings SET
+                light_preset = $lightPreset,
+                light_background = $lightBg,
+                light_foreground = $lightFg,
+                light_accent = $lightAccent,
+                dark_preset = $darkPreset,
+                dark_background = $darkBg,
+                dark_foreground = $darkFg,
+                dark_accent = $darkAccent
+            WHERE singleton = 1;
+            """;
+        command.Parameters.AddWithValue("$lightPreset", light.Preset);
+        command.Parameters.AddWithValue("$lightBg", light.Background.Value);
+        command.Parameters.AddWithValue("$lightFg", light.Foreground.Value);
+        command.Parameters.AddWithValue("$lightAccent", light.Accent.Value);
+        command.Parameters.AddWithValue("$darkPreset", dark.Preset);
+        command.Parameters.AddWithValue("$darkBg", dark.Background.Value);
+        command.Parameters.AddWithValue("$darkFg", dark.Foreground.Value);
+        command.Parameters.AddWithValue("$darkAccent", dark.Accent.Value);
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         transaction.Commit();
+    }
+
+    private static async Task<(ThemeConfiguration light, ThemeConfiguration dark)> LoadThemeSettingsAsync(
+        SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await EnsureThemeTableAsync(connection, cancellationToken).ConfigureAwait(false);
+        await using SqliteCommand cmd = connection.CreateCommand();
+        cmd.CommandText =
+            """
+            SELECT light_preset, light_background, light_foreground, light_accent,
+                   dark_preset, dark_background, dark_foreground, dark_accent
+            FROM theme_settings WHERE singleton = 1;
+            """;
+        await using SqliteDataReader reader = await cmd.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            return (ThemeConfiguration.DefaultLight, ThemeConfiguration.DefaultDark);
+
+        var light = new ThemeConfiguration
+        {
+            Preset = reader.GetString(0),
+            Background = ParsePersistedColor(reader.GetString(1), "light_background"),
+            Foreground = ParsePersistedColor(reader.GetString(2), "light_foreground"),
+            Accent = ParsePersistedColor(reader.GetString(3), "light_accent"),
+        };
+        var dark = new ThemeConfiguration
+        {
+            Preset = reader.GetString(4),
+            Background = ParsePersistedColor(reader.GetString(5), "dark_background"),
+            Foreground = ParsePersistedColor(reader.GetString(6), "dark_foreground"),
+            Accent = ParsePersistedColor(reader.GetString(7), "dark_accent"),
+        };
+        return (light, dark);
+    }
+
+    private static async Task EnsureThemeTableAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await using SqliteCommand cmd = connection.CreateCommand();
+        cmd.CommandText =
+            """
+            CREATE TABLE IF NOT EXISTS theme_settings (
+                singleton        INTEGER NOT NULL PRIMARY KEY,
+                light_preset     TEXT    NOT NULL,
+                light_background TEXT    NOT NULL,
+                light_foreground TEXT    NOT NULL,
+                light_accent     TEXT    NOT NULL,
+                dark_preset      TEXT    NOT NULL,
+                dark_background  TEXT    NOT NULL,
+                dark_foreground  TEXT    NOT NULL,
+                dark_accent      TEXT    NOT NULL,
+                CHECK (singleton = 1)
+            );
+            INSERT OR IGNORE INTO theme_settings (
+                singleton, light_preset, light_background, light_foreground, light_accent,
+                dark_preset, dark_background, dark_foreground, dark_accent)
+            VALUES (1, 'default', '#F2F5F5', '#0F1414', '#183739',
+                       'default', '#0A0D0D', '#F0F4F4', '#2D6669');
+            """;
+        await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private static HexColor ParsePersistedColor(string value, string column)

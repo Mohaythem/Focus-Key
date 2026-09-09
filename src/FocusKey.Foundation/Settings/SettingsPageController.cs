@@ -2,7 +2,12 @@ using System.Globalization;
 
 namespace FocusKey.Foundation.Settings;
 
-public enum SettingsField { WorkDuration, BreakDuration, Appearance, WorkColor, BreakColor }
+public enum SettingsField
+{
+    WorkDuration, BreakDuration, Appearance, WorkColor, BreakColor,
+    LightPreset, LightBackground, LightForeground, LightAccent,
+    DarkPreset, DarkBackground, DarkForeground, DarkAccent
+}
 
 /// <summary>UI-thread auto-save queue. Only committed values are published to runtime.</summary>
 public sealed class SettingsPageController(SettingsService settings, Func<Task> refreshRuntime, Action<Exception> report)
@@ -58,6 +63,56 @@ public sealed class SettingsPageController(SettingsService settings, Func<Task> 
         ChangeAsync(SettingsField.WorkColor, () => settings.UpdateWorkColorAsync(value), cancellationToken);
     public Task UpdateBreakColorAsync(HexColor value, CancellationToken cancellationToken = default) =>
         ChangeAsync(SettingsField.BreakColor, () => settings.UpdateBreakColorAsync(value), cancellationToken);
+
+    public Task UpdateLightPresetAsync(string presetId, CancellationToken cancellationToken = default)
+    {
+        var preset = ThemePresets.FindPreset(presetId, false);
+        var updated = new ThemeConfiguration
+        {
+            Preset = preset.Id,
+            Background = preset.Palette.Background,
+            Foreground = preset.Palette.Foreground,
+            Accent = preset.Palette.Accent
+        };
+        return ChangeAsync(SettingsField.LightPreset, () => settings.UpdateLightThemeAsync(updated), cancellationToken);
+    }
+
+    public Task UpdateLightColorAsync(bool isBg, bool isFg, HexColor color, CancellationToken cancellationToken = default)
+    {
+        var current = Saved?.LightTheme ?? ThemeConfiguration.DefaultLight;
+        var bg = isBg ? color : current.Background;
+        var fg = isFg ? color : current.Foreground;
+        var accent = (!isBg && !isFg) ? color : current.Accent;
+        string preset = ThemePresets.DetectPresetId(bg, fg, accent, false);
+        var updated = new ThemeConfiguration { Preset = preset, Background = bg, Foreground = fg, Accent = accent };
+        var field = isBg ? SettingsField.LightBackground : isFg ? SettingsField.LightForeground : SettingsField.LightAccent;
+        return ChangeAsync(field, () => settings.UpdateLightThemeAsync(updated), cancellationToken);
+    }
+
+    public Task UpdateDarkPresetAsync(string presetId, CancellationToken cancellationToken = default)
+    {
+        var preset = ThemePresets.FindPreset(presetId, true);
+        var updated = new ThemeConfiguration
+        {
+            Preset = preset.Id,
+            Background = preset.Palette.Background,
+            Foreground = preset.Palette.Foreground,
+            Accent = preset.Palette.Accent
+        };
+        return ChangeAsync(SettingsField.DarkPreset, () => settings.UpdateDarkThemeAsync(updated), cancellationToken);
+    }
+
+    public Task UpdateDarkColorAsync(bool isBg, bool isFg, HexColor color, CancellationToken cancellationToken = default)
+    {
+        var current = Saved?.DarkTheme ?? ThemeConfiguration.DefaultDark;
+        var bg = isBg ? color : current.Background;
+        var fg = isFg ? color : current.Foreground;
+        var accent = (!isBg && !isFg) ? color : current.Accent;
+        string preset = ThemePresets.DetectPresetId(bg, fg, accent, true);
+        var updated = new ThemeConfiguration { Preset = preset, Background = bg, Foreground = fg, Accent = accent };
+        var field = isBg ? SettingsField.DarkBackground : isFg ? SettingsField.DarkForeground : SettingsField.DarkAccent;
+        return ChangeAsync(field, () => settings.UpdateDarkThemeAsync(updated), cancellationToken);
+    }
 
     private async Task ChangeAsync(SettingsField field, Func<Task<ApplicationSettings>> update, CancellationToken cancellationToken)
     {

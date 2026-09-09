@@ -17,10 +17,17 @@ namespace FocusKey;
 internal sealed class MiniTimerWindow : Window, IDisposable
 {
     private readonly MiniTimerController _controller;
-    private readonly StackPanel _root = new() { Padding = new Thickness(12), Spacing = 6 };
-    private readonly Border _badge = new() { Padding = new Thickness(8, 4, 8, 4), CornerRadius = new CornerRadius(4) };
-    private readonly TextBlock _text = new() { FontSize = 20, Language = "en-US",
-        FlowDirection = FlowDirection.LeftToRight, TextReadingOrder = TextReadingOrder.UseFlowDirection };
+    private readonly StackPanel _root = new() { Padding = new Thickness(14), Spacing = 8 };
+    private readonly Border _badge = new() { Padding = new Thickness(10, 6, 10, 6), CornerRadius = new CornerRadius(6) };
+    private readonly TextBlock _text = new() {
+        FontSize = 20,
+        FontFamily = new FontFamily("Consolas"),
+        FontWeight = Microsoft.UI.Text.FontWeights.Normal,
+        Language = "en-US",
+        FlowDirection = FlowDirection.LeftToRight,
+        TextReadingOrder = TextReadingOrder.UseFlowDirection,
+        HorizontalAlignment = HorizontalAlignment.Center
+    };
     private readonly DispatcherQueueTimer _timer;
     private readonly OverlappedPresenter _presenter;
     private SessionColors _colors = SessionColors.From(ApplicationSettings.Default);
@@ -37,12 +44,12 @@ internal sealed class MiniTimerWindow : Window, IDisposable
         AppWindow.IsShownInSwitchers = false;
         _badge.Child = _text;
         _root.Children.Add(_badge);
-        var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-        var pin = new ToggleButton { Content = "Keep on top", FontSize = 12 };
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Center };
+        var pin = new ToggleButton { Content = "Keep on top", FontSize = 12, CornerRadius = new CornerRadius(4) };
         AutomationProperties.SetName(pin, "Keep Mini Timer on top");
         pin.Checked += (_, _) => _presenter.IsAlwaysOnTop = true;
         pin.Unchecked += (_, _) => _presenter.IsAlwaysOnTop = false;
-        var open = new Button { Content = "Open Focus Key", FontSize = 12 };
+        var open = new Button { Content = "Open Focus Key", FontSize = 12, CornerRadius = new CornerRadius(4) };
         open.Click += (_, _) => openMain();
         actions.Children.Add(pin);
         actions.Children.Add(open);
@@ -77,7 +84,7 @@ internal sealed class MiniTimerWindow : Window, IDisposable
     private void SizeWindow()
     {
         double scale = _root.XamlRoot?.RasterizationScale ?? 1;
-        AppWindow.ResizeClient(new SizeInt32((int)Math.Ceiling(310 * scale), (int)Math.Ceiling(100 * scale)));
+        AppWindow.ResizeClient(new SizeInt32((int)Math.Ceiling(290 * scale), (int)Math.Ceiling(100 * scale)));
     }
     internal void Hide() { if (_disposed) return; _controller.Hide(); _timer.Stop(); AppWindow.Hide(); }
     internal void ApplyAppearance(Appearance appearance) { WindowAppearance.Apply(_root, AppWindow, appearance); Paint(); }
@@ -87,7 +94,7 @@ internal sealed class MiniTimerWindow : Window, IDisposable
     {
         if (_disposed) return;
         _text.Text = _controller.Text;
-        _text.FontSize = _controller.Error is null ? 20 : 14;
+        _text.FontSize = _controller.Error is null ? 20 : 13;
         AutomationProperties.SetName(_text, _controller.Text);
         if (_controller.IsVisible && !_controller.IsLoading && _controller.Session is not null && _controller.Remaining > TimeSpan.Zero)
             _timer.Start();
@@ -95,18 +102,20 @@ internal sealed class MiniTimerWindow : Window, IDisposable
     }
     private void Paint()
     {
-        bool dark = _root.ActualTheme == ElementTheme.Dark;
-        _root.Background = new SolidColorBrush(dark ? Microsoft.UI.Colors.Black : Microsoft.UI.Colors.White);
+        _root.Background = (Brush)Application.Current.Resources["FkSurface"];
         if (_controller.Session is { } session && _controller.Error is null)
         {
             var color = session.Type == SessionType.Work ? _colors.Work : _colors.Break;
             _badge.Background = SessionColorBrush.Create(color);
+            _badge.BorderThickness = new Thickness(0);
             _text.Foreground = SessionColorBrush.Create(SessionColors.Foreground(color));
         }
         else
         {
-            _badge.Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
-            _text.Foreground = new SolidColorBrush(dark ? Microsoft.UI.Colors.White : Microsoft.UI.Colors.Black);
+            _badge.Background = (Brush)Application.Current.Resources["FkSurface2"];
+            _badge.BorderBrush = (Brush)Application.Current.Resources["CardStrokeColorDefaultBrush"];
+            _badge.BorderThickness = new Thickness(1);
+            _text.Foreground = (Brush)Application.Current.Resources["FkForeground"];
         }
     }
     public void Dispose()

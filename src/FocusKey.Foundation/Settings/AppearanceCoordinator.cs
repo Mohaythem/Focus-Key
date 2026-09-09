@@ -11,11 +11,23 @@ public sealed class AppearanceCoordinator(SettingsService settings)
     private readonly object _state = new();
     private Appearance? _current;
     private SessionColors? _colors;
+    private ThemePalette? _lightPalette;
+    private ThemePalette? _darkPalette;
 
     public event Action<SessionColors>? ColorsChanged;
     public SessionColors Colors
     {
         get { lock (_state) return _colors ?? throw new InvalidOperationException("Initialize appearance before reading colors."); }
+    }
+
+    public event Action<ThemePalette, ThemePalette>? PalettesChanged;
+    public ThemePalette LightPalette
+    {
+        get { lock (_state) return _lightPalette ?? ThemeConfiguration.DefaultLight.ResolvePalette(false); }
+    }
+    public ThemePalette DarkPalette
+    {
+        get { lock (_state) return _darkPalette ?? ThemeConfiguration.DefaultDark.ResolvePalette(true); }
     }
 
     public event Action<Appearance>? Changed;
@@ -63,17 +75,24 @@ public sealed class AppearanceCoordinator(SettingsService settings)
     {
         Appearance appearance = settings.Appearance;
         SessionColors colors = SessionColors.From(settings);
+        ThemePalette light = (settings.LightTheme ?? ThemeConfiguration.DefaultLight).ResolvePalette(false);
+        ThemePalette dark = (settings.DarkTheme ?? ThemeConfiguration.DefaultDark).ResolvePalette(true);
         bool changed;
         bool colorsChanged;
+        bool palettesChanged;
         lock (_state)
         {
             changed = _current != appearance;
             _current = appearance;
             colorsChanged = _colors != colors;
             _colors = colors;
+            palettesChanged = _lightPalette != light || _darkPalette != dark;
+            _lightPalette = light;
+            _darkPalette = dark;
         }
         if (changed) Changed?.Invoke(appearance);
         if (colorsChanged) ColorsChanged?.Invoke(colors);
+        if (palettesChanged) PalettesChanged?.Invoke(light, dark);
         return appearance;
     }
 }

@@ -1,3 +1,4 @@
+using FocusKey.Foundation.MiniTimer;
 using FocusKey.Foundation.Sessions;
 using FocusKey.Foundation.Shell;
 using FocusKey.Foundation.Overlay;
@@ -8,6 +9,7 @@ using FocusKey.Startup;
 using System.Security.Principal;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Media;
 
 namespace FocusKey;
 
@@ -25,7 +27,7 @@ public partial class App : Application
     private InstanceActivationSignal? _activationSignal;
     private QuickOverlayController? _quickOverlay;
     private QuickOverlayWindow? _quickOverlayWindow;
-    private FocusKey.Foundation.MiniTimer.MiniTimerController? _miniTimer;
+    private MiniTimerController? _miniTimer;
     private MiniTimerWindow? _miniTimerWindow;
     private CompletionCoordinator? _completion;
     private bool _isExiting;
@@ -65,6 +67,8 @@ public partial class App : Application
                 exception => _startup?.Logger.Error("Main-page operation failed.", exception), RefreshSettingsAsync);
             _startup.Appearance.Changed += OnAppearanceChanged;
             _startup.Appearance.ColorsChanged += OnColorsChanged;
+            _startup.Appearance.PalettesChanged += OnPalettesChanged;
+            ApplyThemePalettes(_startup.Appearance.LightPalette, _startup.Appearance.DarkPalette);
             ApplyAppearance(_startup.Appearance.Current);
             ApplyColors();
             _window.MiniTimerRequested += () => OnShellActivation(ShellActivationKind.MiniTimer);
@@ -151,9 +155,13 @@ public partial class App : Application
                 await _miniTimerWindow.ShowAsync();
                 _startup.Logger.Info($"Mini Timer shown: {_miniTimer.Text}; appearance {_startup.Appearance.Current}; Work {_startup.Appearance.Colors.Work}, Break {_startup.Appearance.Colors.Break}.");
             }
-            else if (_quickOverlay is not null)
+            else if (kind is ShellActivationKind.Hotkey)
             {
-                await _quickOverlay.HandleActivationAsync(kind);
+                if (_isExiting || _startup is null) return;
+                if (_quickOverlay is not null)
+                {
+                    await _quickOverlay.HandleActivationAsync(ShellActivationKind.Hotkey);
+                }
             }
         }
         catch (Exception exception)
@@ -213,9 +221,71 @@ public partial class App : Application
         _startup.Logger.Info($"Session colors applied: Work {colors.Work}, Break {colors.Break}; foregrounds {SessionColors.Foreground(colors.Work)}, {SessionColors.Foreground(colors.Break)}.");
     }
 
+    private void OnPalettesChanged(ThemePalette light, ThemePalette dark)
+    {
+        if (_window is null) return;
+        void Update()
+        {
+            ApplyThemePalettes(light, dark);
+            if (_startup is not null) ApplyAppearance(_startup.Appearance.Current);
+        }
+        if (_window.DispatcherQueue.HasThreadAccess) Update();
+        else _window.DispatcherQueue.TryEnqueue(Update);
+    }
+
+    internal static void ApplyThemePalettes(ThemePalette light, ThemePalette dark)
+    {
+        if (Application.Current?.Resources.ThemeDictionaries is { } dicts)
+        {
+            if (dicts.TryGetValue("Light", out object? lightObj) && lightObj is ResourceDictionary lightDict)
+            {
+                SetBrush(lightDict, "FkBackground", light.Background);
+                SetBrush(lightDict, "FkSidebar", light.Sidebar);
+                SetBrush(lightDict, "FkSurface", light.Surface);
+                SetBrush(lightDict, "FkSurface2", light.Surface2);
+                SetBrush(lightDict, "FkOverlay", light.Surface);
+                SetBrush(lightDict, "FkBorder", light.Border);
+                SetBrush(lightDict, "FkForeground", light.Foreground);
+                SetBrush(lightDict, "FkSecondary", light.Secondary);
+                SetBrush(lightDict, "FkDim", light.Dim);
+                SetBrush(lightDict, "FkAccent", light.Accent);
+            }
+            if (dicts.TryGetValue("Dark", out object? darkObj) && darkObj is ResourceDictionary darkDict)
+            {
+                SetBrush(darkDict, "FkBackground", dark.Background);
+                SetBrush(darkDict, "FkSidebar", dark.Sidebar);
+                SetBrush(darkDict, "FkSurface", dark.Surface);
+                SetBrush(darkDict, "FkSurface2", dark.Surface2);
+                SetBrush(darkDict, "FkOverlay", dark.Surface);
+                SetBrush(darkDict, "FkBorder", dark.Border);
+                SetBrush(darkDict, "FkForeground", dark.Foreground);
+                SetBrush(darkDict, "FkSecondary", dark.Secondary);
+                SetBrush(darkDict, "FkDim", dark.Dim);
+                SetBrush(darkDict, "FkAccent", dark.Accent);
+            }
+        }
+    }
+
+    private static void SetBrush(ResourceDictionary dict, string key, HexColor color)
+    {
+        var winColor = Windows.UI.Color.FromArgb(255,
+            Convert.ToByte(color.Value.Substring(1, 2), 16),
+            Convert.ToByte(color.Value.Substring(3, 2), 16),
+            Convert.ToByte(color.Value.Substring(5, 2), 16));
+
+        if (dict.TryGetValue(key, out object? existing) && existing is SolidColorBrush brush)
+        {
+            brush.Color = winColor;
+        }
+        else
+        {
+            dict[key] = new SolidColorBrush(winColor);
+        }
+    }
+
     private void ApplyAppearance(Appearance appearance)
     {
-        _window?.ApplyAppearance(appearance);
+        _window?.ApplyAppearance(appearance, _startup?.Appearance.LightPalette, _startup?.Appearance.DarkPalette);
         _quickOverlayWindow?.ApplyAppearance(appearance);
         _miniTimerWindow?.ApplyAppearance(appearance);
         if (_appliedAppearance == appearance) return;
@@ -239,6 +309,7 @@ public partial class App : Application
     {
         SessionRecord session = await _completion!.StartAsync(type, cancellationToken);
         _window?.RefreshPages();
+        if (_quickOverlay is not null) await _quickOverlay.RefreshIfVisibleAsync();
         await RefreshMiniTimerAsync();
         return session;
     }
@@ -344,6 +415,7 @@ public partial class App : Application
     {
         if (_startup is not null) _startup.Appearance.Changed -= OnAppearanceChanged;
         if (_startup is not null) _startup.Appearance.ColorsChanged -= OnColorsChanged;
+        if (_startup is not null) _startup.Appearance.PalettesChanged -= OnPalettesChanged;
         _miniTimerWindow?.Dispose();
         _completion?.Dispose();
         _quickOverlay?.Dispose();

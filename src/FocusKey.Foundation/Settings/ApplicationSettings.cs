@@ -10,6 +10,8 @@ public sealed record ApplicationSettings
         Appearance = Appearance.System,
         WorkColor = HexColor.Parse("#183739"),
         BreakColor = HexColor.Parse("#434763"),
+        LightTheme = ThemeConfiguration.DefaultLight,
+        DarkTheme = ThemeConfiguration.DefaultDark,
     };
 
     public required TimeSpan WorkDuration { get; init; }
@@ -17,6 +19,8 @@ public sealed record ApplicationSettings
     public required Appearance Appearance { get; init; }
     public required HexColor WorkColor { get; init; }
     public required HexColor BreakColor { get; init; }
+    public ThemeConfiguration LightTheme { get; init; } = ThemeConfiguration.DefaultLight;
+    public ThemeConfiguration DarkTheme { get; init; } = ThemeConfiguration.DefaultDark;
 
     public void Validate()
     {
@@ -26,6 +30,8 @@ public sealed record ApplicationSettings
             throw new ArgumentException($"Unsupported appearance '{Appearance}'.", nameof(Appearance));
         ValidateColor(WorkColor, nameof(WorkColor));
         ValidateColor(BreakColor, nameof(BreakColor));
+        (LightTheme ?? ThemeConfiguration.DefaultLight).Validate(false);
+        (DarkTheme ?? ThemeConfiguration.DefaultDark).Validate(true);
     }
 
     private static void ValidateDuration(TimeSpan duration, string name)

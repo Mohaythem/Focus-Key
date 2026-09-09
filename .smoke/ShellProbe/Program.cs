@@ -21,6 +21,7 @@ internal static class ShellProbe
 
     public static async Task<int> RunAsync(string[] args)
     {
+        AttachToDefaultDesktop();
         try
         {
             if (args.Length == 0) return Usage();
@@ -39,6 +40,7 @@ internal static class ShellProbe
                 "hotkey-free" => HotkeyFree(),
                 "hold-hotkey" => HoldHotkey(),
                 "seed" => await SeedAsync(args),
+                "launch" => LaunchOnDefaultDesktop(args),
                 "seed-reports" => await SeedReportsAsync(args),
                 "set-durations" => await SetDurationsAsync(args),
                 "set-appearance" => await SetAppearanceAsync(args),
@@ -67,7 +69,12 @@ internal static class ShellProbe
             throw new InvalidOperationException($"Expected exactly one {ClassPrefix} top-level window for PID {pid}, found {windows.Count}.");
         var window = windows[0];
         var id = new NOTIFYICONIDENTIFIER { cbSize = (uint)Marshal.SizeOf<NOTIFYICONIDENTIFIER>(), hWnd = window, uID = 1 };
-        int result = Shell_NotifyIconGetRect(ref id, out RECT rect);
+        int result = 0;
+        RECT rect = default;
+        OnDefaultDesktop(() =>
+        {
+            result = Shell_NotifyIconGetRect(ref id, out rect);
+        });
         if (result != 0) throw new Win32Exception(result, "Shell_NotifyIconGetRect failed.");
         Console.WriteLine($"pid={pid} hwnd=0x{window.ToInt64():X} class={ClassName(window)} rect={rect.Left},{rect.Top},{rect.Right},{rect.Bottom}");
         return 0;
@@ -77,19 +84,33 @@ internal static class ShellProbe
     {
         string expectedTitle = overlay ? "Focus Key — Quick Overlay" : "Focus Key Mini Timer";
         var matches = new List<IntPtr>();
-        EnumWindows((window, _) =>
+        bool visible = false;
+        bool hideSuccess = false;
+        RECT rect = default;
+        bool rectSuccess = false;
+        bool pinned = false;
+        OnDefaultDesktop(() =>
         {
-            GetWindowThreadProcessId(window, out uint owner);
-            var title = new StringBuilder(256);
-            GetWindowText(window, title, title.Capacity);
-            if (owner == pid && title.ToString() == expectedTitle) matches.Add(window);
-            return true;
-        }, IntPtr.Zero);
+            EnumWindows((window, _) =>
+            {
+                GetWindowThreadProcessId(window, out uint owner);
+                var title = new StringBuilder(256);
+                GetWindowText(window, title, title.Capacity);
+                if (owner == pid && title.ToString() == expectedTitle) matches.Add(window);
+                return true;
+            }, IntPtr.Zero);
+            if (matches.Count == 1)
+            {
+                visible = IsWindowVisible(matches[0]);
+                hideSuccess = !hide || PostMessage(matches[0], 0x0010, IntPtr.Zero, IntPtr.Zero);
+                rectSuccess = GetWindowRect(matches[0], out rect);
+                pinned = (GetWindowLongPtr(matches[0], -20).ToInt64() & 8) != 0;
+            }
+        });
         if (matches.Count != 1) throw new InvalidOperationException($"Expected one Mini Timer, found {matches.Count}.");
-        if (!IsWindowVisible(matches[0])) throw new InvalidOperationException("Mini Timer is hidden.");
-        if (hide && !PostMessage(matches[0], 0x0010, IntPtr.Zero, IntPtr.Zero)) throw LastError("Could not hide Mini Timer.");
-        if (!GetWindowRect(matches[0], out var rect)) throw LastError("Could not read Mini Timer bounds.");
-        bool pinned = (GetWindowLongPtr(matches[0], -20).ToInt64() & 8) != 0;
+        if (!visible) throw new InvalidOperationException("Mini Timer is hidden.");
+        if (!hideSuccess) throw LastError("Could not hide Mini Timer.");
+        if (!rectSuccess) throw LastError("Could not read Mini Timer bounds.");
         Console.WriteLine($"Mini Timer hwnd=0x{matches[0].ToInt64():X} visible; hide={hide}; pinned={pinned}; bounds={rect.Left},{rect.Top},{rect.Right},{rect.Bottom}.");
         return 0;
     }
@@ -103,7 +124,12 @@ internal static class ShellProbe
     {
         var windows = FindWindows(pid);
         if (windows.Count != 1) throw new InvalidOperationException($"Expected exactly one {ClassPrefix} top-level window for PID {pid}, found {windows.Count}.");
-        if (!PostMessage(windows[0], WM_COMMAND, (IntPtr)command, IntPtr.Zero)) throw LastError("PostMessage failed.");
+        bool sent = false;
+        OnDefaultDesktop(() =>
+        {
+            sent = PostMessage(windows[0], WM_COMMAND, (IntPtr)command, IntPtr.Zero);
+        });
+        if (!sent) throw LastError("PostMessage failed.");
         Console.WriteLine($"posted command={command} pid={pid} hwnd=0x{windows[0].ToInt64():X}");
         return 0;
     }
@@ -111,10 +137,14 @@ internal static class ShellProbe
     private static int PostHotkey(int pid)
     {
         var windows = FindWindows(pid);
-        if (windows.Count != 1) throw new InvalidOperationException("Expected one shell window.");
-        if (!PostMessage(windows[0], WM_HOTKEY, (IntPtr)FOCUS_KEY_HOTKEY_ID, IntPtr.Zero))
-            throw LastError("Could not post the Focus Key hotkey message.");
-        Console.WriteLine($"posted hotkey pid={pid}");
+        if (windows.Count != 1) throw new InvalidOperationException($"Expected exactly one {ClassPrefix} top-level window for PID {pid}, found {windows.Count}.");
+        bool sent = false;
+        OnDefaultDesktop(() =>
+        {
+            sent = PostMessage(windows[0], WM_HOTKEY, (IntPtr)FOCUS_KEY_HOTKEY_ID, (IntPtr)((VK_F3 << 16) | MOD_SHIFT | MOD_NOREPEAT));
+        });
+        if (!sent) throw LastError("PostMessage WM_HOTKEY failed.");
+        Console.WriteLine($"posted hotkey pid={pid} hwnd=0x{windows[0].ToInt64():X}");
         return 0;
     }
 
@@ -323,7 +353,12 @@ internal static class ShellProbe
     {
         var windows = FindWindows(pid);
         if (windows.Count != 1) throw new InvalidOperationException("Expected one Focus Key shell window.");
-        if (!PostMessage(windows[0], resume ? 0x0218u : 0x001Eu, resume ? (IntPtr)18 : IntPtr.Zero, IntPtr.Zero))
+        bool sent = false;
+        OnDefaultDesktop(() =>
+        {
+            sent = PostMessage(windows[0], resume ? 0x0218u : 0x001Eu, resume ? (IntPtr)18 : IntPtr.Zero, IntPtr.Zero);
+        });
+        if (!sent)
             throw LastError("Could not post completion evaluation signal.");
         Console.WriteLine($"posted {(resume ? "resume" : "clock-change")} pid={pid}");
         return 0;
@@ -344,7 +379,10 @@ internal static class ShellProbe
     private static List<IntPtr> FindWindows(int pid)
     {
         var result = new List<IntPtr>();
-        EnumWindows((window, _) => { GetWindowThreadProcessId(window, out uint owner); if (owner == pid && ClassName(window).StartsWith(ClassPrefix, StringComparison.Ordinal)) result.Add(window); return true; }, IntPtr.Zero);
+        OnDefaultDesktop(() =>
+        {
+            EnumWindows((window, _) => { GetWindowThreadProcessId(window, out uint owner); if (owner == pid && ClassName(window).StartsWith(ClassPrefix, StringComparison.Ordinal)) result.Add(window); return true; }, IntPtr.Zero);
+        });
         return result;
     }
     private static string ClassName(IntPtr window) { var buffer = new StringBuilder(256); int length = GetClassName(window, buffer, buffer.Capacity); return length == 0 ? string.Empty : buffer.ToString(); }
@@ -359,4 +397,103 @@ internal static class ShellProbe
     [DllImport("user32.dll", SetLastError = true)] private static extern bool RegisterHotKey(IntPtr window, int id, uint modifiers, uint key);
     [DllImport("user32.dll", SetLastError = true)] private static extern bool UnregisterHotKey(IntPtr window, int id);
     [DllImport("shell32.dll")] private static extern int Shell_NotifyIconGetRect(ref NOTIFYICONIDENTIFIER identifier, out RECT rect);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern IntPtr OpenDesktop(string lpszDesktop, uint dwFlags, bool fInherit, uint dwDesiredAccess);
+    [DllImport("user32.dll", SetLastError = true)] private static extern bool SetThreadDesktop(IntPtr hDesktop);
+    [DllImport("user32.dll", SetLastError = true)] private static extern bool CloseDesktop(IntPtr hDesktop);
+    private static void AttachToDefaultDesktop()
+    {
+        IntPtr defaultDesk = OpenDesktop("default", 0, false, 0x01FF);
+        if (defaultDesk != IntPtr.Zero)
+        {
+            SetThreadDesktop(defaultDesk);
+            CloseDesktop(defaultDesk);
+        }
+    }
+
+    private static void OnDefaultDesktop(Action action)
+    {
+        var t = new Thread(() =>
+        {
+            IntPtr defaultDesk = OpenDesktop("default", 0, false, 0x01FF);
+            if (defaultDesk != IntPtr.Zero)
+            {
+                SetThreadDesktop(defaultDesk);
+                CloseDesktop(defaultDesk);
+            }
+            action();
+        });
+        t.Start();
+        t.Join();
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct STARTUPINFO
+    {
+        public uint cb;
+        public string lpReserved;
+        public string lpDesktop;
+        public string lpTitle;
+        public uint dwX;
+        public uint dwY;
+        public uint dwXSize;
+        public uint dwYSize;
+        public uint dwXCountChars;
+        public uint dwYCountChars;
+        public uint dwFillAttribute;
+        public uint dwFlags;
+        public ushort wShowWindow;
+        public ushort cbReserved2;
+        public IntPtr lpReserved2;
+        public IntPtr hStdInput;
+        public IntPtr hStdOutput;
+        public IntPtr hStdError;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct PROCESS_INFORMATION
+    {
+        public IntPtr hProcess;
+        public IntPtr hThread;
+        public uint dwProcessId;
+        public uint dwThreadId;
+    }
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern bool CreateProcess(
+        string? lpApplicationName,
+        string? lpCommandLine,
+        IntPtr lpProcessAttributes,
+        IntPtr lpThreadAttributes,
+        bool bInheritHandles,
+        uint dwCreationFlags,
+        IntPtr lpEnvironment,
+        string? lpCurrentDirectory,
+        ref STARTUPINFO lpStartupInfo,
+        out PROCESS_INFORMATION lpProcessInformation);
+    [DllImport("kernel32.dll", SetLastError = true)] private static extern bool CloseHandle(IntPtr handle);
+
+    [DllImport("kernel32.dll", SetLastError = true)] private static extern uint WaitForSingleObject(IntPtr hHandle, uint dwMilliseconds);
+    [DllImport("kernel32.dll", SetLastError = true)] private static extern bool GetExitCodeProcess(IntPtr hProcess, out uint lpExitCode);
+
+    private static int LaunchOnDefaultDesktop(string[] args)
+    {
+        if (args.Length < 2) throw new ArgumentException("Usage: launch <exePath> [workingDir]");
+        string exe = Path.GetFullPath(args[1]);
+        string dir = args.Length > 2 ? Path.GetFullPath(args[2]) : Path.GetDirectoryName(exe)!;
+        var si = new STARTUPINFO
+        {
+            cb = (uint)Marshal.SizeOf<STARTUPINFO>(),
+            lpDesktop = @"WinSta0\default"
+        };
+        string cmd = $"\"{exe}\"";
+        if (!CreateProcess(null, cmd, IntPtr.Zero, IntPtr.Zero, false, 0, IntPtr.Zero, dir, ref si, out var pi))
+            throw LastError($"Could not launch {exe} on WinSta0\\default");
+        Console.WriteLine($"pid={pi.dwProcessId}");
+        CloseHandle(pi.hThread);
+        WaitForSingleObject(pi.hProcess, 0xFFFFFFFF);
+        GetExitCodeProcess(pi.hProcess, out uint exitCode);
+        CloseHandle(pi.hProcess);
+        Console.WriteLine($"Process {pi.dwProcessId} exited with code {exitCode}.");
+        return (int)exitCode;
+    }
 }

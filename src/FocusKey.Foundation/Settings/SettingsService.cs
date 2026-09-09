@@ -28,6 +28,10 @@ public sealed class SettingsService(ISettingsRepository repository)
         UpdateAsync(current => current with { WorkColor = value }, cancellationToken);
     public Task<ApplicationSettings> UpdateBreakColorAsync(HexColor value, CancellationToken cancellationToken = default) =>
         UpdateAsync(current => current with { BreakColor = value }, cancellationToken);
+    public Task<ApplicationSettings> UpdateLightThemeAsync(ThemeConfiguration value, CancellationToken cancellationToken = default) =>
+        UpdateAsync(current => current with { LightTheme = value }, cancellationToken);
+    public Task<ApplicationSettings> UpdateDarkThemeAsync(ThemeConfiguration value, CancellationToken cancellationToken = default) =>
+        UpdateAsync(current => current with { DarkTheme = value }, cancellationToken);
 
     private async Task<ApplicationSettings> UpdateAsync(
         Func<ApplicationSettings, ApplicationSettings> change, CancellationToken cancellationToken)

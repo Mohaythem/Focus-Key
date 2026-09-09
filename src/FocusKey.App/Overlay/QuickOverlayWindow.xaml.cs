@@ -10,6 +10,7 @@ using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Hosting;
 using Windows.Graphics;
 using Windows.System;
 using WinRT.Interop;
@@ -25,7 +26,6 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
     private bool _closing;
     private readonly Microsoft.UI.Dispatching.DispatcherQueueTimer _displayTimer;
     private readonly Action<string>? _trace;
-    private readonly Dictionary<(Button, string), SolidColorBrush> _stateBrushes = new();
     private SessionColors _colors = SessionColors.From(ApplicationSettings.Default);
     internal void ApplyColors(SessionColors colors) { _colors = colors; Render(_state); }
 
@@ -95,27 +95,46 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
         if (state.Active is { } session)
         {
             var color = session.Type == SessionType.Work ? _colors.Work : _colors.Break;
-            ActiveCard.Background = SessionColorBrush.Create(color);
-            ActiveType.Foreground = ActiveRemaining.Foreground = SessionColorBrush.Create(SessionColors.Foreground(color));
-            ActiveType.Text = session.Type.ToString();
-            PaintButton(StopButton, color);
+            ActiveBadgeDot.Fill = SessionColorBrush.Create(color);
+            ActiveCard.BorderBrush = SessionColorBrush.Create(color);
+            ActiveType.Text = (session.Type == SessionType.Work ? "WORK SESSION" : "BREAK SESSION");
+            ActiveType.Foreground = SessionColorBrush.Create(color);
         }
         RenderCountdown();
         WorkDuration.Text = QuickOverlayDurationFormatter.Format(state.Durations?.Work);
         BreakDuration.Text = QuickOverlayDurationFormatter.Format(state.Durations?.Break);
         AutomationProperties.SetName(WorkCard, $"Work, {WorkDuration.Text}");
         AutomationProperties.SetName(BreakCard, $"Break, {BreakDuration.Text}");
-        PaintCard(WorkCard, WorkLabel, WorkDuration, state.Selected == SessionType.Work, _colors.Work);
-        PaintCard(BreakCard, BreakLabel, BreakDuration, state.Selected == SessionType.Break, _colors.Break);
+        PaintCard(WorkCard, WorkLabel, WorkDuration, WorkDot, state.Selected == SessionType.Work, _colors.Work);
+        PaintCard(BreakCard, BreakLabel, BreakDuration, BreakDot, state.Selected == SessionType.Break, _colors.Break);
         // Keep focusable cards available for navigation while their controller ignores selection
         // during loading/saving or an existing session. Start is explicitly disabled.
         StartButton.IsEnabled = state.CanStart && !state.IsBusy;
         StartButton.Content = state.IsBusy ? "Please wait…" : "Start";
-        PaintButton(StartButton, state.Selected == SessionType.Work ? _colors.Work : _colors.Break);
+        var startColor = state.Selected == SessionType.Work ? _colors.Work : _colors.Break;
+        StartButton.Background = SessionColorBrush.Create(startColor);
+        StartButton.Foreground = SessionColorBrush.Create(SessionColors.Foreground(startColor));
+        StartButton.BorderThickness = new Thickness(0);
         FeedbackText.Text = state.Feedback ?? string.Empty;
         FeedbackText.Visibility = state.Feedback is null ? Visibility.Collapsed : Visibility.Visible;
         if (_visible) ResizeAndCenter();
-        if (_visible && changedMode) FocusSelection();
+        if (_visible && changedMode)
+        {
+            FocusSelection();
+            AnimateMode(state.Active is null ? SelectionCards : ActiveCard);
+        }
+    }
+
+    private static void AnimateMode(UIElement element)
+    {
+        // A short compositor fade never delays focus, input or lifecycle transitions.
+        if (!new Windows.UI.ViewManagement.UISettings().AnimationsEnabled) return;
+        var visual = ElementCompositionPreview.GetElementVisual(element);
+        var animation = visual.Compositor.CreateScalarKeyFrameAnimation();
+        animation.InsertKeyFrame(0, 0.65f);
+        animation.InsertKeyFrame(1, 1);
+        animation.Duration = TimeSpan.FromMilliseconds(120);
+        visual.StartAnimation("Opacity", animation);
     }
 
     private void RenderCountdown()
@@ -213,39 +232,27 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
         // Space and Tab retain the native Button keyboard/focus behavior.
     }
 
-    private void PaintCard(Button card, TextBlock label, TextBlock duration, bool selected, HexColor color)
+    private void PaintCard(Button card, TextBlock label, TextBlock duration, Microsoft.UI.Xaml.Shapes.Ellipse dot, bool selected, HexColor color)
     {
-        PaintButton(card, color);
-        card.BorderThickness = new Thickness(selected ? 3 : 1);
-        label.Foreground = duration.Foreground = card.Foreground;
-    }
-
-    private void PaintButton(Button button, HexColor color)
-    {
-        button.Background = SessionColorBrush.Create(color);
-        button.Foreground = SessionColorBrush.Create(SessionColors.Foreground(color));
-        button.BorderBrush = button.Foreground;
-        foreach (string state in new[] { "PointerOver", "Pressed", "Disabled" })
+        dot.Fill = SessionColorBrush.Create(color);
+        if (selected)
         {
-            UpdateResource(button, $"ButtonBackground{state}", (SolidColorBrush)button.Background);
-            UpdateResource(button, $"ButtonForeground{state}", (SolidColorBrush)button.Foreground);
-            UpdateResource(button, $"ButtonBorderBrush{state}", (SolidColorBrush)button.BorderBrush);
+            card.Style = (Style)Application.Current.Resources["FkOverlayCardSelected"];
+            card.ClearValue(Control.BackgroundProperty);
+            card.BorderBrush = SessionColorBrush.Create(color);
+            card.BorderThickness = new Thickness(2);
         }
-    }
-
-    private void UpdateResource(Button button, string key, SolidColorBrush value)
-    {
-        // Keep resource identity so already-materialized native visual states also update.
-        if (_stateBrushes.TryGetValue((button, key), out var existing))
-            existing.Color = value.Color;
         else
         {
-            var owned = new SolidColorBrush(value.Color);
-            _stateBrushes.Add((button, key), owned);
-            button.Resources[key] = owned;
+            card.Style = (Style)Application.Current.Resources["FkOverlayCard"];
+            card.ClearValue(Control.BackgroundProperty);
+            card.ClearValue(Control.BorderBrushProperty);
+            card.ClearValue(Control.BorderThicknessProperty);
         }
+        card.Opacity = 1;
     }
     [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] private static extern uint GetDpiForWindow(IntPtr window);
     [DllImport("dwmapi.dll")] private static extern int DwmSetWindowAttribute(IntPtr window, uint attribute, ref uint value, int size);
 }
+

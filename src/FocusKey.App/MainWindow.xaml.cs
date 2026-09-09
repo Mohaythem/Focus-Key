@@ -1,3 +1,6 @@
+using System.Globalization;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 using FocusKey.Foundation.Sessions;
 using FocusKey.Foundation.Settings;
 using FocusKey.Foundation.Today;
@@ -27,8 +30,32 @@ public sealed partial class MainWindow : Window
     private void OnMiniTimerClick(object sender, RoutedEventArgs args) => MiniTimerRequested?.Invoke();
     internal event Action? ExitRequested;
 
-    internal void ApplyAppearance(Appearance appearance) =>
-        WindowAppearance.Apply(MainSurface, AppWindow, appearance);
+    private Appearance _appearance = Appearance.System;
+    private ThemePalette? _lightPalette;
+    private ThemePalette? _darkPalette;
+
+    internal void ApplyAppearance(Appearance appearance, ThemePalette? lightPalette = null, ThemePalette? darkPalette = null)
+    {
+        _appearance = appearance;
+        if (lightPalette is not null) _lightPalette = lightPalette;
+        if (darkPalette is not null) _darkPalette = darkPalette;
+        UpdateAppearance();
+    }
+
+    private void UpdateAppearance()
+    {
+        MainSurface.RequestedTheme = WindowAppearance.ToElementTheme(_appearance);
+        bool isDark = _appearance switch
+        {
+            Appearance.Dark => true,
+            Appearance.Light => false,
+            _ => MainSurface.ActualTheme == ElementTheme.Dark,
+        };
+        ThemePalette palette = isDark
+            ? (_darkPalette ?? ThemePalette.DefaultDark)
+            : (_lightPalette ?? ThemePalette.DefaultLight);
+        WindowAppearance.ApplyTitleBar(AppWindow, palette);
+    }
 
     internal MainWindow(StartupContext startup,
         Func<SessionId, CancellationToken, Task<SessionOutcome>> stop, Action<Exception> report,
@@ -39,7 +66,14 @@ public sealed partial class MainWindow : Window
         ReportsHost.Content = _reports;
         _settings = new SettingsView(startup.Settings, refreshSettings, report);
         SettingsHost.Content = _settings;
-        AppWindow.Resize(new SizeInt32(900, 720));
+        AppWindow.Resize(new SizeInt32(880, 660));
+        MainSurface.ActualThemeChanged += (_, _) => { if (_appearance == Appearance.System) UpdateAppearance(); };
+        MainSurface.SizeChanged += (_, _) =>
+        {
+            bool narrow = MainSurface.ActualWidth < 740;
+            NavColumn.Width = new GridLength(narrow ? 180 : 216);
+            PageContent.Padding = new Thickness(narrow ? 24 : 40, 28, narrow ? 24 : 40, 36);
+        };
         _today = new TodayController(startup.Today.ReadAsync, stop, report);
         _today.Changed += Render;
         _displayTimer = DispatcherQueue.CreateTimer();
@@ -115,16 +149,38 @@ public sealed partial class MainWindow : Window
         ErrorText.Visibility = _today.Error is null ? Visibility.Collapsed : Visibility.Visible;
         if (_today.Snapshot is { } snapshot)
         {
-            DayLabel.Text = $"{snapshot.Date:dddd, d MMMM yyyy} · {snapshot.TimeZone.DisplayName}\nSessions grouped by local start date.";
-            SummaryText.Text = $"Completed Work sessions: {snapshot.CompletedWorkCount}\n" +
-                $"Completed Break sessions: {snapshot.CompletedBreakCount}\n" +
-                $"Focus time: {Duration(snapshot.WorkTime)}\nBreak time: {Duration(snapshot.BreakTime)}\n" +
-                $"Completion rate: {(snapshot.CompletionRate is { } rate ? $"{rate:0}%" : "—")}";
+            DayLabel.Text = snapshot.Date.ToString("dddd, d MMMM yyyy", CultureInfo.InvariantCulture);
+            ToolTipService.SetToolTip(DayLabel, $"{snapshot.TimeZone.DisplayName}. Sessions grouped by local start date.");
+            FocusValue.Text = Presentation.Duration(snapshot.WorkTime);
+            WorkValue.Text = snapshot.CompletedWorkCount.ToString(CultureInfo.InvariantCulture);
+            BreakValue.Text = Presentation.Duration(snapshot.BreakTime);
+            BreakDetail.Text = "today";
+            CompletionValue.Text = snapshot.CompletionRate is { } rate ? rate.ToString("0", CultureInfo.InvariantCulture) + "%" : "—";
             ActivityRows.ItemsSource = snapshot.Sessions.Select(session =>
             {
-                string started = TimeZoneInfo.ConvertTime(session.StartedAt, snapshot.TimeZone).ToString("HH:mm");
-                string duration = session.ActualDuration is { } actual ? Duration(actual) : $"{Duration(session.PlannedDuration)} planned";
-                return $"{started}   {session.Type}   {session.Status}   {duration}";
+                string started = TimeZoneInfo.ConvertTime(session.StartedAt, snapshot.TimeZone).ToString("HH:mm", CultureInfo.InvariantCulture);
+                string duration = session.ActualDuration is { } actual ? Presentation.Duration(actual) : $"{Presentation.Duration(session.PlannedDuration)} planned";
+                var row = new Grid { ColumnSpacing = 16, Padding = new Thickness(0, 12, 0, 12) };
+                foreach (var width in new[] { new GridLength(40), new GridLength(4), new GridLength(1, GridUnitType.Star), GridLength.Auto, new GridLength(72) })
+                    row.ColumnDefinitions.Add(new ColumnDefinition { Width = width });
+                var color = session.Type == SessionType.Work ? _colors.Work : _colors.Break;
+                var timeText = Presentation.Text(started, 11, true);
+                timeText.FontFamily = new FontFamily("Consolas");
+                timeText.VerticalAlignment = VerticalAlignment.Center;
+                row.Children.Add(timeText);
+                var dot = new Border { Width = 4, Height = 4, CornerRadius = new CornerRadius(2), VerticalAlignment = VerticalAlignment.Center,
+                    Background = SessionColorBrush.Create(color) };
+                Grid.SetColumn(dot, 1); row.Children.Add(dot);
+                var type = new TextBlock { Text = session.Type.ToString(), FontSize = 12, VerticalAlignment = VerticalAlignment.Center,
+                    Style = (Style)Application.Current.Resources["FkText"] };
+                Grid.SetColumn(type, 2); row.Children.Add(type);
+                var time = Presentation.Text(duration, 11, true);
+                time.VerticalAlignment = VerticalAlignment.Center;
+                Grid.SetColumn(time, 3); row.Children.Add(time);
+                var status = Presentation.StatusText(session.Status, 11);
+                status.VerticalAlignment = VerticalAlignment.Center;
+                Grid.SetColumn(status, 4); row.Children.Add(status);
+                return row;
             }).ToArray();
             EmptyActivity.Visibility = snapshot.Sessions.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         }
@@ -134,22 +190,47 @@ public sealed partial class MainWindow : Window
 
     private void RenderRunning()
     {
+        bool hasRunning = _today.Snapshot?.Running is not null;
+
+        // Sidebar active indicator
+        ActiveIndicator.Visibility = hasRunning ? Visibility.Visible : Visibility.Collapsed;
+        if (hasRunning)
+        {
+            var indicatorColor = _today.Snapshot!.Running!.Type == SessionType.Work ? _colors.Work : _colors.Break;
+            ActiveDot.Fill = SessionColorBrush.Create(indicatorColor);
+        }
+
         if (_today.Snapshot?.Running is not { } running)
         {
-            RunningText.Text = "No running session.";
+            CurrentCard.ClearValue(Border.BackgroundProperty);
+            CurrentHeading.ClearValue(TextBlock.ForegroundProperty);
+            RunningText.ClearValue(TextBlock.ForegroundProperty);
+            RunningHint.ClearValue(TextBlock.ForegroundProperty);
+            RunningType.Visibility = Visibility.Collapsed;
+            RunningText.Text = "Ready when you are";
+            RunningText.FontSize = 22;
+            RunningText.FontFamily = new FontFamily("Segoe UI Variable");
+            RunningHint.Text = "Press Shift + F3 to start Work or Break.";
             SessionProgress.Visibility = StopButton.Visibility = Visibility.Collapsed;
             return;
         }
         var snapshot = SessionSnapshot.For(running, DateTimeOffset.UtcNow);
         var remaining = TimeSpan.FromSeconds(Math.Ceiling(snapshot.Remaining.TotalSeconds));
-        RunningText.Text = snapshot.HasReachedPlannedEnd ? $"{running.Type} · Finishing…" :
-            $"{running.Type} · {(long)remaining.TotalMinutes:00}:{remaining.Seconds:00} remaining";
+        var color = running.Type == SessionType.Work ? _colors.Work : _colors.Break;
+        var foreground = Presentation.Stroke(color);
+        CurrentCard.Background = SessionColorBrush.Create(color);
+        CurrentHeading.Foreground = RunningType.Foreground = RunningText.Foreground = RunningHint.Foreground = foreground;
+        RunningType.Text = running.Type.ToString();
+        RunningType.Visibility = Visibility.Visible;
+        RunningText.FontSize = 40;
+        RunningText.FontFamily = new FontFamily("Consolas");
+        RunningText.Text = snapshot.HasReachedPlannedEnd ? "00:00" : string.Create(CultureInfo.InvariantCulture, $"{(long)remaining.TotalMinutes:00}:{remaining.Seconds:00}");
+        RunningHint.Text = snapshot.HasReachedPlannedEnd ? "Finishing…" : "remaining";
         SessionProgress.Value = 100 * snapshot.Elapsed.TotalSeconds / snapshot.PlannedDuration.TotalSeconds;
-        SessionProgress.Foreground = SessionColorBrush.Create(running.Type == SessionType.Work ? _colors.Work : _colors.Break);
+        SessionProgress.Foreground = foreground;
         SessionProgress.Visibility = StopButton.Visibility = Visibility.Visible;
         StopButton.IsEnabled = !_today.IsRefreshing && !_today.IsStopping && _today.Error is null;
     }
-
     private async void OnDisplayTick(DispatcherQueueTimer sender, object args)
     {
         if (!_visible || _today.Page != MainPage.Today || _today.IsRefreshing) return;

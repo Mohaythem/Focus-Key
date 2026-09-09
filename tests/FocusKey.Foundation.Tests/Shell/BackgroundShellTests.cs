@@ -26,7 +26,7 @@ public sealed class BackgroundShellTests
     }
 
     [Fact]
-    public async Task Activation_ForwardsShowWindowAndHotkey_AndIsSuppressedDuringShutdown()
+    public async Task Activation_ForwardsWindowHotkeyAndMiniTimer_AndIsSuppressedDuringShutdown()
     {
         var integration = new FakeShellIntegration();
         var shutdownEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -38,12 +38,14 @@ public sealed class BackgroundShellTests
 
         integration.RaiseActivation(ShellActivationKind.ShowWindow);
         integration.RaiseActivation(ShellActivationKind.Hotkey);
-        Assert.Equal([ShellActivationKind.ShowWindow, ShellActivationKind.Hotkey], activations);
+        integration.RaiseActivation(ShellActivationKind.MiniTimer);
+        Assert.Equal([ShellActivationKind.ShowWindow, ShellActivationKind.Hotkey, ShellActivationKind.MiniTimer], activations);
 
         Task exit = shell.ExitAsync();
         await shutdownEntered.Task;
         integration.RaiseActivation(ShellActivationKind.Hotkey);
-        Assert.Equal(2, activations.Count);
+        integration.RaiseActivation(ShellActivationKind.MiniTimer);
+        Assert.Equal(3, activations.Count);
         release.SetResult();
         await exit;
     }

@@ -11,6 +11,7 @@ internal sealed class WindowsShellIntegration : IShellIntegration
     private const uint TrayCallback = 0x0400 + 71;
     private const uint OpenCommand = 1;
     private const uint ExitCommand = 2;
+    private const uint MiniTimerCommand = 3;
     private readonly NativeMethods.WndProc _windowProcedure;
     private readonly string _className = $"FocusKey.Shell.{Guid.NewGuid():N}";
     private IntPtr _instance;
@@ -132,7 +133,7 @@ internal sealed class WindowsShellIntegration : IShellIntegration
             }
             if (message == NativeMethods.WM_COMMAND)
             {
-                switch ((uint)(wParam.ToInt64() & 0xFFFF)) { case OpenCommand: RaiseActivation(ShellActivationKind.ShowWindow); break; case ExitCommand: RaiseExit(); break; }
+                switch ((uint)(wParam.ToInt64() & 0xFFFF)) { case OpenCommand: RaiseActivation(ShellActivationKind.ShowWindow); break; case ExitCommand: RaiseExit(); break; case MiniTimerCommand: RaiseActivation(ShellActivationKind.MiniTimer); break; }
                 return IntPtr.Zero;
             }
         }
@@ -148,6 +149,7 @@ internal sealed class WindowsShellIntegration : IShellIntegration
         try
         {
             if (!NativeMethods.AppendMenu(menu, NativeMethods.MF_STRING, (UIntPtr)OpenCommand, "Open Focus Key") ||
+                !NativeMethods.AppendMenu(menu, NativeMethods.MF_STRING, (UIntPtr)MiniTimerCommand, "Mini Timer") ||
                 !NativeMethods.AppendMenu(menu, NativeMethods.MF_STRING, (UIntPtr)ExitCommand, "Exit Focus Key"))
                 throw LastError("Could not populate the Focus Key tray menu.");
             if (!NativeMethods.GetCursorPos(out var point)) throw LastError("Could not position the tray menu.");

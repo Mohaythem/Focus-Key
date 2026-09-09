@@ -11,6 +11,7 @@
             <ToggleButton x:Name="ReportsNav" Content="Reports" HorizontalAlignment="Stretch" Click="OnReportsClick"/>
             <ToggleButton x:Name="SettingsNav" Content="Settings" HorizontalAlignment="Stretch" Click="OnSettingsClick"/>
             <TextBlock Text="Shift + F3 to start a session" TextWrapping="Wrap" Opacity="0.7"/>
+            <Button Content="Mini Timer" Click="OnMiniTimerClick"/>
             <Button Content="Exit Focus Key" Click="OnExitClick"/>
         </StackPanel>
         <ScrollViewer Grid.Column="1">

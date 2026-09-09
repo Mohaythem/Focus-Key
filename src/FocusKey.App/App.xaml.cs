@@ -25,6 +25,8 @@ public partial class App : Application
     private InstanceActivationSignal? _activationSignal;
     private QuickOverlayController? _quickOverlay;
     private QuickOverlayWindow? _quickOverlayWindow;
+    private FocusKey.Foundation.MiniTimer.MiniTimerController? _miniTimer;
+    private MiniTimerWindow? _miniTimerWindow;
     private CompletionCoordinator? _completion;
     private bool _isExiting;
     private Appearance? _appliedAppearance;
@@ -65,6 +67,7 @@ public partial class App : Application
             _startup.Appearance.ColorsChanged += OnColorsChanged;
             ApplyAppearance(_startup.Appearance.Current);
             ApplyColors();
+            _window.MiniTimerRequested += () => OnShellActivation(ShellActivationKind.MiniTimer);
             _window.ExitRequested += OnExplicitExitRequested;
             _window.AppWindow.Closing += OnAppWindowClosing;
             _window.Closed += OnMainWindowClosed;
@@ -76,6 +79,7 @@ public partial class App : Application
             {
                 TimeZoneInfo.ClearCachedData();
                 _window?.RefreshPages();
+                _ = RefreshMiniTimerAsync();
             };
             _quickOverlay = new QuickOverlayController(CreateQuickOverlay,
                 _startup.Sessions.GetActiveAsync, _startup.Sessions.GetDurationsAsync, StartSessionAsync);
@@ -93,6 +97,7 @@ public partial class App : Application
         }
         catch (Exception exception)
         {
+            _miniTimerWindow?.Dispose();
             _completion?.Dispose();
             _shell?.Dispose();
             _activationSignal?.Dispose();
@@ -130,6 +135,20 @@ public partial class App : Application
             if (kind == ShellActivationKind.ShowWindow)
             {
                 ShowWindow();
+            }
+            else if (kind == ShellActivationKind.MiniTimer)
+            {
+                if (_isExiting || _startup is null) return;
+                _miniTimer ??= new(token => Task.Run(() => _startup.Sessions.GetActiveAsync(token)), exception => _startup?.Logger.Error("Mini Timer read failed.", exception));
+                if (_miniTimerWindow is null)
+                {
+                    _miniTimerWindow = new MiniTimerWindow(_miniTimer, ShowWindow);
+                    _startup.Logger.Info("Mini Timer created.");
+                }
+                _miniTimerWindow.ApplyAppearance(_startup.Appearance.Current);
+                _miniTimerWindow.ApplyColors(_startup.Appearance.Colors);
+                await _miniTimerWindow.ShowAsync();
+                _startup.Logger.Info($"Mini Timer shown: {_miniTimer.Text}; appearance {_startup.Appearance.Current}; Work {_startup.Appearance.Colors.Work}, Break {_startup.Appearance.Colors.Break}.");
             }
             else if (_quickOverlay is not null)
             {
@@ -189,6 +208,7 @@ public partial class App : Application
         var colors = _startup.Appearance.Colors;
         _window?.ApplyColors(colors);
         _quickOverlayWindow?.ApplyColors(colors);
+        _miniTimerWindow?.ApplyColors(colors);
         _startup.Logger.Info($"Session colors applied: Work {colors.Work}, Break {colors.Break}; foregrounds {SessionColors.Foreground(colors.Work)}, {SessionColors.Foreground(colors.Break)}.");
     }
 
@@ -196,6 +216,7 @@ public partial class App : Application
     {
         _window?.ApplyAppearance(appearance);
         _quickOverlayWindow?.ApplyAppearance(appearance);
+        _miniTimerWindow?.ApplyAppearance(appearance);
         if (_appliedAppearance == appearance) return;
         _appliedAppearance = appearance;
         _startup?.Logger.Info($"Appearance applied to native surfaces: {appearance}.");
@@ -217,6 +238,7 @@ public partial class App : Application
     {
         SessionRecord session = await _completion!.StartAsync(type, cancellationToken);
         _window?.RefreshPages();
+        await RefreshMiniTimerAsync();
         return session;
     }
 
@@ -225,13 +247,22 @@ public partial class App : Application
         SessionOutcome result = await _completion!.StopAsync(expectedId, cancellationToken);
         _window?.RefreshPages();
         if (_quickOverlay is not null) await _quickOverlay.RefreshIfVisibleAsync();
+        await RefreshMiniTimerAsync();
         return result;
+    }
+
+    private async Task RefreshMiniTimerAsync()
+    {
+        if (_miniTimer is null || _isExiting) return;
+        await _miniTimer.RefreshAsync();
+        if (_miniTimer.IsVisible) _startup?.Logger.Info($"Mini Timer refreshed: {_miniTimer.Text}.");
     }
 
     private async Task ShutdownSessionsAsync()
     {
         if (_window is not null) await _window.FlushSettingsAsync();
         _quickOverlay?.Dismiss();
+        _miniTimerWindow?.Hide();
         _window?.HideToday();
         if (_startup is null) return;
         _isExiting = true;
@@ -262,6 +293,7 @@ public partial class App : Application
                     if (!_isExiting)
                     {
                         _window?.RefreshPages();
+                        await RefreshMiniTimerAsync();
                         if (_quickOverlay is not null) await _quickOverlay.RefreshIfVisibleAsync();
                     }
                 }
@@ -311,6 +343,7 @@ public partial class App : Application
     {
         if (_startup is not null) _startup.Appearance.Changed -= OnAppearanceChanged;
         if (_startup is not null) _startup.Appearance.ColorsChanged -= OnColorsChanged;
+        _miniTimerWindow?.Dispose();
         _completion?.Dispose();
         _quickOverlay?.Dispose();
         _shell?.Dispose();

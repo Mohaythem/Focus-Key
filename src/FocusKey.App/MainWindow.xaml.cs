@@ -23,6 +23,8 @@ public sealed partial class MainWindow : Window
         _reports.ApplyColors(colors);
         RenderRunning();
     }
+    internal event Action? MiniTimerRequested;
+    private void OnMiniTimerClick(object sender, RoutedEventArgs args) => MiniTimerRequested?.Invoke();
     internal event Action? ExitRequested;
 
     internal void ApplyAppearance(Appearance appearance) =>

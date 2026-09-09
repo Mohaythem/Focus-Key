@@ -28,6 +28,9 @@ internal static class ShellProbe
             {
                 "probe" => Probe(ParsePid(args)),
                 "open" => PostCommand(ParsePid(args), 1),
+                "mini" => PostCommand(ParsePid(args), 3),
+                "mini-probe" => ProbeMini(ParsePid(args), false),
+                "mini-hide" => ProbeMini(ParsePid(args), true),
                 "hotkey" => PostHotkey(ParsePid(args)),
                 "exit" => PostCommand(ParsePid(args), 2),
                 "menu" => OpenMenu(ParsePid(args)),
@@ -67,6 +70,31 @@ internal static class ShellProbe
         Console.WriteLine($"pid={pid} hwnd=0x{window.ToInt64():X} class={ClassName(window)} rect={rect.Left},{rect.Top},{rect.Right},{rect.Bottom}");
         return 0;
     }
+
+    private static int ProbeMini(int pid, bool hide)
+    {
+        var matches = new List<IntPtr>();
+        EnumWindows((window, _) =>
+        {
+            GetWindowThreadProcessId(window, out uint owner);
+            var title = new StringBuilder(256);
+            GetWindowText(window, title, title.Capacity);
+            if (owner == pid && title.ToString() == "Focus Key Mini Timer") matches.Add(window);
+            return true;
+        }, IntPtr.Zero);
+        if (matches.Count != 1) throw new InvalidOperationException($"Expected one Mini Timer, found {matches.Count}.");
+        if (!IsWindowVisible(matches[0])) throw new InvalidOperationException("Mini Timer is hidden.");
+        if (hide && !PostMessage(matches[0], 0x0010, IntPtr.Zero, IntPtr.Zero)) throw LastError("Could not hide Mini Timer.");
+        if (!GetWindowRect(matches[0], out var rect)) throw LastError("Could not read Mini Timer bounds.");
+        bool pinned = (GetWindowLongPtr(matches[0], -20).ToInt64() & 8) != 0;
+        Console.WriteLine($"Mini Timer hwnd=0x{matches[0].ToInt64():X} visible; hide={hide}; pinned={pinned}; bounds={rect.Left},{rect.Top},{rect.Right},{rect.Bottom}.");
+        return 0;
+    }
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetWindowText(IntPtr window, StringBuilder title, int count);
+    [DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr window);
+    [DllImport("user32.dll", SetLastError = true)] private static extern bool GetWindowRect(IntPtr window, out RECT rect);
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")] private static extern IntPtr GetWindowLongPtr(IntPtr window, int index);
 
     private static int PostCommand(int pid, uint command)
     {

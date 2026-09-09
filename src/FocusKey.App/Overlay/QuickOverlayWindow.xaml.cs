@@ -95,10 +95,15 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
         if (state.Active is { } session)
         {
             var color = session.Type == SessionType.Work ? _colors.Work : _colors.Break;
-            ActiveBadgeDot.Fill = SessionColorBrush.Create(color);
-            ActiveCard.BorderBrush = SessionColorBrush.Create(color);
+            var textFg = SessionColorBrush.Create(SessionColors.Foreground(color));
+            ActiveCard.Background = SessionColorBrush.Create(color);
+            ActiveCard.BorderThickness = new Thickness(0);
             ActiveType.Text = (session.Type == SessionType.Work ? "WORK SESSION" : "BREAK SESSION");
-            ActiveType.Foreground = SessionColorBrush.Create(color);
+            ActiveType.Foreground = textFg;
+            ActiveBadgeDot.Visibility = Visibility.Collapsed;
+            ActiveRemaining.Foreground = textFg;
+            RemainingLabel.Foreground = textFg;
+            RemainingLabel.Opacity = 0.75;
         }
         RenderCountdown();
         WorkDuration.Text = QuickOverlayDurationFormatter.Format(state.Durations?.Work);

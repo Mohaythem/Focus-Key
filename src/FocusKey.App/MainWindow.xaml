@@ -26,7 +26,7 @@
     </StackPanel>
    </StackPanel>
    <StackPanel Grid.Row="2" Spacing="8">
-    <Button Content="Mini Timer" Click="OnMiniTimerClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="12,7" Background="Transparent" BorderThickness="0" FontSize="12" Foreground="{ThemeResource FkSecondary}"/>
+    <Button Content="Quick Overlay" Click="OnOverlayClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="12,7" Background="Transparent" BorderThickness="0" FontSize="12" Foreground="{ThemeResource FkSecondary}"/>
     <Button Content="Exit Focus Key" Click="OnExitClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="12,7" Background="Transparent" BorderThickness="0" FontSize="12" Foreground="{ThemeResource FkSecondary}"/>
     <Border BorderBrush="{ThemeResource FkBorder}" BorderThickness="0,1,0,0" Padding="12,16,12,0" Margin="0,4,0,0"><StackPanel Spacing="2"><TextBlock Text="Shift + F3" Style="{StaticResource FkText}" FontFamily="Consolas" FontSize="11" Foreground="{ThemeResource FkSecondary}"/><TextBlock Text="One focused session." Style="{StaticResource FkDimText}" FontSize="10"/></StackPanel></Border>
    </StackPanel>

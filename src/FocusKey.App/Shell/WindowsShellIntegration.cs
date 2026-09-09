@@ -149,7 +149,7 @@ internal sealed class WindowsShellIntegration : IShellIntegration
         try
         {
             if (!NativeMethods.AppendMenu(menu, NativeMethods.MF_STRING, (UIntPtr)OpenCommand, "Open Focus Key") ||
-                !NativeMethods.AppendMenu(menu, NativeMethods.MF_STRING, (UIntPtr)MiniTimerCommand, "Mini Timer") ||
+                !NativeMethods.AppendMenu(menu, NativeMethods.MF_STRING, (UIntPtr)MiniTimerCommand, "Quick Overlay") ||
                 !NativeMethods.AppendMenu(menu, NativeMethods.MF_STRING, (UIntPtr)ExitCommand, "Exit Focus Key"))
                 throw LastError("Could not populate the Focus Key tray menu.");
             if (!NativeMethods.GetCursorPos(out var point)) throw LastError("Could not position the tray menu.");

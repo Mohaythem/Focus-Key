@@ -26,8 +26,8 @@ public sealed partial class MainWindow : Window
         _reports.ApplyColors(colors);
         RenderRunning();
     }
-    internal event Action? MiniTimerRequested;
-    private void OnMiniTimerClick(object sender, RoutedEventArgs args) => MiniTimerRequested?.Invoke();
+    internal event Action? OverlayRequested;
+    private void OnOverlayClick(object sender, RoutedEventArgs args) => OverlayRequested?.Invoke();
     internal event Action? ExitRequested;
 
     private Appearance _appearance = Appearance.System;

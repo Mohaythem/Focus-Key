@@ -52,8 +52,9 @@ public sealed record FocusPeriod(int StartHour, int CompletedWork);
 public sealed record ReportsSnapshot(ReportPeriod Period, ReportRange Range, TimeZoneInfo TimeZone,
     DateTimeOffset ObservedAt, ReportTotals Totals, IReadOnlyList<ReportBucket> Trend,
     IReadOnlyList<FocusPeriod> LeadingFocusPeriods, ReportRange ComparisonWeek,
-    TimeSpan WeekFocus, TimeSpan PreviousWeekFocus)
+    TimeSpan WeekFocus, TimeSpan PreviousWeekFocus, StreakStatistics? Streaks = null)
 {
+    public StreakStatistics Streaks { get; init; } = Streaks ?? StreakStatistics.Zero;
     public TimeSpan WeekDifference => WeekFocus - PreviousWeekFocus;
 }
 
@@ -115,8 +116,16 @@ public sealed class ReportsService(ISessionRepository repository, TimeProvider? 
         var leading = focus.Length == 0 ? [] : focus.Where(p => p.CompletedWork == focus.Max(f => f.CompletedWork)).OrderBy(p => p.StartHour).ToArray();
         TimeSpan WeekTime(ReportRange span) => ReportTotals.From(localized
             .Where(s => span.Contains(DateOnly.FromDateTime(s.Local.DateTime))).Select(s => s.Session)).FocusTime;
+
+        // User-level streak statistics derived from all persisted historical sessions
+        var allRecords = await _repository.GetStartedBetweenAsync(
+            DateTimeOffset.MinValue,
+            DateTimeOffset.MaxValue,
+            cancellationToken).ConfigureAwait(false);
+        var streaks = StreakCalculator.Calculate(allRecords, CurrentDate(), zone);
+
         cancellationToken.ThrowIfCancellationRequested();
         return new(period, range, zone, now, totals, buckets.AsReadOnly(), Array.AsReadOnly(leading),
-            week, WeekTime(week), WeekTime(previous));
+            week, WeekTime(week), WeekTime(previous), streaks);
     }
 }

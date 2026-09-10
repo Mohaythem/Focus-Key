@@ -169,3 +169,80 @@ Verification/support files changed: `.smoke/ShellProbe/Program.cs`, `.smoke/Shel
 - No original raster Figma screenshots exist in `Focus Key.zip`; the remaining visual comparison is therefore against the original design brief and the available prior runtime captures.
 - The existing captures show the pre-correction active overlay at approximately 420×176; current source targets approximately 379×198 for active state to restore vertical breathing room, but that final runtime proportion is explicitly unverified.
 - Physical sleep/hibernation, notification suppression, varied sound profiles, mixed-DPI monitor migration, and enlarged text scaling remain deferred from earlier phases.
+
+---
+
+## 6. Final Phase 12 Refinements — Reports Streaks, Responsive Chart Bars, and Quick Overlay Footer (2026-09-10)
+
+This final refinement pass addresses the four remaining accepted Phase 12 punch-list items without expanding product scope or entering Phase 13.
+
+### 1. Quick Overlay Footer Layout & Unclipped Keyboard Hints
+- **Observed Problem**: In the idle Quick Overlay selection state, the bottom keyboard-hint row (`Select`, `Start`, `Esc Close`) was crowded against the bottom window border and could become clipped or cut off under certain display configurations or text scaling.
+- **Architectural Solution**:
+  - Replaced the hard-coded 260 DIP window height with a dynamic measurement pipeline:
+    ```csharp
+    Surface.Width = widthDip;
+    Surface.Height = double.NaN;
+    Surface.Measure(new Windows.Foundation.Size(widthDip, double.PositiveInfinity));
+    heightDip = Math.Max(286, Math.Ceiling(Surface.DesiredSize.Height));
+    if (_state.Feedback is not null)
+    {
+        heightDip = Math.Max(320, heightDip);
+    }
+    ```
+  - Sizing applies a 286 DIP baseline providing 24+ DIP of clear breathing room below the keyboard hints, while dynamically expanding to accommodate Windows accessibility text scaling (125%, 150%) and feedback error text.
+  - Active timer state remains locked to its balanced, compact 379×198 DIP composition.
+- **Files Modified**: `src/FocusKey.App/Overlay/QuickOverlayWindow.xaml.cs`.
+
+### 2. Reports Chart Bar Visual Weight & Proportions
+- **Observed Problem**: The previous fixed 16 DIP bar width looked thin and spindly on wide desktop monitors, leaving excessive empty space between daily/weekly buckets.
+- **Architectural Solution**:
+  - Increased bar visual weight from 16 DIP to a responsive range of 20–34 DIP (`Math.Clamp(Math.Floor((colWidth - 14) / 2.5), 20, 34)`), with a 28 DIP baseline and 4 DIP inter-bar spacing between Work and Break.
+  - Attached a dynamic `SizeChanged` event on the chart groups container to adjust bar and column definition widths live as the window resizes.
+  - Work bar is always anchored in Column 0 and Break bar in Column 1 of each pair grid, guaranteeing consistent alignment.
+  - Preserved the dedicated theme-aware Reports chart palette (`ReportsPalette.cs`), keeping chart colors independent of user-configured session colors.
+- **Files Modified**: `src/FocusKey.App/ReportsChart.cs`.
+
+### 3. Current Streak & Longest Streak Statistics
+- **Domain Definition (`StreakStatistics.cs`, `StreakCalculator.cs`)**:
+  - **Qualifying Day**: A calendar day containing at least one completed Work session (`session.Type == SessionType.Work && session.Status == SessionStatus.Completed`).
+  - **Exclusions**: Break sessions, stopped sessions, and interrupted sessions are strictly ignored and never extend or count toward a streak.
+  - **Today-In-Progress Rule**: If today does not yet have a completed Work session but yesterday qualified, yesterday's streak is preserved while today remains active.
+  - **Broken Streak**: Once a full calendar day passes with no completed Work session, the current streak resets to 0.
+  - **Longest Streak**: The greatest number of consecutive qualifying calendar days across all historical records in the database. Invariant across Daily, Weekly, and Monthly periods (0 if no qualifying sessions exist).
+  - **Formatting**: Uses Western digits and grammatically correct pluralization via `StreakStatistics.Format(days)` (`"0 days"`, `"1 day"`, `"2 days"`, `"14 days"`).
+- **Reports UI Presentation (`ReportsView.cs`)**:
+  - Integrated as a sleek 2-column companion card (`StreaksCard`) positioned directly underneath the primary 3 metric cards (`Focus Time`, `Break Time`, `Completion Rate`).
+  - Uses Consolas 20pt typography, secondary styling, a subtle 1px vertical divider (`CardStrokeColorDefaultBrush`), and screen-reader accessibility labels (`AutomationProperties.SetName`).
+  - Avoids oversized or gamified clutter (no badges, XP, levels, or game mechanics); delivers clean, factual productivity statistics.
+- **Service Integration (`ReportsService.cs`)**:
+  - Queried across the entire database history (`DateTimeOffset.MinValue` to `DateTimeOffset.MaxValue`) to ensure streaks represent authoritative user achievements regardless of the selected report view range.
+- **Files Added/Modified**:
+  - `src/FocusKey.Foundation/Reports/StreakStatistics.cs` [NEW]
+  - `src/FocusKey.Foundation/Reports/ReportsService.cs`
+  - `src/FocusKey.App/ReportsView.cs`
+
+### 4. Verification Evidence
+- **Build**: `dotnet build FocusKey.slnx --no-incremental` succeeded with **0 warnings, 0 errors**.
+- **Automated Tests**:
+  - `dotnet test` executed **504 tests across all test suites — 100% pass rate (504 passed, 0 failed, 0 skipped)**.
+  - 10 new dedicated unit tests in `tests/FocusKey.Foundation.Tests/Reports/StreakCalculationTests.cs`:
+    - `EmptyHistory_YieldsZeroStreaks`
+    - `BreakSessionsOnly_YieldsZeroStreaks`
+    - `StoppedOrInterruptedWork_YieldsZeroStreaks`
+    - `SingleCompletedDay_Today_YieldsOneDayStreak`
+    - `MultipleSessionsOnSameDay_CountAsSingleStreakDay`
+    - `ConsecutiveDaysThroughToday_CountsThroughToday`
+    - `TodayNotYetQualified_PreservesActiveStreakFromYesterday`
+    - `MissedFullCalendarDay_BreaksCurrentStreak`
+    - `LongestHistoricalStreak_PreservedEvenWhenCurrentStreakIsShorter`
+    - `CrossMonthBoundary_CalculatesCorrectly`
+    - `FormatStreak_UsesWesternDigitsAndSingularPluralCorrectly`
+  - Updated `tests/FocusKey.Foundation.Tests/Reports/ReportsPolishVerificationTests.cs` verifying streak consistency across Daily, Weekly, Monthly, and future empty periods.
+- **ShellProbe & Isolated Seed**:
+  - Updated `.smoke/ShellProbe/Program.cs` to seed a 7-day historical streak in August 2026 alongside varied test durations (10h marathon, 15m minimal, 4.5h, 1.5h, 0h empty day).
+- **Scope Discipline**:
+  - Strictly on branch `native/phased-rewrite`.
+  - No merge to `main`.
+  - No Phase 13 packaging, deployment, or domain architecture changes introduced.
+

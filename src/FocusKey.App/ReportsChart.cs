@@ -66,16 +66,20 @@ internal sealed class ReportsChart : Grid
 
             var groups = new Grid { ColumnSpacing = 8 };
             var labels = new Grid { ColumnSpacing = 8, Margin = new Thickness(0, 8, 0, 0) };
+            var barPairs = new List<(Grid Pair, Border? WorkBar, Border? BreakBar)>();
             for (int i = 0; i < trend.Count; i++)
             {
                 groups.ColumnDefinitions.Add(new ColumnDefinition());
                 labels.ColumnDefinitions.Add(new ColumnDefinition());
                 var bucket = trend[i];
-                var pair = new Grid { ColumnSpacing = 3, HorizontalAlignment = HorizontalAlignment.Center };
-                pair.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(16) });
-                pair.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(16) });
-                AddBar(pair, bucket.Totals.FocusTime.TotalSeconds, scale, palette.Work, "Work", bucket.Label, 0);
-                AddBar(pair, bucket.Totals.BreakTime.TotalSeconds, scale, palette.Break, "Break", bucket.Label, 1);
+                var pair = new Grid { ColumnSpacing = 4, HorizontalAlignment = HorizontalAlignment.Center };
+                var col0 = new ColumnDefinition { Width = new GridLength(28) };
+                var col1 = new ColumnDefinition { Width = new GridLength(28) };
+                pair.ColumnDefinitions.Add(col0);
+                pair.ColumnDefinitions.Add(col1);
+                var workBar = AddBar(pair, bucket.Totals.FocusTime.TotalSeconds, scale, palette.Work, "Work", bucket.Label, 0, 28);
+                var breakBar = AddBar(pair, bucket.Totals.BreakTime.TotalSeconds, scale, palette.Break, "Break", bucket.Label, 1, 28);
+                barPairs.Add((pair, workBar, breakBar));
                 Grid.SetColumn(pair, i);
                 groups.Children.Add(pair);
 
@@ -94,6 +98,22 @@ internal sealed class ReportsChart : Grid
                 Grid.SetColumn(text, i);
                 labels.Children.Add(text);
             }
+
+            // Responsively adjust bar widths to fill chart comfortably without becoming chunky
+            groups.SizeChanged += (_, args) =>
+            {
+                double width = args.NewSize.Width;
+                if (width <= 0 || trend.Count == 0) return;
+                double colWidth = width / trend.Count;
+                double dynamicBarWidth = Math.Clamp(Math.Floor((colWidth - 14) / 2.5), 20, 34);
+                foreach (var item in barPairs)
+                {
+                    item.Pair.ColumnDefinitions[0].Width = new GridLength(dynamicBarWidth);
+                    item.Pair.ColumnDefinitions[1].Width = new GridLength(dynamicBarWidth);
+                    if (item.WorkBar is not null) item.WorkBar.Width = dynamicBarWidth;
+                    if (item.BreakBar is not null) item.BreakBar.Width = dynamicBarWidth;
+                }
+            };
             plot.Children.Add(groups);
             Grid.SetRow(labels, 1);
             Grid.SetColumn(labels, 1);
@@ -151,14 +171,14 @@ internal sealed class ReportsChart : Grid
         return niceMinutes * 60;
     }
 
-    private static void AddBar(Grid parent, double value, double maximum, HexColor color, string kind, string label, int column)
+    private static Border? AddBar(Grid parent, double value, double maximum, HexColor color, string kind, string label, int column, double initialWidth = 28)
     {
-        if (value <= 0) return;
+        if (value <= 0) return null;
 
         var stroke = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", parent);
         var bar = new Border
         {
-            Width = 16,
+            Width = initialWidth,
             Height = Math.Max(4, PlotHeight * value / maximum),
             Background = SessionColorBrush.Create(color),
             BorderBrush = stroke,
@@ -172,5 +192,6 @@ internal sealed class ReportsChart : Grid
         AutomationProperties.SetName(bar, description);
         Grid.SetColumn(bar, column);
         parent.Children.Add(bar);
+        return bar;
     }
 }

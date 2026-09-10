@@ -197,8 +197,89 @@ internal sealed class ReportsView : UserControl, IDisposable
         metrics.Children.Add(Metric("Break Time", Duration(totals.BreakTime), "break sessions", 1));
         metrics.Children.Add(Metric("Completion Rate", totals.CompletionRate is { } rate ? string.Create(CultureInfo.InvariantCulture, $"{rate:0.#}%") : "—", "sessions finished", 2));
         _results.Children.Add(metrics);
+
+        // Secondary streak companion card
+        _results.Children.Add(StreaksCard(snapshot.Streaks));
+
         _results.Children.Add(ChartCard(snapshot));
         _results.Children.Add(InsightCard(snapshot));
+    }
+
+    private UIElement StreaksCard(StreakStatistics streaks)
+    {
+        var grid = new Grid { HorizontalAlignment = HorizontalAlignment.Stretch };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        // Left: Current Streak
+        var left = new StackPanel { Spacing = 2 };
+        var curValue = new TextBlock
+        {
+            Text = StreakStatistics.Format(streaks.CurrentStreak),
+            FontSize = 20,
+            FontFamily = new FontFamily("Consolas"),
+            FontWeight = Microsoft.UI.Text.FontWeights.Normal,
+            Language = "en-US",
+            FlowDirection = FlowDirection.LeftToRight,
+            TextReadingOrder = TextReadingOrder.UseFlowDirection,
+            Margin = new Thickness(0, 0, 0, 2)
+        };
+        if (Application.Current?.Resources["FkMetricText"] is Style metricStyle)
+        {
+            curValue.Style = metricStyle;
+            curValue.FontSize = 20;
+            curValue.Margin = new Thickness(0, 0, 0, 2);
+        }
+        left.Children.Add(curValue);
+        var curLabel = Presentation.Text("Current Streak", 12);
+        curLabel.FontWeight = Microsoft.UI.Text.FontWeights.Medium;
+        left.Children.Add(curLabel);
+        left.Children.Add(Presentation.DimText("active focus streak", 11));
+        AutomationProperties.SetName(left, $"Current Streak, {curValue.Text}");
+        grid.Children.Add(left);
+
+        // Divider
+        var divider = new Border
+        {
+            Width = 1,
+            Background = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", this),
+            Margin = new Thickness(24, 4, 24, 4)
+        };
+        Grid.SetColumn(divider, 1);
+        grid.Children.Add(divider);
+
+        // Right: Longest Streak
+        var right = new StackPanel { Spacing = 2 };
+        var longValue = new TextBlock
+        {
+            Text = StreakStatistics.Format(streaks.LongestStreak),
+            FontSize = 20,
+            FontFamily = new FontFamily("Consolas"),
+            FontWeight = Microsoft.UI.Text.FontWeights.Normal,
+            Language = "en-US",
+            FlowDirection = FlowDirection.LeftToRight,
+            TextReadingOrder = TextReadingOrder.UseFlowDirection,
+            Margin = new Thickness(0, 0, 0, 2)
+        };
+        if (Application.Current?.Resources["FkMetricText"] is Style metricStyle2)
+        {
+            longValue.Style = metricStyle2;
+            longValue.FontSize = 20;
+            longValue.Margin = new Thickness(0, 0, 0, 2);
+        }
+        right.Children.Add(longValue);
+        var longLabel = Presentation.Text("Longest Streak", 12);
+        longLabel.FontWeight = Microsoft.UI.Text.FontWeights.Medium;
+        right.Children.Add(longLabel);
+        right.Children.Add(Presentation.DimText("all-time best streak", 11));
+        AutomationProperties.SetName(right, $"Longest Streak, {longValue.Text}");
+        Grid.SetColumn(right, 2);
+        grid.Children.Add(right);
+
+        var card = Card(grid, 14);
+        card.Padding = new Thickness(20, 14, 20, 14);
+        return card;
     }
 
     private UIElement ChartCard(ReportsSnapshot snapshot)

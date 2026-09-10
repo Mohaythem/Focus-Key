@@ -373,10 +373,16 @@ internal static class ShellProbe
 
         // Prior Month (August 2026):
         await Add(new DateOnly(today.Year, today.Month, 1).AddDays(-1), 11 * 60, SessionType.Work, SessionStatus.Completed, 90);
+        // Historical 7-day streak (Aug 10 - Aug 16)
+        var aug1 = new DateOnly(today.Year, today.Month, 1).AddMonths(-1);
+        for (int d = 10; d <= 16; d++)
+        {
+            await Add(new DateOnly(aug1.Year, aug1.Month, d), 10 * 60, SessionType.Work, SessionStatus.Completed, 60);
+        }
         await Add(new DateOnly(today.Year, today.Month, 1).AddDays(-10), 10 * 60, SessionType.Work, SessionStatus.Completed, 180);
         await Add(new DateOnly(today.Year, today.Month, 1).AddDays(-15), 14 * 60, SessionType.Work, SessionStatus.Completed, 240);
 
-        Console.WriteLine($"Reports fixture local date {today:yyyy-MM-dd}: seeded deliberately varied representative multi-session data (10h marathon, 15m minimal, 4.5h, 1.5h, 0h empty day, varied breaks).");
+        Console.WriteLine($"Reports fixture local date {today:yyyy-MM-dd}: seeded deliberately varied representative multi-session data (10h marathon, 15m minimal, 4.5h, 1.5h, 0h empty day, varied breaks, 7-day historical streak).");
         return 0;
     }
 

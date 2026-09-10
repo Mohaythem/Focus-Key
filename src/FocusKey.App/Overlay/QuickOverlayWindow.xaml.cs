@@ -291,10 +291,27 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
     private void ResizeAndCenter()
     {
         _display ??= DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary);
-        // Keep the reference surface stable. Feedback gets its own two-line allowance rather
-        // than measuring a root still constrained by the previous native window dimensions.
+        // Keep the reference surface stable. Feedback and idle measurement allow dynamic sizing
+        // so keyboard hints and text scaling never clip or collide with the bottom window border.
         double widthDip = _state.Active is not null ? 379 : 420;
-        double heightDip = _state.Feedback is not null ? 310 : (_state.Active is not null ? 198 : 260);
+        double heightDip;
+        if (_state.Active is not null)
+        {
+            heightDip = 198;
+        }
+        else
+        {
+            Surface.Width = widthDip;
+            Surface.Height = double.NaN;
+            Surface.Measure(new Windows.Foundation.Size(widthDip, double.PositiveInfinity));
+            // Baseline 286 DIP provides comfortable bottom breathing room; expands dynamically for text scaling or feedback
+            heightDip = Math.Max(286, Math.Ceiling(Surface.DesiredSize.Height));
+            if (_state.Feedback is not null)
+            {
+                heightDip = Math.Max(320, heightDip);
+            }
+        }
+
         Surface.Width = widthDip;
         Surface.Height = heightDip;
         double scale = NativeMethods.GetDpiForWindow(WindowNative.GetWindowHandle(this)) / 96.0;

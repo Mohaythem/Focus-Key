@@ -1,4 +1,4 @@
-﻿using FocusKey.Foundation.Reports;
+using FocusKey.Foundation.Reports;
 using FocusKey.Foundation.Sessions;
 using FocusKey.Foundation.Tests.Sessions;
 
@@ -71,13 +71,23 @@ public sealed class ReportsPolishVerificationTests
         Assert.True(monthly.Trend.Count >= 4);
         Assert.Equal(TimeSpan.FromMinutes(235), monthly.Totals.FocusTime); // 175m this week + 60m on Sept 3
 
-        // 4. Empty Period Verification (Future)
+        // 4. Streak Statistics Verification (User-level, invariant across periods)
+        Assert.Equal(1, daily.Streaks.CurrentStreak);
+        Assert.Equal(2, daily.Streaks.LongestStreak);
+        Assert.Equal(1, weekly.Streaks.CurrentStreak);
+        Assert.Equal(2, weekly.Streaks.LongestStreak);
+        Assert.Equal(1, monthly.Streaks.CurrentStreak);
+        Assert.Equal(2, monthly.Streaks.LongestStreak);
+
+        // 5. Empty Period Verification (Future)
         var future = await service.ReadAsync(ReportPeriod.Weekly, new DateOnly(2026, 12, 1));
         Assert.Equal(0, future.Totals.Started);
         Assert.Equal(0, future.Totals.Completed);
         Assert.Equal(TimeSpan.Zero, future.Totals.FocusTime);
         Assert.Equal(TimeSpan.Zero, future.Totals.BreakTime);
         Assert.Null(future.Totals.CompletionRate);
+        Assert.Equal(1, future.Streaks.CurrentStreak);
+        Assert.Equal(2, future.Streaks.LongestStreak);
     }
 
     private static SessionRecord Finished(DateTimeOffset start, SessionType type, SessionStatus status, int minutes) =>

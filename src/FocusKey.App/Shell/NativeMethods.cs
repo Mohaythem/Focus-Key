@@ -107,10 +107,17 @@ internal static class NativeMethods
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)] internal static extern bool AppendMenu(IntPtr menu, uint flags, UIntPtr id, string text);
     [DllImport("user32.dll", SetLastError = true)] internal static extern uint TrackPopupMenu(IntPtr menu, uint flags, int x, int y, int reserved, IntPtr owner, IntPtr rect);
     [DllImport("user32.dll", SetLastError = true)] internal static extern bool DestroyMenu(IntPtr menu);
+    [DllImport("user32.dll")] internal static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll", SetLastError = true)] internal static extern bool SetForegroundWindow(IntPtr window);
     [DllImport("user32.dll", SetLastError = true)] internal static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
     [DllImport("user32.dll", SetLastError = true)] internal static extern bool GetCursorPos(out POINT point);
     [DllImport("user32.dll")] internal static extern uint GetDpiForWindow(IntPtr window);
+
+    internal static void ForceForeground(IntPtr targetWindow)
+    {
+        if (targetWindow == IntPtr.Zero) return;
+        SetForegroundWindow(targetWindow);
+    }
 
     [StructLayout(LayoutKind.Sequential)] internal struct POINT { internal int X; internal int Y; }
 }

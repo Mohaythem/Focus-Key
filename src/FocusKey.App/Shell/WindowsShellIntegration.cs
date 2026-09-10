@@ -90,7 +90,7 @@ internal sealed class WindowsShellIntegration : IShellIntegration
     private void AddTrayIcon()
     {
         _icon = NativeMethods.LoadIcon(IntPtr.Zero, (IntPtr)NativeMethods.IDI_APPLICATION);
-        if (_icon == IntPtr.Zero) throw LastError("Could not load the Focus Key notification-area icon.");
+        if (_icon == IntPtr.Zero) return;
         var data = TrayData(NativeMethods.NIF_MESSAGE | NativeMethods.NIF_ICON | NativeMethods.NIF_TIP | NativeMethods.NIF_SHOWTIP);
         for (int retry = 0; retry < 5; retry++)
         {
@@ -98,13 +98,11 @@ internal sealed class WindowsShellIntegration : IShellIntegration
             {
                 _trayAdded = true;
                 data.uTimeoutOrVersion = NativeMethods.NIM_SETVERSION4;
-                if (!NativeMethods.Shell_NotifyIcon(NativeMethods.NIM_SETVERSION, ref data))
-                    throw LastError("Could not configure the Focus Key notification-area icon.");
+                NativeMethods.Shell_NotifyIcon(NativeMethods.NIM_SETVERSION, ref data);
                 return;
             }
             Thread.Sleep(100);
         }
-        throw LastError("Could not add the Focus Key notification-area icon after five attempts.");
     }
 
     private NativeMethods.NOTIFYICONDATA TrayData(uint flags) => new()

@@ -25,11 +25,13 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
     private DisplayArea? _display;
     private bool _visible;
     private bool _closing;
+    private long _shownTimestamp;
     private readonly Microsoft.UI.Dispatching.DispatcherQueueTimer _displayTimer;
     private readonly Action<string>? _trace;
     private SessionColors _colors = SessionColors.From(ApplicationSettings.Default);
     private ThemePalette? _palette;
     private Appearance _appearance = Appearance.System;
+    private Contrast _contrast = Contrast.Standard;
     internal void ApplyColors(SessionColors colors) { _colors = colors; Render(_state); }
 
     public QuickOverlayWindow(Action<string>? trace = null)
@@ -46,12 +48,13 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
         presenter.IsAlwaysOnTop = true;
         presenter.SetBorderAndTitleBar(false, false);
         AppWindow.SetPresenter(presenter);
-        AppWindow.IsShownInSwitchers = false;
+        try { AppWindow.IsShownInSwitchers = false; }
+        catch { }
         Surface.PreviewKeyDown += OnPreviewKeyDown;
         Surface.Loaded += (_, _) => { ResizeAndCenter(); FocusSelection(); };
         Surface.ActualThemeChanged += (_, _) =>
         {
-            if (_appearance == Appearance.System) ApplySystemSurfaceTheme();
+            if (_appearance == Appearance.System && _state.Active is null) ApplySystemSurfaceTheme();
             Render(_state);
         };
         WorkCard.GotFocus += (_, _) => { if (_state.Active is null && _state.Selected != SessionType.Work) SelectionRequested?.Invoke(SessionType.Work); };
@@ -64,8 +67,15 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
         };
         Activated += (_, args) =>
         {
-            if (_visible && args.WindowActivationState == WindowActivationState.Deactivated)
-                DismissRequested?.Invoke();
+            if (args.WindowActivationState == WindowActivationState.Deactivated)
+            {
+                long now = System.Diagnostics.Stopwatch.GetTimestamp();
+                double elapsedMs = (now - _shownTimestamp) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+                if (_visible && elapsedMs > 250)
+                {
+                    DismissRequested?.Invoke();
+                }
+            }
         };
     }
 
@@ -74,36 +84,51 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
     public event Action? StopRequested;
     public event Action? DismissRequested;
 
-    internal void ApplyAppearance(Appearance appearance, ThemePalette? palette = null)
+    internal void ApplyAppearance(Appearance appearance, ThemePalette? palette = null, Contrast contrast = Contrast.Standard)
     {
         _appearance = appearance;
         _palette = palette;
+        _contrast = contrast;
         WindowAppearance.Apply(Surface, AppWindow, appearance);
-        if (appearance == Appearance.System)
+        if (_state.Active is null)
         {
-            ApplySystemSurfaceTheme();
-        }
-        else if (palette is not null)
-        {
-            Surface.Background = SessionColorBrush.Create(palette.Surface);
-            Surface.BorderBrush = SessionColorBrush.Create(palette.Border);
-            ApplyDwmBorder(ToColorRef(palette.Border));
-        }
-        else
-        {
-            uint borderColor = appearance switch
+            if (appearance == Appearance.System)
             {
-                Appearance.System => 0xFFFFFFFF,
-                Appearance.Light => 0x00DEDEDE,
-                Appearance.Dark => 0x002E2E2E,
-                _ => throw new ArgumentOutOfRangeException(nameof(appearance), appearance, "Unsupported appearance."),
-            };
-            ApplyDwmBorder(borderColor);
+                ApplySystemSurfaceTheme();
+            }
+            else if (palette is not null)
+            {
+                Surface.Background = SessionColorBrush.Create(palette.Surface);
+                Surface.BorderBrush = SessionColorBrush.Create(palette.Border);
+                ApplyDwmBorder(ToColorRef(palette.Border));
+            }
+            else
+            {
+                uint borderColor = appearance switch
+                {
+                    Appearance.System => 0xFFFFFFFF,
+                    Appearance.Light => 0x00DEDEDE,
+                    Appearance.Dark => 0x002E2E2E,
+                    _ => throw new ArgumentOutOfRangeException(nameof(appearance), appearance, "Unsupported appearance."),
+                };
+                ApplyDwmBorder(borderColor);
+            }
         }
 
         var targetTheme = WindowAppearance.ToElementTheme(appearance);
         Surface.RequestedTheme = targetTheme;
         Render(_state);
+    }
+
+    private bool IsDarkTheme()
+    {
+        if (_appearance == Appearance.Dark) return true;
+        if (_appearance == Appearance.Light) return false;
+        if (Surface.ActualTheme == ElementTheme.Dark) return true;
+        if (Surface.ActualTheme == ElementTheme.Light) return false;
+        var bg = new Windows.UI.ViewManagement.UISettings().GetColorValue(Windows.UI.ViewManagement.UIColorType.Background);
+        double luminance = (0.299 * bg.R + 0.587 * bg.G + 0.114 * bg.B) / 255.0;
+        return luminance < 0.5;
     }
 
     private void ApplySystemSurfaceTheme()
@@ -146,36 +171,57 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
         StopButton.IsEnabled = active && !state.IsBusy;
         StopButton.Content = state.IsBusy ? "Please wait…" : "Stop Session";
 
-        bool isDark = Surface.ActualTheme == ElementTheme.Dark;
+        bool isHighContrast = new Windows.UI.ViewManagement.AccessibilitySettings().HighContrast;
+        bool isDark = IsDarkTheme();
         if (state.Active is { } session)
         {
             var sessionColor = session.Type == SessionType.Work ? _colors.Work : _colors.Break;
             ActiveType.Text = session.Type == SessionType.Work ? "WORK SESSION" : "BREAK SESSION";
-            ProgressBar.Background = SessionColorBrush.Create(sessionColor);
 
-            Windows.UI.Color activeSurfaceColor;
-            if (isDark)
+            if (isHighContrast)
+            {
+                Surface.Background = Presentation.ThemeBrush("FkOverlay", Surface);
+                Surface.BorderBrush = Presentation.ThemeBrush("FkBorder", Surface);
+                ProgressBar.Background = Presentation.ThemeBrush("FkAccent", Surface);
+                ProgressTrack.Background = Presentation.ThemeBrush("FkBorder", Surface);
+                ActiveType.Foreground = Presentation.ThemeBrush("FkForeground", Surface);
+                ActiveRemaining.Foreground = Presentation.ThemeBrush("FkForeground", Surface);
+                StopButton.Background = Presentation.ThemeBrush("FkSurface2", Surface);
+                StopButton.BorderBrush = Presentation.ThemeBrush("FkBorder", Surface);
+                StopButton.Foreground = Presentation.ThemeBrush("FkForeground", Surface);
+                if (Surface.BorderBrush is SolidColorBrush hcBorder)
+                    ApplyDwmBorder(ToColorRef(hcBorder.Color));
+            }
+            else if (isDark)
             {
                 var shaded = SessionColorBrush.CreateShaded(sessionColor, -18);
                 Surface.Background = shaded;
                 Surface.BorderBrush = SessionColorBrush.Create(sessionColor);
-                activeSurfaceColor = shaded.Color;
+                ProgressBar.Background = SessionColorBrush.Create(sessionColor);
+                ProgressTrack.Background = SessionColorBrush.CreateAlpha(HexColor.Parse("#FFFFFF"), 0.18);
+                Windows.UI.Color activeSurfaceColor = shaded.Color;
+                var activeTextColor = SessionColors.Foreground(ToHexColor(activeSurfaceColor));
+                ActiveType.Foreground = SessionColorBrush.Create(activeTextColor);
+                ActiveRemaining.Foreground = SessionColorBrush.Create(activeTextColor);
+                StopButton.Background = Presentation.ThemeBrush("FkSurface2", Surface);
+                StopButton.BorderBrush = SessionColorBrush.CreateAlpha(sessionColor, 0.40);
+                StopButton.Foreground = Presentation.ThemeBrush("FkSecondary", Surface);
+                ApplyDwmBorder(ToColorRef(sessionColor));
             }
             else
             {
-                Surface.BorderBrush = SessionColorBrush.CreateAlpha(sessionColor, 0.40);
-                var baseColor = (Presentation.ThemeBrush("FkOverlay", Surface) as SolidColorBrush)?.Color ??
-                    Windows.UI.Color.FromArgb(255, 255, 255, 255);
-                activeSurfaceColor = Blend(sessionColor, 0.08, baseColor);
-                // Paint the exact composited color so the foreground calculation matches
-                // the pixels users see; a translucent root brush has no separate underlay.
-                Surface.Background = new SolidColorBrush(activeSurfaceColor);
+                Surface.Background = SessionColorBrush.Create(sessionColor);
+                Surface.BorderBrush = SessionColorBrush.Create(sessionColor);
+                var activeTextColor = SessionColors.Foreground(sessionColor);
+                ActiveType.Foreground = SessionColorBrush.Create(activeTextColor);
+                ActiveRemaining.Foreground = SessionColorBrush.Create(activeTextColor);
+                ProgressBar.Background = SessionColorBrush.Create(activeTextColor);
+                ProgressTrack.Background = SessionColorBrush.CreateAlpha(activeTextColor, 0.25);
+                StopButton.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 255, 255));
+                StopButton.BorderBrush = SessionColorBrush.CreateAlpha(activeTextColor, 0.35);
+                StopButton.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 20, 20, 20));
+                ApplyDwmBorder(ToColorRef(sessionColor));
             }
-            var activeTextColor = SessionColors.Foreground(ToHexColor(activeSurfaceColor));
-            ActiveType.Foreground = SessionColorBrush.Create(activeTextColor);
-            ActiveRemaining.Foreground = SessionColorBrush.Create(activeTextColor);
-            if (Surface.BorderBrush is SolidColorBrush border)
-                ApplyDwmBorder(ToColorRef(border.Color));
         }
         else
         {
@@ -187,12 +233,17 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
             {
                 Surface.Background = SessionColorBrush.Create(_palette.Surface);
                 Surface.BorderBrush = SessionColorBrush.Create(_palette.Border);
+                ApplyDwmBorder(ToColorRef(_palette.Border));
             }
             else
             {
                 Surface.ClearValue(Control.BackgroundProperty);
                 Surface.ClearValue(Control.BorderBrushProperty);
             }
+            StopButton.ClearValue(Control.BackgroundProperty);
+            StopButton.ClearValue(Control.BorderBrushProperty);
+            StopButton.ClearValue(Control.ForegroundProperty);
+            ProgressTrack.ClearValue(Border.BackgroundProperty);
         }
 
         RenderCountdown();
@@ -253,9 +304,10 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
     public void ShowAndFocus()
     {
         if (_closing) return;
+        _shownTimestamp = System.Diagnostics.Stopwatch.GetTimestamp();
         if (!_visible)
         {
-            IntPtr foreground = GetForegroundWindow();
+            IntPtr foreground = NativeMethods.GetForegroundWindow();
             _display = DisplayArea.GetFromWindowId(Win32Interop.GetWindowIdFromWindow(foreground), DisplayAreaFallback.Primary);
             // Move to the foreground monitor first so subsequent DPI queries belong to that monitor.
             RectInt32 area = _display.WorkArea;
@@ -265,8 +317,17 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
         ResizeAndCenter();
         AppWindow.Show();
         Activate();
+
+        IntPtr hwnd = WindowNative.GetWindowHandle(this);
+        NativeMethods.ForceForeground(hwnd);
+
         FocusSelection();
         RenderCountdown();
+
+        DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+        {
+            if (_visible) FocusSelection();
+        });
     }
 
     public void Hide()
@@ -354,6 +415,12 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
         // Space and Tab retain the native Button keyboard/focus behavior.
     }
 
+    private void OnCloseClicked(object sender, PointerRoutedEventArgs args)
+    {
+        args.Handled = true;
+        DismissRequested?.Invoke();
+    }
+
     private static void PaintCard(Button card, TextBlock label, TextBlock duration, Microsoft.UI.Xaml.Shapes.Ellipse? dot, bool selected, HexColor color, bool isDark)
     {
         if (dot is not null)
@@ -409,7 +476,6 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
 
     private static HexColor ToHexColor(Windows.UI.Color color) =>
         HexColor.Parse($"#{color.R:X2}{color.G:X2}{color.B:X2}");
-    [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
     [DllImport("dwmapi.dll")] private static extern int DwmSetWindowAttribute(IntPtr window, uint attribute, ref uint value, int size);
 }
 

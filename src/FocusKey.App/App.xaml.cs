@@ -161,7 +161,7 @@ public partial class App : Application
             _ => (_window?.Content as FrameworkElement)?.ActualTheme == ElementTheme.Dark,
         };
         ThemePalette palette = isDark ? _startup.Appearance.DarkPalette : _startup.Appearance.LightPalette;
-        window.ApplyAppearance(_startup.Appearance.Current, palette);
+        window.ApplyAppearance(_startup.Appearance.Current, palette, _startup.Appearance.Contrast);
         window.ApplyColors(_startup.Appearance.Colors);
         _quickOverlayWindow = window;
         _startup.Logger.Info($"Quick overlay created with appearance {_startup.Appearance.Current}; Work {_startup.Appearance.Colors.Work}, Break {_startup.Appearance.Colors.Break}.");
@@ -285,7 +285,7 @@ public partial class App : Application
             _ => (_window?.Content as FrameworkElement)?.ActualTheme == ElementTheme.Dark,
         };
         ThemePalette? activePalette = isDark ? dark : light;
-        _quickOverlayWindow?.ApplyAppearance(appearance, activePalette);
+        _quickOverlayWindow?.ApplyAppearance(appearance, activePalette, contrast);
         if (_appliedAppearance == appearance) return;
         _appliedAppearance = appearance;
         _startup?.Logger.Info($"Appearance applied to native surfaces: {appearance}.");

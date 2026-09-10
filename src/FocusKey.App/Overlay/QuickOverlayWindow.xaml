@@ -111,15 +111,8 @@
             <!-- Start Button (Idle mode) -->
             <Button
                 x:Name="StartButton"
+                Style="{StaticResource FkOverlayStartButton}"
                 Content="Start"
-                Height="38"
-                Padding="16,0"
-                CornerRadius="4"
-                FontSize="13"
-                FontWeight="Medium"
-                HorizontalAlignment="Stretch"
-                HorizontalContentAlignment="Center"
-                VerticalContentAlignment="Center"
                 UseSystemFocusVisuals="True"
                 FocusVisualPrimaryBrush="{ThemeResource FkSecondary}"
                 FocusVisualSecondaryBrush="Transparent"
@@ -234,7 +227,10 @@
                         VerticalAlignment="Center"
                         Margin="5,0,0,0" />
                 </StackPanel>
-                <StackPanel Orientation="Horizontal">
+                <StackPanel
+                    Orientation="Horizontal"
+                    Background="Transparent"
+                    PointerPressed="OnCloseClicked">
                     <Border
                         Background="{ThemeResource FkSurface2}"
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"

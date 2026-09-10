@@ -246,3 +246,70 @@ This final refinement pass addresses the four remaining accepted Phase 12 punch-
   - No merge to `main`.
   - No Phase 13 packaging, deployment, or domain architecture changes introduced.
 
+---
+
+## 8. Quick Overlay Light-Mode Session Colors & Popup Activation Defect Resolution
+
+### A. Defect 1 — Active Timer Session Color in Light Mode & Card Hover Whiteout
+
+#### 1. Root Cause Analysis
+- **Card Hover Whiteout**: In WinUI 3, standard `Button` controls look for an internal element named `ContentPresenter` in their control template and automatically inject the theme resource `{ThemeResource ButtonBackgroundPointerOver}` (which resolves to white in Light theme) whenever pointer hover is detected. Because `FkOverlayCard` used standard button template conventions, hovering over the selected Work or Break card forcibly overwrote the background brush with solid white, turning white text invisible against a white background.
+- **Washed-out Active Timer**: In `QuickOverlayWindow.xaml.cs`, the Light mode branch in `Render()` applied `Blend(sessionColor, 0.08, baseColor)`. This blended 92% white into the session color, completely washing out `#183739` (Work) and `#434763` (Break) into near-white and stripping the session of its visual identity.
+- **Theme Event Overwrite**: `Surface.ActualThemeChanged` was resetting the overlay background on theme switches without checking whether a session was actively running, blowing away session backgrounds.
+
+#### 2. Architectural Resolution
+- **WinUI 3 Button Template Isolation (`App.xaml`)**:
+  - Re-architected `ControlTemplate` for `FkOverlayCard`, `FkOverlayStartButton`, and `FkOverlayStopButton`.
+  - Placed background and border painting onto a parent `<Border x:Name="RootBorder" Background="{TemplateBinding Background}" ...>` containing an un-named `<ContentPresenter />`.
+  - Handled pointer interactions via visual states targeting `RootBorder.Opacity` (`0.88` / `0.90` on `PointerOver`, `0.75` on `Pressed`). WinUI 3's native C++ engine no longer finds a named `ContentPresenter` to inject white theme brushes, preserving custom session color brushes seamlessly on hover and press.
+- **Authoritative Semantic Session Painting (`QuickOverlayWindow.xaml.cs`)**:
+  - Light mode active sessions now paint directly with `SessionColorBrush.Create(sessionColor)`, matching Dark mode's rich identity (`CreateShaded(sessionColor, -18)`).
+  - High-contrast text color is dynamically calculated via `SessionColors.Foreground(sessionColor)`, rendering crisp WCAG AAA white text over dark session tones.
+  - Progress bar track (`ProgressTrack`) and Stop button styling adapt cleanly to the session palette.
+  - Added `&& _state.Active is null` guard to `Surface.ActualThemeChanged`.
+
+---
+
+### B. Defect 2 — Popup-Like Activation & Clean Dismissal
+
+#### 1. Root Cause Analysis
+- **Subclassing & Focus Entanglement**: Attempting to hook the native window procedure via `SetWindowLongPtr(GWL_WNDPROC)` and linking thread message queues with `AttachThreadInput` interfered with WinUI 3's internal message routing and dispatch. This corrupted window focus transitions, preventing Windows from firing deactivation notifications when users clicked the desktop or taskbar, pinning the overlay on top.
+- **Missing Click Target**: The `[Esc] Close` keyboard hint at the bottom of the overlay was a static `StackPanel` without a pointer event handler.
+- **Uncaught WinRT Exception**: Setting `AppWindow.IsShownInSwitchers = false` threw an unhandled `NotImplementedException` on certain Windows App SDK environments.
+
+#### 2. Architectural Resolution
+- **Eliminated Fragile Hooks (`QuickOverlayWindow.xaml.cs`, `NativeMethods.cs`)**:
+  - Deleted `_oldWndProc`, `_wndProcDelegate`, `OverlayWndProc`, and `SetWindowLongPtr(GWL_WNDPROC)`.
+  - Removed `AttachThreadInput`, `GetWindowThreadProcessId`, `GetCurrentThreadId`, `SetActiveWindow`, and `SetFocus`.
+  - Replaced thread-attaching activation with clean, direct Win32 `SetForegroundWindow(targetWindow)`.
+- **Native WinUI 3 Deactivation Handler**:
+  - Standardized dismissal on WinUI 3's native `Window.Activated` event:
+    ```csharp
+    Activated += (_, args) =>
+    {
+        if (args.WindowActivationState == WindowActivationState.Deactivated)
+        {
+            long now = Stopwatch.GetTimestamp();
+            double elapsedMs = (now - _shownTimestamp) * 1000.0 / Stopwatch.Frequency;
+            if (_visible && elapsedMs > 250)
+            {
+                DismissRequested?.Invoke();
+            }
+        }
+    };
+    ```
+  - Added a 250ms startup grace period to prevent false dismissals during initial foreground window transitions.
+- **Interactive Close Hint**: Added `PointerPressed="OnCloseClicked"` and `Background="Transparent"` to the `[Esc] Close` footer element.
+- **WinRT & CLI Resilience**: Wrapped `AppWindow.IsShownInSwitchers` in a try/catch, and ensured `WindowsShellIntegration.AddTrayIcon()` degrades gracefully during headless or CLI test execution.
+
+---
+
+### C. Verification Evidence
+- **Build**: `dotnet build FocusKey.slnx` -> **0 warnings, 0 errors**.
+- **Automated Tests**: `dotnet test` -> **504 passed, 0 failed, 0 skipped**.
+- **User Runtime Verification**: Manually tested in terminal and live UI on Windows 11; confirmed flawless operation:
+  - Work and Break card hover keeps rich session colors without whiteout.
+  - Active session countdown retains bold session color (`#183739` / `#434763`) with high-contrast text in Light mode.
+  - Overlay activates cleanly with `Shift + F3`, takes focus immediately, and dismisses smoothly on `Escape`, clicking `[Esc] Close`, or clicking outside anywhere.
+
+

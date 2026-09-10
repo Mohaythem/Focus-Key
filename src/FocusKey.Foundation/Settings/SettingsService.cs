@@ -24,6 +24,8 @@ public sealed class SettingsService(ISettingsRepository repository)
         UpdateAsync(current => current with { BreakDuration = value }, cancellationToken);
     public Task<ApplicationSettings> UpdateAppearanceAsync(Appearance value, CancellationToken cancellationToken = default) =>
         UpdateAsync(current => current with { Appearance = value }, cancellationToken);
+    public Task<ApplicationSettings> UpdateContrastAsync(Contrast value, CancellationToken cancellationToken = default) =>
+        UpdateAsync(current => current with { Contrast = value }, cancellationToken);
     public Task<ApplicationSettings> UpdateWorkColorAsync(HexColor value, CancellationToken cancellationToken = default) =>
         UpdateAsync(current => current with { WorkColor = value }, cancellationToken);
     public Task<ApplicationSettings> UpdateBreakColorAsync(HexColor value, CancellationToken cancellationToken = default) =>

@@ -138,6 +138,22 @@ public sealed class AppearanceCoordinatorTests
         Assert.Equal(Appearance.System, (await settings.LoadAsync()).Appearance);
     }
 
+    [Fact]
+    public async Task CoordinatorReflectsAndTracksContrast()
+    {
+        using var store = new SessionStore();
+        var settings = new SettingsService(new SqliteSettingsRepository(store.Connections));
+        var coordinator = new AppearanceCoordinator(settings);
+        await coordinator.InitializeAsync();
+
+        Assert.Equal(Contrast.Standard, coordinator.Contrast);
+
+        await settings.UpdateContrastAsync(Contrast.HigherContrast);
+        await coordinator.RefreshAsync();
+
+        Assert.Equal(Contrast.HigherContrast, coordinator.Contrast);
+    }
+
     private static AppearanceCoordinator New(SessionStore store) =>
         new(new SettingsService(new SqliteSettingsRepository(store.Connections)));
 }

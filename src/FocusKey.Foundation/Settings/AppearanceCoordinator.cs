@@ -30,6 +30,12 @@ public sealed class AppearanceCoordinator(SettingsService settings)
         get { lock (_state) return _darkPalette ?? ThemeConfiguration.DefaultDark.ResolvePalette(true); }
     }
 
+    private Contrast _contrast = Contrast.Standard;
+    public Contrast Contrast
+    {
+        get { lock (_state) return _contrast; }
+    }
+
     public event Action<Appearance>? Changed;
 
     public Appearance Current
@@ -75,8 +81,8 @@ public sealed class AppearanceCoordinator(SettingsService settings)
     {
         Appearance appearance = settings.Appearance;
         SessionColors colors = SessionColors.From(settings);
-        ThemePalette light = (settings.LightTheme ?? ThemeConfiguration.DefaultLight).ResolvePalette(false);
-        ThemePalette dark = (settings.DarkTheme ?? ThemeConfiguration.DefaultDark).ResolvePalette(true);
+        ThemePalette light = (settings.LightTheme ?? ThemeConfiguration.DefaultLight).ResolvePalette(false, settings.Contrast);
+        ThemePalette dark = (settings.DarkTheme ?? ThemeConfiguration.DefaultDark).ResolvePalette(true, settings.Contrast);
         bool changed;
         bool colorsChanged;
         bool palettesChanged;
@@ -89,6 +95,7 @@ public sealed class AppearanceCoordinator(SettingsService settings)
             palettesChanged = _lightPalette != light || _darkPalette != dark;
             _lightPalette = light;
             _darkPalette = dark;
+            _contrast = settings.Contrast;
         }
         if (changed) Changed?.Invoke(appearance);
         if (colorsChanged) ColorsChanged?.Invoke(colors);

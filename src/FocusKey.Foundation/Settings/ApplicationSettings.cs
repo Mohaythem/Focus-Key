@@ -8,6 +8,7 @@ public sealed record ApplicationSettings
         WorkDuration = TimeSpan.FromMinutes(30),
         BreakDuration = TimeSpan.FromMinutes(10),
         Appearance = Appearance.System,
+        Contrast = Contrast.Standard,
         WorkColor = HexColor.Parse("#183739"),
         BreakColor = HexColor.Parse("#434763"),
         LightTheme = ThemeConfiguration.DefaultLight,
@@ -17,6 +18,7 @@ public sealed record ApplicationSettings
     public required TimeSpan WorkDuration { get; init; }
     public required TimeSpan BreakDuration { get; init; }
     public required Appearance Appearance { get; init; }
+    public Contrast Contrast { get; init; } = Contrast.Standard;
     public required HexColor WorkColor { get; init; }
     public required HexColor BreakColor { get; init; }
     public ThemeConfiguration LightTheme { get; init; } = ThemeConfiguration.DefaultLight;
@@ -28,6 +30,8 @@ public sealed record ApplicationSettings
         ValidateDuration(BreakDuration, nameof(BreakDuration));
         if (!Enum.IsDefined(Appearance))
             throw new ArgumentException($"Unsupported appearance '{Appearance}'.", nameof(Appearance));
+        if (!Enum.IsDefined(Contrast))
+            throw new ArgumentException($"Unsupported contrast '{Contrast}'.", nameof(Contrast));
         ValidateColor(WorkColor, nameof(WorkColor));
         ValidateColor(BreakColor, nameof(BreakColor));
         (LightTheme ?? ThemeConfiguration.DefaultLight).Validate(false);

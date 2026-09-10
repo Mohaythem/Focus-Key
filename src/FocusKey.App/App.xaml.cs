@@ -60,12 +60,12 @@ public partial class App : Application
 
             _startup = await FoundationBootstrap.RunAsync();
             _startup.Logger.Info("Single-instance shell ownership acquired.");
+            ApplyThemePalettes(_startup.Appearance.LightPalette, _startup.Appearance.DarkPalette);
             _window = new MainWindow(_startup, StopSessionAsync,
                 exception => _startup?.Logger.Error("Main-page operation failed.", exception), RefreshSettingsAsync);
             _startup.Appearance.Changed += OnAppearanceChanged;
             _startup.Appearance.ColorsChanged += OnColorsChanged;
             _startup.Appearance.PalettesChanged += OnPalettesChanged;
-            ApplyThemePalettes(_startup.Appearance.LightPalette, _startup.Appearance.DarkPalette);
             ApplyAppearance(_startup.Appearance.Current);
             ApplyColors();
             _window.OverlayRequested += () => OnShellActivation(ShellActivationKind.Hotkey);
@@ -154,7 +154,14 @@ public partial class App : Application
     private IQuickOverlayView CreateQuickOverlay()
     {
         var window = new QuickOverlayWindow(message => _startup?.Logger.Info(message));
-        window.ApplyAppearance(_startup!.Appearance.Current);
+        bool isDark = _startup!.Appearance.Current switch
+        {
+            Appearance.Dark => true,
+            Appearance.Light => false,
+            _ => (_window?.Content as FrameworkElement)?.ActualTheme == ElementTheme.Dark,
+        };
+        ThemePalette palette = isDark ? _startup.Appearance.DarkPalette : _startup.Appearance.LightPalette;
+        window.ApplyAppearance(_startup.Appearance.Current, palette);
         window.ApplyColors(_startup.Appearance.Colors);
         _quickOverlayWindow = window;
         _startup.Logger.Info($"Quick overlay created with appearance {_startup.Appearance.Current}; Work {_startup.Appearance.Colors.Work}, Break {_startup.Appearance.Colors.Break}.");
@@ -225,6 +232,7 @@ public partial class App : Application
                 SetBrush(lightDict, "FkSurface2", light.Surface2);
                 SetBrush(lightDict, "FkOverlay", light.Surface);
                 SetBrush(lightDict, "FkBorder", light.Border);
+                SetBrush(lightDict, "CardStrokeColorDefaultBrush", light.Border);
                 SetBrush(lightDict, "FkForeground", light.Foreground);
                 SetBrush(lightDict, "FkSecondary", light.Secondary);
                 SetBrush(lightDict, "FkDim", light.Dim);
@@ -238,6 +246,7 @@ public partial class App : Application
                 SetBrush(darkDict, "FkSurface2", dark.Surface2);
                 SetBrush(darkDict, "FkOverlay", dark.Surface);
                 SetBrush(darkDict, "FkBorder", dark.Border);
+                SetBrush(darkDict, "CardStrokeColorDefaultBrush", dark.Border);
                 SetBrush(darkDict, "FkForeground", dark.Foreground);
                 SetBrush(darkDict, "FkSecondary", dark.Secondary);
                 SetBrush(darkDict, "FkDim", dark.Dim);
@@ -265,8 +274,18 @@ public partial class App : Application
 
     private void ApplyAppearance(Appearance appearance)
     {
-        _window?.ApplyAppearance(appearance, _startup?.Appearance.LightPalette, _startup?.Appearance.DarkPalette);
-        _quickOverlayWindow?.ApplyAppearance(appearance);
+        var light = _startup?.Appearance.LightPalette;
+        var dark = _startup?.Appearance.DarkPalette;
+        var contrast = _startup?.Appearance.Contrast ?? Contrast.Standard;
+        _window?.ApplyAppearance(appearance, light, dark, contrast);
+        bool isDark = appearance switch
+        {
+            Appearance.Dark => true,
+            Appearance.Light => false,
+            _ => (_window?.Content as FrameworkElement)?.ActualTheme == ElementTheme.Dark,
+        };
+        ThemePalette? activePalette = isDark ? dark : light;
+        _quickOverlayWindow?.ApplyAppearance(appearance, activePalette);
         if (_appliedAppearance == appearance) return;
         _appliedAppearance = appearance;
         _startup?.Logger.Info($"Appearance applied to native surfaces: {appearance}.");

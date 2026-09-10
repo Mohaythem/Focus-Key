@@ -21,6 +21,8 @@ internal sealed class SettingsView : UserControl
     private readonly TextBox _breakMinutes = Number("Break minutes");
     private readonly TextBox _breakSeconds = Number("Break seconds");
     private readonly ComboBox _appearance = new() { ItemsSource = Enum.GetNames<Appearance>(), MinWidth = 140, FontSize = 12 };
+    private static readonly string[] ContrastOptions = ["Standard", "Higher Contrast"];
+    private readonly ComboBox _contrast = new() { ItemsSource = ContrastOptions, MinWidth = 140, FontSize = 12 };
     private readonly ColorPicker _workColor = Picker("Work color picker");
     private readonly ColorPicker _breakColor = Picker("Break color picker");
     private readonly Button _workButton = new();
@@ -56,13 +58,23 @@ internal sealed class SettingsView : UserControl
 
     private readonly Button _reload = new() { Content = "Reload saved values", FontSize = 12, Padding = new Thickness(12, 6, 12, 6) };
     private readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap };
+    private readonly Microsoft.UI.Dispatching.DispatcherQueueTimer _colorDebounceTimer;
+    private readonly Dictionary<SettingsField, Func<Task>> _pendingColorActions = new();
+    private Task _colorDrainTask = Task.CompletedTask;
+    private bool _colorDrainRunning;
     private bool _applying;
     private bool _workDirty, _breakDirty;
 
     internal SettingsView(SettingsService settings, Func<Task> refresh, Action<Exception> report)
     {
         _controller = new(settings, refresh, report);
+        _colorDebounceTimer = DispatcherQueue.CreateTimer();
+        _colorDebounceTimer.Interval = TimeSpan.FromMilliseconds(250);
+        _colorDebounceTimer.Tick += (_, _) => StartColorDrain();
+        Unloaded += async (_, _) => await FlushPendingColorSaveAsync();
+
         AutomationProperties.SetName(_appearance, "Appearance");
+        AutomationProperties.SetName(_contrast, "Contrast");
         AutomationProperties.SetName(_lightPreset, "Light theme preset");
         AutomationProperties.SetName(_darkPreset, "Dark theme preset");
         AutomationProperties.SetLiveSetting(_status, AutomationLiveSetting.Polite);
@@ -74,7 +86,8 @@ internal sealed class SettingsView : UserControl
 
         // 1. APPEARANCE
         var appearance = new StackPanel { Spacing = 0 };
-        appearance.Children.Add(Row("Color scheme", "Controls whether the application uses light, dark, or system theme", _appearance, true));
+        appearance.Children.Add(Row("Color scheme", "Controls whether the application uses light, dark, or system theme", _appearance, false));
+        appearance.Children.Add(Row("Contrast", "Enhances text legibility and border definition across the interface", _contrast, true));
         _fields.Children.Add(Section("APPEARANCE", appearance));
 
         // 2. LIGHT THEME
@@ -103,8 +116,10 @@ internal sealed class SettingsView : UserControl
         var colors = new StackPanel { Spacing = 0 };
         ConfigureColor(_workButton, _workColor, "Work color");
         ConfigureColor(_breakButton, _breakColor, "Break color");
-        colors.Children.Add(Row("Work color", "Used for work session indicators and timer", _workButton));
-        colors.Children.Add(Row("Break color", "Used for break session indicators and timer", _breakButton, true));
+        var workSelector = BuildColorSelector(_workButton, _workColor, WorkColorPresets, true);
+        var breakSelector = BuildColorSelector(_breakButton, _breakColor, BreakColorPresets, false);
+        colors.Children.Add(Row("Work color", "Used for work session indicators and timer", workSelector));
+        colors.Children.Add(Row("Break color", "Used for break session indicators and timer", breakSelector, true));
         _fields.Children.Add(Section("SESSION COLORS", colors));
 
         // 5. SESSIONS
@@ -144,62 +159,112 @@ internal sealed class SettingsView : UserControl
         panel.Children.Add(_status);
         Content = panel;
 
-        _reload.Click += async (_, _) => await OpenAsync();
+        _reload.Click += async (_, _) =>
+        {
+            await FlushPendingColorSaveAsync();
+            await OpenAsync();
+        };
         _appearance.SelectionChanged += async (_, _) =>
         {
-            if (!_applying) await _controller.UpdateAppearanceAsync((Appearance)_appearance.SelectedIndex);
+            if (!_applying)
+            {
+                await FlushPendingColorSaveAsync();
+                await _controller.UpdateAppearanceAsync((Appearance)_appearance.SelectedIndex);
+            }
         };
-        _workColor.ColorChanged += async (_, _) =>
+        _contrast.SelectionChanged += async (_, _) =>
         {
-            if (!_applying) await _controller.UpdateWorkColorAsync(ColorValue(_workColor));
+            if (!_applying && _contrast.SelectedIndex >= 0)
+            {
+                await FlushPendingColorSaveAsync();
+                await _controller.UpdateContrastAsync((Contrast)_contrast.SelectedIndex);
+            }
         };
-        _breakColor.ColorChanged += async (_, _) =>
+        _workColor.ColorChanged += (_, _) =>
         {
-            if (!_applying) await _controller.UpdateBreakColorAsync(ColorValue(_breakColor));
+            if (!_applying)
+            {
+                var color = ColorValue(_workColor);
+                DebounceColorSave(SettingsField.WorkColor, () => _controller.UpdateWorkColorAsync(color));
+            }
+        };
+        _breakColor.ColorChanged += (_, _) =>
+        {
+            if (!_applying)
+            {
+                var color = ColorValue(_breakColor);
+                DebounceColorSave(SettingsField.BreakColor, () => _controller.UpdateBreakColorAsync(color));
+            }
         };
 
         _lightPreset.SelectionChanged += async (_, _) =>
         {
             if (_applying) return;
             int idx = _lightPreset.SelectedIndex;
-            if (idx >= 0 && idx < ThemePresets.LightPresets.Count)
+            string? presetId = idx >= 0 && idx < ThemePresets.LightPresets.Count
+                ? ThemePresets.LightPresets[idx].Id
+                : null;
+            await FlushPendingColorSaveAsync();
+            if (presetId is not null) await _controller.UpdateLightPresetAsync(presetId);
+        };
+        _lightBgColor.ColorChanged += (_, _) =>
+        {
+            if (!_applying)
             {
-                await _controller.UpdateLightPresetAsync(ThemePresets.LightPresets[idx].Id);
+                var color = ColorValue(_lightBgColor);
+                DebounceColorSave(SettingsField.LightBackground, () => _controller.UpdateLightColorAsync(true, false, color));
             }
         };
-        _lightBgColor.ColorChanged += async (_, _) =>
+        _lightFgColor.ColorChanged += (_, _) =>
         {
-            if (!_applying) await _controller.UpdateLightColorAsync(true, false, ColorValue(_lightBgColor));
+            if (!_applying)
+            {
+                var color = ColorValue(_lightFgColor);
+                DebounceColorSave(SettingsField.LightForeground, () => _controller.UpdateLightColorAsync(false, true, color));
+            }
         };
-        _lightFgColor.ColorChanged += async (_, _) =>
+        _lightAccentColor.ColorChanged += (_, _) =>
         {
-            if (!_applying) await _controller.UpdateLightColorAsync(false, true, ColorValue(_lightFgColor));
-        };
-        _lightAccentColor.ColorChanged += async (_, _) =>
-        {
-            if (!_applying) await _controller.UpdateLightColorAsync(false, false, ColorValue(_lightAccentColor));
+            if (!_applying)
+            {
+                var color = ColorValue(_lightAccentColor);
+                DebounceColorSave(SettingsField.LightAccent, () => _controller.UpdateLightColorAsync(false, false, color));
+            }
         };
 
         _darkPreset.SelectionChanged += async (_, _) =>
         {
             if (_applying) return;
             int idx = _darkPreset.SelectedIndex;
-            if (idx >= 0 && idx < ThemePresets.DarkPresets.Count)
+            string? presetId = idx >= 0 && idx < ThemePresets.DarkPresets.Count
+                ? ThemePresets.DarkPresets[idx].Id
+                : null;
+            await FlushPendingColorSaveAsync();
+            if (presetId is not null) await _controller.UpdateDarkPresetAsync(presetId);
+        };
+        _darkBgColor.ColorChanged += (_, _) =>
+        {
+            if (!_applying)
             {
-                await _controller.UpdateDarkPresetAsync(ThemePresets.DarkPresets[idx].Id);
+                var color = ColorValue(_darkBgColor);
+                DebounceColorSave(SettingsField.DarkBackground, () => _controller.UpdateDarkColorAsync(true, false, color));
             }
         };
-        _darkBgColor.ColorChanged += async (_, _) =>
+        _darkFgColor.ColorChanged += (_, _) =>
         {
-            if (!_applying) await _controller.UpdateDarkColorAsync(true, false, ColorValue(_darkBgColor));
+            if (!_applying)
+            {
+                var color = ColorValue(_darkFgColor);
+                DebounceColorSave(SettingsField.DarkForeground, () => _controller.UpdateDarkColorAsync(false, true, color));
+            }
         };
-        _darkFgColor.ColorChanged += async (_, _) =>
+        _darkAccentColor.ColorChanged += (_, _) =>
         {
-            if (!_applying) await _controller.UpdateDarkColorAsync(false, true, ColorValue(_darkFgColor));
-        };
-        _darkAccentColor.ColorChanged += async (_, _) =>
-        {
-            if (!_applying) await _controller.UpdateDarkColorAsync(false, false, ColorValue(_darkAccentColor));
+            if (!_applying)
+            {
+                var color = ColorValue(_darkAccentColor);
+                DebounceColorSave(SettingsField.DarkAccent, () => _controller.UpdateDarkColorAsync(false, false, color));
+            }
         };
 
         WireDuration(_workMinutes, _workSeconds, true);
@@ -222,7 +287,48 @@ internal sealed class SettingsView : UserControl
         Render();
     }
 
-    internal Task OpenAsync() => _controller.LoadAsync();
+    internal async Task OpenAsync()
+    {
+        await FlushPendingColorSaveAsync();
+        await _controller.LoadAsync();
+    }
+
+    private void DebounceColorSave(SettingsField field, Func<Task> saveAction)
+    {
+        _pendingColorActions[field] = saveAction;
+        _colorDebounceTimer.Stop();
+        _colorDebounceTimer.Start();
+    }
+
+    private async Task FlushPendingColorSaveAsync()
+    {
+        _colorDebounceTimer.Stop();
+        StartColorDrain();
+        await _colorDrainTask;
+    }
+
+    private void StartColorDrain()
+    {
+        if (_colorDrainRunning || _pendingColorActions.Count == 0) return;
+        _colorDrainRunning = true;
+        _colorDrainTask = DrainColorQueueAsync();
+    }
+
+    private async Task DrainColorQueueAsync()
+    {
+        try
+        {
+            // Keep the queue alive until every action accepted before shutdown has run. A
+            // ColorChanged event can arrive while an earlier persistence action is awaiting.
+            while (_pendingColorActions.Count > 0)
+            {
+                var actions = _pendingColorActions.Values.ToArray();
+                _pendingColorActions.Clear();
+                foreach (var action in actions) await action();
+            }
+        }
+        finally { _colorDrainRunning = false; }
+    }
 
     private void WireDuration(TextBox minutes, TextBox seconds, bool work)
     {
@@ -268,9 +374,14 @@ internal sealed class SettingsView : UserControl
 
     internal async Task FlushAsync()
     {
-        CommitPendingDurations();
+        await FlushPendingColorSaveAsync();
+        await CommitPendingDurationsAsync();
         await _controller.DrainAsync();
     }
+
+    private Task CommitPendingDurationsAsync() => Task.WhenAll(
+        CommitDurationAsync(true),
+        CommitDurationAsync(false));
 
     private void SetField(SettingsField field, ApplicationSettings saved)
     {
@@ -282,6 +393,7 @@ internal sealed class SettingsView : UserControl
                 case SettingsField.WorkDuration when !_workDirty: SetDuration(saved.WorkDuration, _workMinutes, _workSeconds); break;
                 case SettingsField.BreakDuration when !_breakDirty: SetDuration(saved.BreakDuration, _breakMinutes, _breakSeconds); break;
                 case SettingsField.Appearance: _appearance.SelectedIndex = (int)saved.Appearance; break;
+                case SettingsField.Contrast: _contrast.SelectedIndex = (int)saved.Contrast; break;
                 case SettingsField.WorkColor: _workColor.Color = SessionColorBrush.Create(saved.WorkColor).Color; break;
                 case SettingsField.BreakColor: _breakColor.Color = SessionColorBrush.Create(saved.BreakColor).Color; break;
                 case SettingsField.LightPreset:
@@ -368,6 +480,97 @@ internal sealed class SettingsView : UserControl
         }
         picker.ColorChanged += (_, _) => Preview();
         Preview();
+    }
+
+    private static readonly (string Name, HexColor Color)[] WorkColorPresets =
+    [
+        ("Forest Teal", HexColor.Parse("#183739")),
+        ("Pine Emerald", HexColor.Parse("#1B4D3E")),
+        ("Nordic Cyan", HexColor.Parse("#1A3F54")),
+        ("Slate Sage", HexColor.Parse("#2D4F4F")),
+        ("Deep Cobalt", HexColor.Parse("#1E3A5F"))
+    ];
+
+    private static readonly (string Name, HexColor Color)[] BreakColorPresets =
+    [
+        ("Twilight Slate", HexColor.Parse("#434763")),
+        ("Deep Indigo", HexColor.Parse("#343D5B")),
+        ("Night Amethyst", HexColor.Parse("#3B355A")),
+        ("Muted Plum", HexColor.Parse("#4A354F")),
+        ("Warm Charcoal", HexColor.Parse("#3D3D45"))
+    ];
+
+    private FrameworkElement BuildColorSelector(Button customButton, ColorPicker picker, (string Name, HexColor Color)[] presets, bool isWork)
+    {
+        var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, VerticalAlignment = VerticalAlignment.Center };
+        var swatches = new List<Border>();
+
+        void UpdateSwatches(HexColor current)
+        {
+            for (int i = 0; i < presets.Length; i++)
+            {
+                bool isSelected = string.Equals(presets[i].Color.Value, current.Value, StringComparison.OrdinalIgnoreCase);
+                swatches[i].BorderThickness = new Thickness(isSelected ? 2 : 1);
+                swatches[i].BorderBrush = isSelected
+                    ? Presentation.ThemeBrush("FkForeground", this)
+                    : Presentation.ThemeBrush("CardStrokeColorDefaultBrush", this);
+            }
+        }
+
+        for (int i = 0; i < presets.Length; i++)
+        {
+            var preset = presets[i];
+            var swatch = new Border
+            {
+                Width = 20,
+                Height = 20,
+                CornerRadius = new CornerRadius(4),
+                Background = SessionColorBrush.Create(preset.Color),
+                BorderThickness = new Thickness(1),
+                BorderBrush = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", this),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            swatches.Add(swatch);
+
+            var btn = new Button
+            {
+                Padding = new Thickness(0),
+                Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
+                BorderThickness = new Thickness(0),
+                CornerRadius = new CornerRadius(4),
+                Content = swatch,
+                VerticalAlignment = VerticalAlignment.Center,
+                MinHeight = 20,
+                MinWidth = 20
+            };
+            ToolTipService.SetToolTip(btn, $"{preset.Name} ({preset.Color.Value})");
+            AutomationProperties.SetName(btn, $"{preset.Name}, {preset.Color.Value}");
+
+            btn.Click += async (_, _) =>
+            {
+                if (_applying) return;
+                await FlushPendingColorSaveAsync();
+                // Presets are an explicit immediate commit. Suppress the picker callback
+                // while changing its preview so it cannot enqueue a duplicate delayed save.
+                _applying = true;
+                try { picker.Color = SessionColorBrush.Create(preset.Color).Color; }
+                finally { _applying = false; }
+                if (isWork) await _controller.UpdateWorkColorAsync(preset.Color);
+                else await _controller.UpdateBreakColorAsync(preset.Color);
+                UpdateSwatches(preset.Color);
+            };
+            panel.Children.Add(btn);
+        }
+
+        picker.ColorChanged += (_, _) =>
+        {
+            UpdateSwatches(ColorValue(picker));
+        };
+
+        customButton.Margin = new Thickness(6, 0, 0, 0);
+        panel.Children.Add(customButton);
+        UpdateSwatches(ColorValue(picker));
+        return panel;
     }
 
     private static ColorPicker Picker(string name)

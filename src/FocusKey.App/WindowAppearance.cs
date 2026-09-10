@@ -25,10 +25,16 @@ internal static class WindowAppearance
         }
     }
 
-    internal static void ApplyTitleBar(AppWindow appWindow, ThemePalette palette)
+    internal static void ApplyTitleBar(AppWindow appWindow, ThemePalette? palette)
     {
         if (!AppWindowTitleBar.IsCustomizationSupported()) return;
         AppWindowTitleBar titleBar = appWindow.TitleBar;
+
+        if (palette is null)
+        {
+            titleBar.ResetToDefault();
+            return;
+        }
 
         Color background = ToWinColor(palette.Sidebar);
         Color foreground = ToWinColor(palette.Foreground);

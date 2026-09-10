@@ -63,6 +63,52 @@ public sealed record ThemePalette
         }
     }
 
+    public static ThemePalette ApplyContrast(ThemePalette basePalette, Contrast contrast, bool isDark)
+    {
+        if (contrast == Contrast.Standard)
+            return basePalette;
+
+        var bgC = ColorFromHex(basePalette.Background);
+        (byte r, byte g, byte b) targetFg = isDark ? ((byte)255, (byte)255, (byte)255) : ((byte)0, (byte)0, (byte)0);
+
+        (byte r, byte g, byte b) Blend(double fgWeight) =>
+            (
+                (byte)Math.Clamp((int)Math.Round(bgC.r * (1 - fgWeight) + targetFg.r * fgWeight), 0, 255),
+                (byte)Math.Clamp((int)Math.Round(bgC.g * (1 - fgWeight) + targetFg.g * fgWeight), 0, 255),
+                (byte)Math.Clamp((int)Math.Round(bgC.b * (1 - fgWeight) + targetFg.b * fgWeight), 0, 255)
+            );
+
+        HexColor HexFrom((byte r, byte g, byte b) c) =>
+            HexColor.Parse($"#{c.r:X2}{c.g:X2}{c.b:X2}");
+
+        if (isDark)
+        {
+            return basePalette with
+            {
+                Foreground = HexColor.Parse("#FFFFFF"),
+                Sidebar = HexFrom(Blend(0.04)),
+                Surface = HexFrom(Blend(0.06)),
+                Surface2 = HexFrom(Blend(0.12)),
+                Border = HexFrom(Blend(0.40)),
+                Secondary = HexFrom(Blend(0.85)),
+                Dim = HexFrom(Blend(0.65)),
+            };
+        }
+        else
+        {
+            return basePalette with
+            {
+                Foreground = HexColor.Parse("#000000"),
+                Sidebar = HexFrom(Blend(0.07)),
+                Surface = HexColor.Parse("#FFFFFF"),
+                Surface2 = HexFrom(Blend(0.04)),
+                Border = HexFrom(Blend(0.38)),
+                Secondary = HexFrom(Blend(0.85)),
+                Dim = HexFrom(Blend(0.65)),
+            };
+        }
+    }
+
     private static (byte r, byte g, byte b) ColorFromHex(HexColor hex)
     {
         string s = hex.Value.TrimStart('#');

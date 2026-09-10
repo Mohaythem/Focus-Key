@@ -260,6 +260,24 @@ public sealed class SettingsPageControllerTests
         Assert.Equal(Custom, page.Saved);
     }
 
+    [Fact]
+    public async Task RapidThemeColorEditsMergeIntoOneLatestPalette()
+    {
+        var repo = new FakeRepository { Pending = new(TaskCreationOptions.RunContinuationsAsynchronously) };
+        var page = new SettingsPageController(new(repo), () => Task.CompletedTask, _ => { });
+        await page.LoadAsync();
+
+        Task background = page.UpdateLightColorAsync(true, false, HexColor.Parse("#112233"));
+        Task foreground = page.UpdateLightColorAsync(false, true, HexColor.Parse("#DDEEFF"));
+        repo.Pending.SetResult();
+        await Task.WhenAll(background, foreground, page.DrainAsync());
+
+        Assert.Equal("#112233", page.Saved!.LightTheme.Background.Value);
+        Assert.Equal("#DDEEFF", page.Saved.LightTheme.Foreground.Value);
+        Assert.Equal("#112233", repo.Value.LightTheme.Background.Value);
+        Assert.Equal("#DDEEFF", repo.Value.LightTheme.Foreground.Value);
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]

@@ -4,6 +4,8 @@ using FocusKey.Foundation.Settings;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Windows.UI;
+using Windows.UI.ViewManagement;
 
 namespace FocusKey;
 
@@ -12,13 +14,9 @@ internal static class Presentation
 {
     internal static Brush ThemeBrush(string key, FrameworkElement? context = null)
     {
-        ElementTheme theme = context?.ActualTheme ?? ElementTheme.Default;
-        if (theme == ElementTheme.Default)
-        {
-            theme = Application.Current?.RequestedTheme == ApplicationTheme.Light 
-                ? ElementTheme.Light 
-                : ElementTheme.Dark;
-        }
+        ElementTheme theme = context?.ActualTheme is ElementTheme.Light or ElementTheme.Dark
+            ? context.ActualTheme
+            : EffectiveSystemTheme();
 
         string themeKey = theme switch
         {
@@ -37,6 +35,21 @@ internal static class Presentation
         }
 
         return Application.Current?.Resources[key] as Brush ?? new SolidColorBrush(Microsoft.UI.Colors.Transparent);
+    }
+
+    private static ElementTheme EffectiveSystemTheme()
+    {
+        if (Application.Current?.RequestedTheme is ApplicationTheme.Light)
+            return ElementTheme.Light;
+        if (Application.Current?.RequestedTheme is ApplicationTheme.Dark)
+            return ElementTheme.Dark;
+
+        // RequestedTheme == Default means "follow Windows"; it is not evidence of Dark.
+        // UISettings exposes the resolved system background without inventing a second theme
+        // lookup path for the application's own ThemeDictionaries.
+        Color background = new UISettings().GetColorValue(UIColorType.Background);
+        double luminance = (0.299 * background.R + 0.587 * background.G + 0.114 * background.B) / 255.0;
+        return luminance < 0.5 ? ElementTheme.Dark : ElementTheme.Light;
     }
 
     internal static TextBlock Text(string value, double size = 13, bool muted = false) => new()

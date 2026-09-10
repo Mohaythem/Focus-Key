@@ -8,6 +8,8 @@ using FocusKey.Startup;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Windows.Graphics;
+using FocusKey.Shell;
+using WinRT.Interop;
 
 namespace FocusKey;
 
@@ -31,12 +33,14 @@ public sealed partial class MainWindow : Window
     internal event Action? ExitRequested;
 
     private Appearance _appearance = Appearance.System;
+    private Contrast _contrast = Contrast.Standard;
     private ThemePalette? _lightPalette;
     private ThemePalette? _darkPalette;
 
-    internal void ApplyAppearance(Appearance appearance, ThemePalette? lightPalette = null, ThemePalette? darkPalette = null)
+    internal void ApplyAppearance(Appearance appearance, ThemePalette? lightPalette = null, ThemePalette? darkPalette = null, Contrast contrast = Contrast.Standard)
     {
         _appearance = appearance;
+        _contrast = contrast;
         if (lightPalette is not null) _lightPalette = lightPalette;
         if (darkPalette is not null) _darkPalette = darkPalette;
         UpdateAppearance();
@@ -44,7 +48,6 @@ public sealed partial class MainWindow : Window
 
     private void UpdateAppearance()
     {
-        MainSurface.RequestedTheme = WindowAppearance.ToElementTheme(_appearance);
         bool isDark = _appearance switch
         {
             Appearance.Dark => true,
@@ -54,7 +57,20 @@ public sealed partial class MainWindow : Window
         ThemePalette palette = isDark
             ? (_darkPalette ?? ThemePalette.DefaultDark)
             : (_lightPalette ?? ThemePalette.DefaultLight);
-        WindowAppearance.ApplyTitleBar(AppWindow, palette);
+
+        MainSurface.Background = SessionColorBrush.Create(palette.Background);
+        NavGrid.Background = SessionColorBrush.Create(palette.Sidebar);
+        NavGrid.BorderBrush = SessionColorBrush.Create(palette.Border);
+        // System appearance leaves the native caption controls under Windows ownership.
+        // The content still uses the resolved light/dark palette above, but any previous
+        // explicit caption colors must be cleared when the user returns to System.
+        WindowAppearance.ApplyTitleBar(AppWindow, _appearance == Appearance.System ? null : palette);
+
+        var targetTheme = WindowAppearance.ToElementTheme(_appearance);
+        MainSurface.RequestedTheme = targetTheme;
+
+        _reports?.RefreshVisuals(_contrast);
+        if (_today is not null) Render();
     }
 
     internal MainWindow(StartupContext startup,
@@ -66,7 +82,10 @@ public sealed partial class MainWindow : Window
         ReportsHost.Content = _reports;
         _settings = new SettingsView(startup.Settings, refreshSettings, report);
         SettingsHost.Content = _settings;
-        AppWindow.Resize(new SizeInt32(880, 660));
+        var hwnd = WindowNative.GetWindowHandle(this);
+        double scale = NativeMethods.GetDpiForWindow(hwnd) / 96.0;
+        if (scale <= 0) scale = 1.0;
+        AppWindow.Resize(new SizeInt32((int)Math.Ceiling(880 * scale), (int)Math.Ceiling(660 * scale)));
         MainSurface.ActualThemeChanged += (_, _) => { if (_appearance == Appearance.System) UpdateAppearance(); };
         MainSurface.SizeChanged += (_, _) =>
         {
@@ -109,7 +128,6 @@ public sealed partial class MainWindow : Window
 
     internal Task FlushSettingsAsync()
     {
-        _settings.CommitPendingDurations();
         _settings.IsEnabled = false;
         return _settings.FlushAsync();
     }
@@ -140,6 +158,7 @@ public sealed partial class MainWindow : Window
         ReportsNav.IsChecked = _today.Page == MainPage.Reports;
         SettingsNav.IsChecked = _today.Page == MainPage.Settings;
         PageTitle.Text = _today.Page.ToString();
+        PageTitle.Visibility = _today.Page == MainPage.Reports ? Visibility.Collapsed : Visibility.Visible;
         TodayPanel.Visibility = isToday ? Visibility.Visible : Visibility.Collapsed;
         SettingsHost.Visibility = _today.Page == MainPage.Settings ? Visibility.Visible : Visibility.Collapsed;
         ReportsHost.Visibility = _today.Page == MainPage.Reports ? Visibility.Visible : Visibility.Collapsed;
@@ -211,6 +230,7 @@ public sealed partial class MainWindow : Window
             RunningText.FontSize = 22;
             RunningText.FontFamily = new FontFamily("Segoe UI Variable");
             RunningHint.Text = "Press Shift + F3 to start Work or Break.";
+            CurrentCard.Padding = new Thickness(24, 20, 24, 20);
             SessionProgress.Visibility = StopButton.Visibility = Visibility.Collapsed;
             return;
         }
@@ -219,6 +239,7 @@ public sealed partial class MainWindow : Window
         var color = running.Type == SessionType.Work ? _colors.Work : _colors.Break;
         var foreground = Presentation.Stroke(color);
         CurrentCard.Background = SessionColorBrush.Create(color);
+        CurrentCard.Padding = new Thickness(28, 24, 28, 24);
         CurrentHeading.Foreground = RunningType.Foreground = RunningText.Foreground = RunningHint.Foreground = foreground;
         RunningType.Text = running.Type.ToString();
         RunningType.Visibility = Visibility.Visible;

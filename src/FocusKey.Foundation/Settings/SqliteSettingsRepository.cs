@@ -30,13 +30,14 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
                 throw new InvalidDataException("More than one authoritative application settings record exists.");
             await reader.CloseAsync().ConfigureAwait(false);
 
-            var (lightTheme, darkTheme) = await LoadThemeSettingsAsync(connection, cancellationToken).ConfigureAwait(false);
+            var (lightTheme, darkTheme, contrast) = await LoadThemeSettingsAsync(connection, cancellationToken).ConfigureAwait(false);
 
             var settings = new ApplicationSettings
             {
                 WorkDuration = workDuration,
                 BreakDuration = breakDuration,
                 Appearance = appearance,
+                Contrast = contrast,
                 WorkColor = workColor,
                 BreakColor = breakColor,
                 LightTheme = lightTheme,
@@ -91,7 +92,8 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
                 dark_preset = $darkPreset,
                 dark_background = $darkBg,
                 dark_foreground = $darkFg,
-                dark_accent = $darkAccent
+                dark_accent = $darkAccent,
+                contrast = $contrast
             WHERE singleton = 1;
             """;
         command.Parameters.AddWithValue("$lightPreset", light.Preset);
@@ -102,11 +104,12 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
         command.Parameters.AddWithValue("$darkBg", dark.Background.Value);
         command.Parameters.AddWithValue("$darkFg", dark.Foreground.Value);
         command.Parameters.AddWithValue("$darkAccent", dark.Accent.Value);
+        command.Parameters.AddWithValue("$contrast", ContrastText.Format(settings.Contrast));
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         transaction.Commit();
     }
 
-    private static async Task<(ThemeConfiguration light, ThemeConfiguration dark)> LoadThemeSettingsAsync(
+    private static async Task<(ThemeConfiguration light, ThemeConfiguration dark, Contrast contrast)> LoadThemeSettingsAsync(
         SqliteConnection connection, CancellationToken cancellationToken)
     {
         await EnsureThemeTableAsync(connection, cancellationToken).ConfigureAwait(false);
@@ -114,12 +117,13 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
         cmd.CommandText =
             """
             SELECT light_preset, light_background, light_foreground, light_accent,
-                   dark_preset, dark_background, dark_foreground, dark_accent
+                   dark_preset, dark_background, dark_foreground, dark_accent,
+                   contrast
             FROM theme_settings WHERE singleton = 1;
             """;
         await using SqliteDataReader reader = await cmd.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-            return (ThemeConfiguration.DefaultLight, ThemeConfiguration.DefaultDark);
+            return (ThemeConfiguration.DefaultLight, ThemeConfiguration.DefaultDark, Contrast.Standard);
 
         var light = new ThemeConfiguration
         {
@@ -135,33 +139,72 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
             Foreground = ParsePersistedColor(reader.GetString(6), "dark_foreground"),
             Accent = ParsePersistedColor(reader.GetString(7), "dark_accent"),
         };
-        return (light, dark);
+        var contrast = reader.IsDBNull(8) ? Contrast.Standard : ContrastText.Parse(reader.GetString(8));
+        return (light, dark, contrast);
     }
 
     private static async Task EnsureThemeTableAsync(SqliteConnection connection, CancellationToken cancellationToken)
     {
-        await using SqliteCommand cmd = connection.CreateCommand();
-        cmd.CommandText =
-            """
-            CREATE TABLE IF NOT EXISTS theme_settings (
-                singleton        INTEGER NOT NULL PRIMARY KEY,
-                light_preset     TEXT    NOT NULL,
-                light_background TEXT    NOT NULL,
-                light_foreground TEXT    NOT NULL,
-                light_accent     TEXT    NOT NULL,
-                dark_preset      TEXT    NOT NULL,
-                dark_background  TEXT    NOT NULL,
-                dark_foreground  TEXT    NOT NULL,
-                dark_accent      TEXT    NOT NULL,
-                CHECK (singleton = 1)
-            );
-            INSERT OR IGNORE INTO theme_settings (
-                singleton, light_preset, light_background, light_foreground, light_accent,
-                dark_preset, dark_background, dark_foreground, dark_accent)
-            VALUES (1, 'default', '#F2F5F5', '#0F1414', '#183739',
-                       'default', '#0A0D0D', '#F0F4F4', '#2D6669');
-            """;
-        await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        await using (var createCmd = connection.CreateCommand())
+        {
+            createCmd.CommandText =
+                """
+                CREATE TABLE IF NOT EXISTS theme_settings (
+                    singleton        INTEGER NOT NULL PRIMARY KEY,
+                    light_preset     TEXT    NOT NULL,
+                    light_background TEXT    NOT NULL,
+                    light_foreground TEXT    NOT NULL,
+                    light_accent     TEXT    NOT NULL,
+                    dark_preset      TEXT    NOT NULL,
+                    dark_background  TEXT    NOT NULL,
+                    dark_foreground  TEXT    NOT NULL,
+                    dark_accent      TEXT    NOT NULL,
+                    contrast         TEXT    NOT NULL DEFAULT 'standard',
+                    CHECK (singleton = 1)
+                );
+                """;
+            await createCmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        try
+        {
+            await using var alterCmd = connection.CreateCommand();
+            alterCmd.CommandText = "ALTER TABLE theme_settings ADD COLUMN contrast TEXT NOT NULL DEFAULT 'standard';";
+            await alterCmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (SqliteException) { }
+
+        await using (var insertCmd = connection.CreateCommand())
+        {
+            insertCmd.CommandText =
+                """
+                INSERT OR IGNORE INTO theme_settings (
+                    singleton, light_preset, light_background, light_foreground, light_accent,
+                    dark_preset, dark_background, dark_foreground, dark_accent, contrast)
+                VALUES (1, 'default', '#F2F5F5', '#0F1414', '#183739',
+                           'carbon', '#121212', '#E0E0E0', '#4CC2FF', 'standard');
+                """;
+            await insertCmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        // Migrate uncustomized legacy default dark row to Carbon Studio
+        await using (var migrateCmd = connection.CreateCommand())
+        {
+            migrateCmd.CommandText =
+                """
+                UPDATE theme_settings
+                SET dark_preset = 'carbon',
+                    dark_background = '#121212',
+                    dark_foreground = '#E0E0E0',
+                    dark_accent = '#4CC2FF'
+                WHERE singleton = 1
+                  AND dark_preset = 'default'
+                  AND dark_background = '#0A0D0D'
+                  AND dark_foreground = '#F0F4F4'
+                  AND dark_accent = '#2D6669';
+                """;
+            await migrateCmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
     }
 
     private static HexColor ParsePersistedColor(string value, string column)

@@ -101,3 +101,71 @@ Verified against an isolated runtime environment (`D:\Focus Key\.smoke\p12-visua
 ## 4. Phase 12 Completion Sign-off
 
 Phase 12 design fidelity, theming architecture, layout responsiveness, Quick Overlay active state, and complete standalone Mini Timer removal are fully implemented, verified, and operational.
+
+---
+
+## 5. Final Independent Verification & Correction Pass — 2026-09-10
+
+### Authority and scope
+
+The final review reconstructed the current product from `Focus Key.md`, this document, Phases 9–10, recent history, the native source, and `Focus Key.zip`. The archive contains the original Figma Make source and design brief, not raster screenshots. Current Phase 12 behavior therefore remains authoritative for features; the original brief remains authoritative for shared visual language and hierarchy. No Phase 13, packaging, release, or domain-architecture work was introduced.
+
+### Confirmed problems and fixes
+
+1. **System title-bar ownership** — confirmed. `MainWindow` reapplied explicit caption colors even when the persisted appearance was `System`, so a previous Light/Dark customization could remain visible. `WindowAppearance` now calls the native `AppWindowTitleBar.ResetToDefault()` path for `System`; content palettes still resolve from the effective Windows theme.
+2. **Effective System theme resolution** — confirmed as an unsafe fallback. `Presentation.ThemeBrush` no longer treats `ApplicationTheme.Default` as Dark. It honors explicit Light/Dark requests and otherwise derives the effective system mode from Windows `UISettings`.
+3. **ColorPicker persistence burst** — confirmed. One pending callback could replace an edit from another picker, and theme-color callbacks could capture an older palette snapshot. Saves now coalesce independently per settings field, explicit preset swatches remain immediate without duplicate delayed writes, and light/dark theme edits are constructed from the latest serialized controller snapshot.
+4. **Daily Reports scale** — confirmed in the earlier dirty Phase 12 delta and retained. Daily rendering aggregates the 24 source buckets into the same eight 3-hour buckets used for maximum calculation, scale labels, and bar heights. Small non-zero bars receive a minimum visible height.
+5. **Quick Overlay keyboard identity** — source-verified and retained. Native tab focus plus focus-to-selection synchronization, arrows, Enter, Escape, mouse events, and Shift+F3 remain aligned; no alternate timer surface was reintroduced.
+6. **System theme transition recursion** — confirmed in final review. Both the main window and Quick Overlay briefly forced the opposite theme before assigning the target theme, which could trigger repeated `ActualThemeChanged` refreshes. The transient toggle was removed; System now keeps `RequestedTheme = Default` and refreshes only from the resolved actual theme.
+7. **Color save shutdown race** — confirmed in final review. A debounce batch could clear its dictionary before all queued actions completed, allowing exit to drain only the first action. Color persistence now uses a serialized drain pump that remains active through the current batch and any ColorChanged actions arriving while an earlier write is awaiting; graceful settings flush awaits it before controller drain.
+8. **Quick Overlay active text contrast** — confirmed in final review. Foreground selection previously used the source session color instead of the displayed shaded/tinted surface. The active text color now derives from the actual displayed surface, including light-mode compositing over the overlay background.
+9. **Quick Overlay DWM border color order** — confirmed in final review. The `Color` overload used the wrong channel order for Windows `COLORREF`. It now matches the existing hex conversion (`0x00BBGGRR`). Tray icon initialization also now throws/report failures after icon load, add, or protocol-version setup instead of silently accepting them.
+10. **Final UI-state edge cases** — confirmed in independent re-review. Light-mode active overlay contrast now uses the exact opaque composited surface it paints, and theme preset handlers capture the user’s selected preset ID before awaiting pending color persistence so a settling callback cannot replace the intended selection.
+
+### Earlier three-agent findings disposition
+
+- Theme resource resolution: **confirmed and already corrected in the pending Phase 12 changes** for theme brushes; the final pass additionally corrected the `Default`-theme fallback and found no remaining direct `FkSecondary`/`FkForeground` brush lookup outside the active-theme helper.
+- Daily Reports scaling: **confirmed and fixed in the pending Phase 12 changes**; source and the reports verification test use the same rendered aggregation.
+- System theme resolution: **confirmed and fixed** by effective-theme resolution plus native title-bar reset.
+- Main Window DPI sizing: **partially confirmed as a verification gap, not a proven regression**. Initial sizing correctly converts intended logical 880×660 DIPs to physical pixels using `GetDpiForWindow`; the Quick Overlay does the same for its logical surface. Runtime checks across 100/125/150/200% and monitor migration remain deferred because the rebuilt executable could not start in this environment.
+- Quick Overlay keyboard selection: **implementation retained and source-verified**; the exact runtime `Tab → Break → Enter` path remains deferred for the same launch limitation.
+- ColorPicker persistence: **confirmed and fixed** as described above; the new controller regression test covers rapid light background/foreground edits.
+
+### Native WinUI decisions
+
+- Native `Button`, `ComboBox`, `TextBox`, `ColorPicker`, `Grid`, `StackPanel`, `ResourceDictionary`/`ThemeDictionaries`, `ThemeResource`, native focus visuals, and AppWindow title-bar APIs remain in use.
+- Layout remains measurement-based where content can grow; fixed overlay dimensions are logical DIP targets converted to physical pixels for windowing, with a larger feedback allowance and no CSS/web layout layer.
+- Reports chart drawing remains custom only where justified by the chart geometry; it uses the report snapshot and a dedicated theme-aware Reports palette independent from Work/Break timer colors.
+
+### Verification performed
+
+- `dotnet test tests/FocusKey.Foundation.Tests/FocusKey.Foundation.Tests.csproj --no-restore --verbosity minimal` — **493 passed, 0 failed, 0 skipped**.
+- `dotnet build FocusKey.slnx --no-restore --verbosity minimal` — **0 warnings, 0 errors**.
+- `dotnet build .smoke/ShellProbe/ShellProbe.csproj --no-restore --verbosity minimal` — **0 warnings, 0 errors** after correcting the pending `Appearance` namespace collision in the probe.
+- `.smoke\\ShellProbe.exe inspect-settings .smoke\\p12-verify` — **passed**; isolated persisted values loaded with `Appearance=System`, `Contrast=Standard`, `LightPreset=default`, `DarkPreset=carbon`, `DarkBg=#121212`, and the expected Work/Break colors.
+- Existing isolated captures were reviewed for Today, Reports Daily/Monthly/Weekly, empty Reports, Settings top/middle, idle Quick Overlay, and active Work/Break overlay states. They confirm the compact native hierarchy and restrained semantic colors; they predate the final correction edits and are not substituted for a final runtime pass.
+- A fresh isolated launch/smoke attempt under `.smoke` was made without touching the normal user data root. The rebuilt `FocusKey.exe` failed before normal logging/window creation with the Windows generic “This application could not be started” host dialog; no `focus_key.log` or `startup-failure.log` was created. This is recorded as an environment/runtime-launch limitation, not claimed as a product pass.
+- A second fresh isolated launch attempt after the final correction pass reproduced the same pre-managed-start failure: the process remained alive briefly with no native window and no isolated `focus_key.log`, then was terminated. The verified result is therefore source/build/test-level for the final edits, with historical captures retained only as pre-correction visual evidence.
+
+### Intentional Figma deviations preserved
+
+- Carbon Studio is the fresh/default Dark preset rather than the original Obsidian-like `#0A0D0D` surface.
+- Quick Overlay is the single timer presentation; the obsolete standalone Mini Timer is not restored.
+- Work/Break colors, curated swatches, custom palettes, contrast modes, System/Light/Dark appearance, and the dedicated Reports palette are later product evolution and remain intact.
+- Reports aggregation, date navigation, Insights, and stress-data behavior are later product behavior; the original brief does not override them.
+
+### Files changed in the final Phase 12 state
+
+Production files changed across the pending Phase 12 delta and final correction pass:
+
+`src/FocusKey.App/App.xaml`, `src/FocusKey.App/App.xaml.cs`, `src/FocusKey.App/MainWindow.xaml`, `src/FocusKey.App/MainWindow.xaml.cs`, `src/FocusKey.App/Overlay/QuickOverlayWindow.xaml`, `src/FocusKey.App/Overlay/QuickOverlayWindow.xaml.cs`, `src/FocusKey.App/Presentation.cs`, `src/FocusKey.App/ReportsChart.cs`, `src/FocusKey.App/ReportsPalette.cs`, `src/FocusKey.App/ReportsView.cs`, `src/FocusKey.App/SessionColorBrush.cs`, `src/FocusKey.App/SettingsView.cs`, `src/FocusKey.App/Shell/NativeMethods.cs`, `src/FocusKey.App/Shell/WindowsShellIntegration.cs`, `src/FocusKey.App/WindowAppearance.cs`, `src/FocusKey.Foundation/Settings/AppearanceCoordinator.cs`, `src/FocusKey.Foundation/Settings/ApplicationSettings.cs`, `src/FocusKey.Foundation/Settings/Contrast.cs`, `src/FocusKey.Foundation/Settings/SettingsPageController.cs`, `src/FocusKey.Foundation/Settings/SettingsService.cs`, `src/FocusKey.Foundation/Settings/SqliteSettingsRepository.cs`, `src/FocusKey.Foundation/Settings/ThemeConfiguration.cs`, `src/FocusKey.Foundation/Settings/ThemePalette.cs`, and `src/FocusKey.Foundation/Settings/ThemePresets.cs`.
+
+Verification/support files changed: `.smoke/ShellProbe/Program.cs`, `.smoke/ShellProbe/ShellProbe.csproj`, `tests/FocusKey.Foundation.Tests/Reports/ReportsPolishVerificationTests.cs`, `tests/FocusKey.Foundation.Tests/Settings/AppearanceCoordinatorTests.cs`, `tests/FocusKey.Foundation.Tests/Settings/SettingsPageControllerTests.cs`, and `tests/FocusKey.Foundation.Tests/Settings/ThemePresetsTests.cs`.
+
+### Remaining limitations and explicit deferrals
+
+- A final interactive runtime walkthrough of the rebuilt binary, live theme switching, caption reset, ColorPicker drag, exact keyboard path, tray activation, high-DPI monitors, and increased Windows text scaling could not be completed because the current rebuilt executable fails before managed startup on this host.
+- No original raster Figma screenshots exist in `Focus Key.zip`; the remaining visual comparison is therefore against the original design brief and the available prior runtime captures.
+- The existing captures show the pre-correction active overlay at approximately 420×176; current source targets approximately 379×198 for active state to restore vertical breathing room, but that final runtime proportion is explicitly unverified.
+- Physical sleep/hibernation, notification suppression, varied sound profiles, mixed-DPI monitor migration, and enlarged text scaling remain deferred from earlier phases.

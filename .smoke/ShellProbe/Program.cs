@@ -4,8 +4,10 @@ using System.Text;
 using FocusKey.Foundation;
 using FocusKey.Foundation.Data;
 using FocusKey.Foundation.Logging;
+using FocusKey.Foundation.Reports;
 using FocusKey.Foundation.Sessions;
 using FocusKey.Foundation.Settings;
+using FocusAppearance = FocusKey.Foundation.Settings.Appearance;
 
 return await ShellProbe.RunAsync(args);
 
@@ -41,6 +43,7 @@ internal static class ShellProbe
                 "hold-hotkey" => HoldHotkey(),
                 "seed" => await SeedAsync(args),
                 "launch" => LaunchOnDefaultDesktop(args),
+                "launch-bg" => LaunchBackgroundOnDefaultDesktop(args),
                 "seed-reports" => await SeedReportsAsync(args),
                 "set-durations" => await SetDurationsAsync(args),
                 "set-appearance" => await SetAppearanceAsync(args),
@@ -226,7 +229,7 @@ internal static class ShellProbe
         var paths = GuardedPaths(args[1]);
         if (!File.Exists(paths.DatabaseFile)) throw new ArgumentException("Use an initialized smoke database.");
         var settings = await new SettingsService(new SqliteSettingsRepository(new SqliteConnectionFactory(paths.DatabaseFile))).LoadAsync();
-        Console.WriteLine($"Work={settings.WorkDuration.TotalSeconds}s Break={settings.BreakDuration.TotalSeconds}s Appearance={settings.Appearance} WorkColor={settings.WorkColor} BreakColor={settings.BreakColor}");
+        Console.WriteLine($"Work={settings.WorkDuration.TotalSeconds}s Break={settings.BreakDuration.TotalSeconds}s Appearance={settings.Appearance} Contrast={settings.Contrast} LightPreset={settings.LightTheme.Preset} DarkPreset={settings.DarkTheme.Preset} DarkBg={settings.DarkTheme.Background} WorkColor={settings.WorkColor} BreakColor={settings.BreakColor}");
         return 0;
     }
 
@@ -263,11 +266,11 @@ internal static class ShellProbe
     {
         if (args.Length != 3)
             throw new ArgumentException("Usage: set-appearance <dataRoot> <system|light|dark>");
-        Appearance appearance = args[2].ToLowerInvariant() switch
+        FocusAppearance appearance = args[2].ToLowerInvariant() switch
         {
-            "system" => Appearance.System,
-            "light" => Appearance.Light,
-            "dark" => Appearance.Dark,
+            "system" => FocusAppearance.System,
+            "light" => FocusAppearance.Light,
+            "dark" => FocusAppearance.Dark,
             _ => throw new ArgumentException("Appearance must be system, light, or dark."),
         };
         AppPaths paths = GuardedPaths(args[1]);
@@ -281,15 +284,15 @@ internal static class ShellProbe
 
     private static async Task<int> SeedReportsAsync(string[] args)
     {
-        if (args.Length != 2) throw new ArgumentException("Usage: seed-reports <freshDataRoot>");
+        if (args.Length != 2) throw new ArgumentException("Usage: seed-reports <dataRoot>");
         AppPaths paths = GuardedPaths(args[1]);
-        if (Directory.Exists(paths.RootDirectory)) throw new ArgumentException("Reports fixture requires a fresh isolated root.");
         paths.EnsureCreated();
         var factory = new SqliteConnectionFactory(paths.DatabaseFile);
         new DatabaseBootstrapper(factory, NullAppLogger.Instance).Initialize();
         var repository = new SqliteSessionRepository(factory);
         var zone = TimeZoneInfo.Local;
         var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, zone).DateTime);
+
         async Task Add(DateOnly date, int minute, SessionType type, SessionStatus status, int length)
         {
             var local = date.ToDateTime(TimeOnly.MinValue).AddMinutes(minute);
@@ -297,15 +300,83 @@ internal static class ShellProbe
             var stamp = new DateTimeOffset(start);
             await repository.AddAsync(new SessionRecord { Id = SessionId.New(), Type = type, Status = status,
                 StartedAt = stamp, CreatedAt = stamp, PlannedDuration = TimeSpan.FromMinutes(length),
-                EndedAt = stamp.AddMinutes(status == SessionStatus.Completed ? length : 1) });
+                EndedAt = stamp.AddMinutes(status == SessionStatus.Completed ? length : Math.Min(length, 5)) });
         }
-        await Add(today, 0, SessionType.Work, SessionStatus.Completed, 30);
-        await Add(today, 30, SessionType.Break, SessionStatus.Completed, 10);
-        await Add(today, 40, SessionType.Work, SessionStatus.Stopped, 30);
-        await Add(today, 42, SessionType.Break, SessionStatus.Interrupted, 10);
-        await Add(today.AddDays(-7), 0, SessionType.Work, SessionStatus.Completed, 60);
-        await Add(new DateOnly(today.Year, today.Month, 1).AddDays(-1), 0, SessionType.Work, SessionStatus.Completed, 90);
-        Console.WriteLine($"Reports fixture local date {today:yyyy-MM-dd}: Work 30m, Break 10m, 1 completed each, 1 Stopped, 1 Interrupted, 50% completion. Prior week +60m, prior month +90m.");
+
+        var weekStart = ReportRange.WeekStart(today); // Monday of current week
+
+        // 1. Current Week Varied Stress Dataset:
+        // Monday: ~4.5 hours focus (270 min) + 45 min break
+        await Add(weekStart, 9 * 60, SessionType.Work, SessionStatus.Completed, 60);
+        await Add(weekStart, 10 * 60, SessionType.Break, SessionStatus.Completed, 15);
+        await Add(weekStart, 10 * 60 + 15, SessionType.Work, SessionStatus.Completed, 60);
+        await Add(weekStart, 11 * 60 + 15, SessionType.Break, SessionStatus.Completed, 15);
+        await Add(weekStart, 13 * 60 + 30, SessionType.Work, SessionStatus.Completed, 90);
+        await Add(weekStart, 15 * 60, SessionType.Break, SessionStatus.Completed, 15);
+        await Add(weekStart, 15 * 60 + 15, SessionType.Work, SessionStatus.Completed, 60);
+
+        // Tuesday: ~10 hours marathon focus (600 min) + 90 min break (stress-test maximum scaling)
+        await Add(weekStart.AddDays(1), 8 * 60, SessionType.Work, SessionStatus.Completed, 120);
+        await Add(weekStart.AddDays(1), 10 * 60, SessionType.Break, SessionStatus.Completed, 20);
+        await Add(weekStart.AddDays(1), 10 * 60 + 20, SessionType.Work, SessionStatus.Completed, 120);
+        await Add(weekStart.AddDays(1), 12 * 60 + 20, SessionType.Break, SessionStatus.Completed, 30);
+        await Add(weekStart.AddDays(1), 13 * 60, SessionType.Work, SessionStatus.Completed, 120);
+        await Add(weekStart.AddDays(1), 15 * 60, SessionType.Break, SessionStatus.Completed, 20);
+        await Add(weekStart.AddDays(1), 15 * 60 + 20, SessionType.Work, SessionStatus.Completed, 120);
+        await Add(weekStart.AddDays(1), 17 * 60 + 20, SessionType.Break, SessionStatus.Completed, 20);
+        await Add(weekStart.AddDays(1), 18 * 60, SessionType.Work, SessionStatus.Completed, 120);
+
+        // Wednesday: ~15 minutes focus + 5 min break (stress-test small values visibility next to 10h)
+        await Add(weekStart.AddDays(2), 11 * 60, SessionType.Work, SessionStatus.Completed, 15);
+        await Add(weekStart.AddDays(2), 11 * 60 + 15, SessionType.Break, SessionStatus.Completed, 5);
+
+        // Thursday (Today): ~1.5 hours focus (90 min) + 20 min break + 1 stopped session
+        await Add(weekStart.AddDays(3), 9 * 60 + 30, SessionType.Work, SessionStatus.Completed, 45);
+        await Add(weekStart.AddDays(3), 10 * 60 + 15, SessionType.Break, SessionStatus.Completed, 10);
+        await Add(weekStart.AddDays(3), 10 * 60 + 25, SessionType.Work, SessionStatus.Completed, 45);
+        await Add(weekStart.AddDays(3), 11 * 60 + 10, SessionType.Break, SessionStatus.Completed, 10);
+        await Add(weekStart.AddDays(3), 11 * 60 + 20, SessionType.Work, SessionStatus.Stopped, 25);
+
+        // Friday: ZERO ACTIVITY (one day with no activity to test empty gaps)
+
+        // Saturday: ~2 hours focus (120 min) + 15 min break
+        await Add(weekStart.AddDays(5), 10 * 60, SessionType.Work, SessionStatus.Completed, 60);
+        await Add(weekStart.AddDays(5), 11 * 60, SessionType.Break, SessionStatus.Completed, 15);
+        await Add(weekStart.AddDays(5), 11 * 60 + 15, SessionType.Work, SessionStatus.Completed, 60);
+
+        // Sunday: ~45 min focus + 15 min break
+        await Add(weekStart.AddDays(6), 16 * 60, SessionType.Work, SessionStatus.Completed, 45);
+        await Add(weekStart.AddDays(6), 16 * 60 + 45, SessionType.Break, SessionStatus.Completed, 15);
+
+        // 2. Additional Month Distribution (September 2026):
+        // Week 1 (Sep 01 - Sep 06): ~14h focus
+        await Add(new DateOnly(today.Year, today.Month, 1), 9 * 60, SessionType.Work, SessionStatus.Completed, 180);
+        await Add(new DateOnly(today.Year, today.Month, 1), 12 * 60, SessionType.Break, SessionStatus.Completed, 30);
+        await Add(new DateOnly(today.Year, today.Month, 2), 9 * 60, SessionType.Work, SessionStatus.Completed, 300);
+        await Add(new DateOnly(today.Year, today.Month, 2), 14 * 60, SessionType.Break, SessionStatus.Completed, 45);
+        await Add(new DateOnly(today.Year, today.Month, 3), 10 * 60, SessionType.Work, SessionStatus.Completed, 120);
+        await Add(new DateOnly(today.Year, today.Month, 4), 9 * 60, SessionType.Work, SessionStatus.Completed, 240);
+
+        // Week 3 (Sep 14 - Sep 20): ~7h focus
+        await Add(new DateOnly(today.Year, today.Month, 15), 9 * 60, SessionType.Work, SessionStatus.Completed, 360);
+        await Add(new DateOnly(today.Year, today.Month, 15), 15 * 60, SessionType.Break, SessionStatus.Completed, 45);
+        await Add(new DateOnly(today.Year, today.Month, 17), 11 * 60, SessionType.Work, SessionStatus.Completed, 60);
+
+        // Week 4 (Sep 21 - Sep 27): ~8.5h focus
+        await Add(new DateOnly(today.Year, today.Month, 22), 8 * 60, SessionType.Work, SessionStatus.Completed, 480);
+        await Add(new DateOnly(today.Year, today.Month, 22), 16 * 60, SessionType.Break, SessionStatus.Completed, 60);
+        await Add(new DateOnly(today.Year, today.Month, 24), 14 * 60, SessionType.Work, SessionStatus.Completed, 30);
+
+        // Week 5 (Sep 28 - Sep 30): ~1h focus
+        await Add(new DateOnly(today.Year, today.Month, 29), 10 * 60, SessionType.Work, SessionStatus.Completed, 60);
+        await Add(new DateOnly(today.Year, today.Month, 29), 11 * 60, SessionType.Break, SessionStatus.Completed, 15);
+
+        // Prior Month (August 2026):
+        await Add(new DateOnly(today.Year, today.Month, 1).AddDays(-1), 11 * 60, SessionType.Work, SessionStatus.Completed, 90);
+        await Add(new DateOnly(today.Year, today.Month, 1).AddDays(-10), 10 * 60, SessionType.Work, SessionStatus.Completed, 180);
+        await Add(new DateOnly(today.Year, today.Month, 1).AddDays(-15), 14 * 60, SessionType.Work, SessionStatus.Completed, 240);
+
+        Console.WriteLine($"Reports fixture local date {today:yyyy-MM-dd}: seeded deliberately varied representative multi-session data (10h marathon, 15m minimal, 4.5h, 1.5h, 0h empty day, varied breaks).");
         return 0;
     }
 
@@ -366,6 +437,9 @@ internal static class ShellProbe
 
     private static AppPaths GuardedPaths(string root)
     {
+        if (string.Equals(root, "default", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(root, "user", StringComparison.OrdinalIgnoreCase))
+            return AppPaths.Resolve();
         string baseRoot = Path.GetFullPath(@"D:\Focus Key\.smoke");
         string full = Path.GetFullPath(root);
         if (!full.StartsWith(baseRoot.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) throw new ArgumentException($"Data root must be strictly under '{baseRoot}'.");
@@ -495,5 +569,24 @@ internal static class ShellProbe
         CloseHandle(pi.hProcess);
         Console.WriteLine($"Process {pi.dwProcessId} exited with code {exitCode}.");
         return (int)exitCode;
+    }
+
+    private static int LaunchBackgroundOnDefaultDesktop(string[] args)
+    {
+        if (args.Length < 2) throw new ArgumentException("Usage: launch-bg <exePath> [workingDir]");
+        string exe = Path.GetFullPath(args[1]);
+        string dir = args.Length > 2 ? Path.GetFullPath(args[2]) : Path.GetDirectoryName(exe)!;
+        var si = new STARTUPINFO
+        {
+            cb = (uint)Marshal.SizeOf<STARTUPINFO>(),
+            lpDesktop = @"WinSta0\default"
+        };
+        string cmd = $"\"{exe}\"";
+        if (!CreateProcess(null, cmd, IntPtr.Zero, IntPtr.Zero, false, 0, IntPtr.Zero, dir, ref si, out var pi))
+            throw LastError($"Could not launch {exe} on WinSta0\\default");
+        Console.WriteLine($"pid={pi.dwProcessId}");
+        CloseHandle(pi.hThread);
+        CloseHandle(pi.hProcess);
+        return 0;
     }
 }

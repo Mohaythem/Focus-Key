@@ -1,4 +1,4 @@
-﻿namespace FocusKey.Foundation.Settings;
+namespace FocusKey.Foundation.Settings;
 
 public sealed record ThemePreset
 {
@@ -108,24 +108,6 @@ public static class ThemePresets
     [
         new ThemePreset
         {
-            Id = "default",
-            DisplayName = "Default Dark (Obsidian)",
-            IsDark = true,
-            Palette = new ThemePalette
-            {
-                Background = HexColor.Parse("#0A0D0D"),
-                Foreground = HexColor.Parse("#F0F4F4"),
-                Accent = HexColor.Parse("#2D6669"),
-                Sidebar = HexColor.Parse("#0E1212"),
-                Surface = HexColor.Parse("#0E1212"),
-                Surface2 = HexColor.Parse("#131818"),
-                Border = HexColor.Parse("#1E2424"),
-                Secondary = HexColor.Parse("#909B9B"),
-                Dim = HexColor.Parse("#5A6666")
-            }
-        },
-        new ThemePreset
-        {
             Id = "carbon",
             DisplayName = "Carbon Studio",
             IsDark = true,
@@ -140,6 +122,24 @@ public static class ThemePresets
                 Border = HexColor.Parse("#2E2E2E"),
                 Secondary = HexColor.Parse("#A0A0A0"),
                 Dim = HexColor.Parse("#6E6E6E")
+            }
+        },
+        new ThemePreset
+        {
+            Id = "obsidian",
+            DisplayName = "Obsidian Dark",
+            IsDark = true,
+            Palette = new ThemePalette
+            {
+                Background = HexColor.Parse("#0A0D0D"),
+                Foreground = HexColor.Parse("#F0F4F4"),
+                Accent = HexColor.Parse("#2D6669"),
+                Sidebar = HexColor.Parse("#0E1212"),
+                Surface = HexColor.Parse("#0E1212"),
+                Surface2 = HexColor.Parse("#131818"),
+                Border = HexColor.Parse("#1E2424"),
+                Secondary = HexColor.Parse("#909B9B"),
+                Dim = HexColor.Parse("#5A6666")
             }
         },
         new ThemePreset
@@ -201,6 +201,8 @@ public static class ThemePresets
     public static ThemePreset FindPreset(string id, bool isDark)
     {
         var list = isDark ? DarkPresets : LightPresets;
+        if (isDark && string.Equals(id, "default", StringComparison.OrdinalIgnoreCase))
+            return list[0]; // Carbon Studio is the default
         return list.FirstOrDefault(p => string.Equals(p.Id, id, StringComparison.OrdinalIgnoreCase)) ?? list[0];
     }
 
@@ -215,14 +217,21 @@ public static class ThemePresets
         return "custom";
     }
 
-    public static ThemePalette ResolvePalette(string presetId, HexColor bg, HexColor fg, HexColor accent, bool isDark)
+    public static ThemePalette ResolvePalette(string presetId, HexColor bg, HexColor fg, HexColor accent, bool isDark, Contrast contrast = Contrast.Standard)
     {
+        ThemePalette basePalette;
         if (!string.Equals(presetId, "custom", StringComparison.OrdinalIgnoreCase))
         {
             var match = FindPreset(presetId, isDark);
             if (match.Palette.Background == bg && match.Palette.Foreground == fg && match.Palette.Accent == accent)
-                return match.Palette;
+                basePalette = match.Palette;
+            else
+                basePalette = ThemePalette.Derive(bg, fg, accent, isDark);
         }
-        return ThemePalette.Derive(bg, fg, accent, isDark);
+        else
+        {
+            basePalette = ThemePalette.Derive(bg, fg, accent, isDark);
+        }
+        return ThemePalette.ApplyContrast(basePalette, contrast, isDark);
     }
 }

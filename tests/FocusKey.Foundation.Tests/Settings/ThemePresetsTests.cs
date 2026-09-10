@@ -1,4 +1,4 @@
-﻿using FocusKey.Foundation.Data;
+using FocusKey.Foundation.Data;
 using FocusKey.Foundation.Settings;
 using Microsoft.Data.Sqlite;
 
@@ -12,7 +12,9 @@ public sealed class ThemePresetsTests
         Assert.Equal(5, ThemePresets.LightPresets.Count);
         Assert.Equal(5, ThemePresets.DarkPresets.Count);
         Assert.Contains(ThemePresets.LightPresets, p => p.Id == "default");
-        Assert.Contains(ThemePresets.DarkPresets, p => p.Id == "default");
+        Assert.Contains(ThemePresets.DarkPresets, p => p.Id == "carbon");
+        Assert.Equal("carbon", ThemePresets.DarkPresets[0].Id);
+        Assert.Equal("Carbon Studio", ThemePresets.DarkPresets[0].DisplayName);
     }
 
     [Theory]
@@ -21,8 +23,8 @@ public sealed class ThemePresetsTests
     [InlineData("nordic", false)]
     [InlineData("sand", false)]
     [InlineData("sage", false)]
-    [InlineData("default", true)]
     [InlineData("carbon", true)]
+    [InlineData("obsidian", true)]
     [InlineData("nordic", true)]
     [InlineData("espresso", true)]
     [InlineData("emerald", true)]
@@ -37,11 +39,23 @@ public sealed class ThemePresetsTests
     }
 
     [Fact]
+    public void FindPreset_DefaultDarkReturnsCarbonStudio()
+    {
+        var preset = ThemePresets.FindPreset("default", true);
+        Assert.Equal("carbon", preset.Id);
+        Assert.Equal("Carbon Studio", preset.DisplayName);
+    }
+
+    [Fact]
     public void DetectPresetId_IdentifiesExactMatchAndCustom()
     {
         var defLight = ThemePresets.FindPreset("default", false);
         Assert.Equal("default", ThemePresets.DetectPresetId(
             defLight.Palette.Background, defLight.Palette.Foreground, defLight.Palette.Accent, false));
+
+        var carbonDark = ThemePresets.FindPreset("carbon", true);
+        Assert.Equal("carbon", ThemePresets.DetectPresetId(
+            carbonDark.Palette.Background, carbonDark.Palette.Foreground, carbonDark.Palette.Accent, true));
 
         Assert.Equal("custom", ThemePresets.DetectPresetId(
             HexColor.Parse("#123456"), HexColor.Parse("#654321"), HexColor.Parse("#AABBCC"), false));
@@ -65,6 +79,24 @@ public sealed class ThemePresetsTests
     }
 
     [Fact]
+    public void ThemePaletteApplyContrast_EnhancesBordersAndTextClarity()
+    {
+        var carbon = ThemePresets.DarkPresets[0].Palette;
+        var highContrastDark = ThemePalette.ApplyContrast(carbon, Contrast.HigherContrast, true);
+
+        Assert.Equal("#FFFFFF", highContrastDark.Foreground.Value);
+        Assert.NotEqual(carbon.Border, highContrastDark.Border);
+        Assert.NotEqual(carbon.Secondary, highContrastDark.Secondary);
+
+        var light = ThemePresets.LightPresets[0].Palette;
+        var highContrastLight = ThemePalette.ApplyContrast(light, Contrast.HigherContrast, false);
+
+        Assert.Equal("#000000", highContrastLight.Foreground.Value);
+        Assert.NotEqual(light.Border, highContrastLight.Border);
+        Assert.NotEqual(light.Secondary, highContrastLight.Secondary);
+    }
+
+    [Fact]
     public async Task ThemeCustomization_PersistsAndSurvivesRestart()
     {
         using var temp = new TempDirectory();
@@ -75,10 +107,13 @@ public sealed class ThemePresetsTests
         var repo = new SqliteSettingsRepository(connections);
         var initial = await repo.LoadAsync();
         Assert.Equal("default", initial.LightTheme.Preset);
-        Assert.Equal("default", initial.DarkTheme.Preset);
+        Assert.Equal("carbon", initial.DarkTheme.Preset);
+        Assert.Equal("#121212", initial.DarkTheme.Background.Value);
+        Assert.Equal(Contrast.Standard, initial.Contrast);
 
         var customized = initial with
         {
+            Contrast = Contrast.HigherContrast,
             LightTheme = new ThemeConfiguration
             {
                 Preset = "custom",
@@ -97,6 +132,7 @@ public sealed class ThemePresetsTests
         await repo.SaveAsync(customized);
 
         var reloaded = await new SqliteSettingsRepository(connections).LoadAsync();
+        Assert.Equal(Contrast.HigherContrast, reloaded.Contrast);
         Assert.Equal("custom", reloaded.LightTheme.Preset);
         Assert.Equal("#F9F9F9", reloaded.LightTheme.Background.Value);
         Assert.Equal("#101010", reloaded.LightTheme.Foreground.Value);
@@ -115,7 +151,7 @@ public sealed class ThemePresetsTests
     }
 
     [Fact]
-    public async Task AppearanceCoordinator_NotifiesPalettesChanged()
+    public async Task AppearanceCoordinator_NotifiesPalettesChangedOnContrast()
     {
         using var temp = new TempDirectory();
         string file = Path.Combine(temp.Path, "focus_key.db");
@@ -128,29 +164,128 @@ public sealed class ThemePresetsTests
         await coordinator.InitializeAsync();
 
         bool fired = false;
-        ThemePalette? observedLight = null;
         ThemePalette? observedDark = null;
-        coordinator.PalettesChanged += (l, d) =>
+        coordinator.PalettesChanged += (_, d) =>
         {
             fired = true;
-            observedLight = l;
             observedDark = d;
         };
 
-        var newLight = new ThemeConfiguration
-        {
-            Preset = "studio",
-            Background = HexColor.Parse("#F9F9F9"),
-            Foreground = HexColor.Parse("#111111"),
-            Accent = HexColor.Parse("#0078D4")
-        };
-        await service.UpdateLightThemeAsync(newLight);
+        await service.UpdateContrastAsync(Contrast.HigherContrast);
         await coordinator.RefreshAsync();
 
         Assert.True(fired);
-        Assert.NotNull(observedLight);
-        Assert.Equal("#F9F9F9", observedLight.Background.Value);
-        Assert.Equal("#111111", observedLight.Foreground.Value);
-        Assert.Equal("#0078D4", observedLight.Accent.Value);
+        Assert.NotNull(observedDark);
+        Assert.Equal("#FFFFFF", observedDark.Foreground.Value);
+    }
+
+    [Fact]
+    public async Task SqliteSettingsRepository_PreservesExplicitDarkCustomizationWhileMigratingUncustomized()
+    {
+        using var temp = new TempDirectory();
+        string file = Path.Combine(temp.Path, "focus_key.db");
+        var connections = new SqliteConnectionFactory(file);
+        new DatabaseBootstrapper(connections).Initialize();
+
+        // 1. Manually simulate an uncustomized legacy database
+        await using (var conn = await connections.OpenConnectionAsync())
+        {
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText =
+                """
+                CREATE TABLE IF NOT EXISTS theme_settings (
+                    singleton INTEGER NOT NULL PRIMARY KEY CHECK (singleton = 1),
+                    light_preset TEXT NOT NULL, light_background TEXT NOT NULL, light_foreground TEXT NOT NULL, light_accent TEXT NOT NULL,
+                    dark_preset TEXT NOT NULL, dark_background TEXT NOT NULL, dark_foreground TEXT NOT NULL, dark_accent TEXT NOT NULL
+                );
+                INSERT OR REPLACE INTO theme_settings VALUES (1, 'default', '#F2F5F5', '#0F1414', '#183739', 'default', '#0A0D0D', '#F0F4F4', '#2D6669');
+                """;
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        var repo = new SqliteSettingsRepository(connections);
+        var loaded = await repo.LoadAsync();
+        // Uncustomized legacy default dark must be migrated to carbon
+        Assert.Equal("carbon", loaded.DarkTheme.Preset);
+        Assert.Equal("#121212", loaded.DarkTheme.Background.Value);
+        Assert.Equal("#E0E0E0", loaded.DarkTheme.Foreground.Value);
+        Assert.Equal("#4CC2FF", loaded.DarkTheme.Accent.Value);
+
+        // 2. Now explicitly customize dark theme to espresso
+        var customized = loaded with
+        {
+            DarkTheme = new ThemeConfiguration
+            {
+                Preset = "espresso",
+                Background = HexColor.Parse("#141210"),
+                Foreground = HexColor.Parse("#EDE5DE"),
+                Accent = HexColor.Parse("#D97736")
+            }
+        };
+        await repo.SaveAsync(customized);
+
+        // Reload to verify explicit choice is strictly preserved
+        var reloaded = await new SqliteSettingsRepository(connections).LoadAsync();
+        Assert.Equal("espresso", reloaded.DarkTheme.Preset);
+        Assert.Equal("#141210", reloaded.DarkTheme.Background.Value);
+    }
+
+    [Theory]
+    [InlineData("nordic", "#242933", "#ECEFF4", "#88C0D0")]
+    [InlineData("espresso", "#141210", "#EDE5DE", "#D97736")]
+    [InlineData("emerald", "#0B120E", "#E2EDE6", "#40916C")]
+    [InlineData("obsidian", "#0A0D0D", "#F0F4F4", "#2D6669")]
+    public void ResolvePalette_WhenSwitchingDarkPreset_AdoptsNewPresetColorsCompletely(
+        string presetId, string expectedBg, string expectedFg, string expectedAccent)
+    {
+        var preset = ThemePresets.FindPreset(presetId, true);
+        var config = new ThemeConfiguration
+        {
+            Preset = preset.Id,
+            Background = preset.Palette.Background,
+            Foreground = preset.Palette.Foreground,
+            Accent = preset.Palette.Accent
+        };
+
+        var resolved = config.ResolvePalette(true);
+        Assert.Equal(expectedBg, resolved.Background.Value);
+        Assert.Equal(expectedFg, resolved.Foreground.Value);
+        Assert.Equal(expectedAccent, resolved.Accent.Value);
+        Assert.NotEqual("#121212", resolved.Background.Value);
+        Assert.Equal(preset.Palette.Sidebar, resolved.Sidebar);
+        Assert.Equal(preset.Palette.Surface, resolved.Surface);
+        Assert.Equal(preset.Palette.Border, resolved.Border);
+    }
+
+    [Fact]
+    public void ResolvePalette_CustomDarkBackground_DerivesAllSurfacesFromCustomColor()
+    {
+        var customBg = HexColor.Parse("#331122");
+        var customFg = HexColor.Parse("#F0E0E8");
+        var customAccent = HexColor.Parse("#FF4488");
+        var config = new ThemeConfiguration
+        {
+            Preset = "custom",
+            Background = customBg,
+            Foreground = customFg,
+            Accent = customAccent
+        };
+
+        var resolved = config.ResolvePalette(true);
+        Assert.Equal("#331122", resolved.Background.Value);
+        Assert.Equal("#F0E0E8", resolved.Foreground.Value);
+        Assert.Equal("#FF4488", resolved.Accent.Value);
+
+        // Surfaces must not be Carbon Studio (#121212, #181818, etc.)
+        Assert.NotEqual("#121212", resolved.Background.Value);
+        Assert.NotEqual("#181818", resolved.Sidebar.Value);
+        Assert.NotEqual("#1E1E1E", resolved.Surface.Value);
+        Assert.NotEqual("#2E2E2E", resolved.Border.Value);
+
+        // Higher contrast on custom palette derives from custom background
+        var highContrast = config.ResolvePalette(true, Contrast.HigherContrast);
+        Assert.Equal("#331122", highContrast.Background.Value);
+        Assert.Equal("#FFFFFF", highContrast.Foreground.Value);
+        Assert.NotEqual(resolved.Border, highContrast.Border);
     }
 }

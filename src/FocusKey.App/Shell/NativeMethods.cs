@@ -110,6 +110,7 @@ internal static class NativeMethods
     [DllImport("user32.dll", SetLastError = true)] internal static extern bool SetForegroundWindow(IntPtr window);
     [DllImport("user32.dll", SetLastError = true)] internal static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
     [DllImport("user32.dll", SetLastError = true)] internal static extern bool GetCursorPos(out POINT point);
+    [DllImport("user32.dll")] internal static extern uint GetDpiForWindow(IntPtr window);
 
     [StructLayout(LayoutKind.Sequential)] internal struct POINT { internal int X; internal int Y; }
 }

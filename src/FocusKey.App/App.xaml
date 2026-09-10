@@ -3,14 +3,15 @@
   <ResourceDictionary.MergedDictionaries><XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" /></ResourceDictionary.MergedDictionaries>
   <ResourceDictionary.ThemeDictionaries>
    <ResourceDictionary x:Key="Dark">
-    <SolidColorBrush x:Key="FkBackground" Color="#0A0D0D"/><SolidColorBrush x:Key="FkSidebar" Color="#0E1212"/>
-    <SolidColorBrush x:Key="FkSurface" Color="#0E1212"/><SolidColorBrush x:Key="FkSurface2" Color="#131818"/>
-    <SolidColorBrush x:Key="FkOverlay" Color="#111616"/>
-    <SolidColorBrush x:Key="FkBorder" Color="#1E2424"/><SolidColorBrush x:Key="FkForeground" Color="#F0F4F4"/>
-    <SolidColorBrush x:Key="FkSecondary" Color="#909B9B"/><SolidColorBrush x:Key="FkDim" Color="#5A6666"/>
-    <SolidColorBrush x:Key="FkAccent" Color="#2D6669"/>
-    <SolidColorBrush x:Key="FkStatusRunning" Color="#F0F4F4"/>
-    <SolidColorBrush x:Key="FkStatusCompleted" Color="#909B9B"/>
+    <SolidColorBrush x:Key="FkBackground" Color="#121212"/><SolidColorBrush x:Key="FkSidebar" Color="#181818"/>
+    <SolidColorBrush x:Key="FkSurface" Color="#1E1E1E"/><SolidColorBrush x:Key="FkSurface2" Color="#252525"/>
+    <SolidColorBrush x:Key="FkOverlay" Color="#1E1E1E"/>
+    <SolidColorBrush x:Key="FkBorder" Color="#2E2E2E"/><SolidColorBrush x:Key="FkForeground" Color="#E0E0E0"/>
+    <SolidColorBrush x:Key="CardStrokeColorDefaultBrush" Color="#2E2E2E"/>
+    <SolidColorBrush x:Key="FkSecondary" Color="#A0A0A0"/><SolidColorBrush x:Key="FkDim" Color="#6E6E6E"/>
+    <SolidColorBrush x:Key="FkAccent" Color="#4CC2FF"/>
+    <SolidColorBrush x:Key="FkStatusRunning" Color="#E0E0E0"/>
+    <SolidColorBrush x:Key="FkStatusCompleted" Color="#A0A0A0"/>
     <SolidColorBrush x:Key="FkStatusStopped" Color="#C37878"/>
     <SolidColorBrush x:Key="FkStatusInterrupted" Color="#CD964B"/>
    </ResourceDictionary>
@@ -19,6 +20,7 @@
     <SolidColorBrush x:Key="FkSurface" Color="#FFFFFF"/><SolidColorBrush x:Key="FkSurface2" Color="#F7FAFA"/>
     <SolidColorBrush x:Key="FkOverlay" Color="#FFFFFF"/>
     <SolidColorBrush x:Key="FkBorder" Color="#D4DCDC"/><SolidColorBrush x:Key="FkForeground" Color="#0F1414"/>
+    <SolidColorBrush x:Key="CardStrokeColorDefaultBrush" Color="#D4DCDC"/>
     <SolidColorBrush x:Key="FkSecondary" Color="#5A6A6A"/><SolidColorBrush x:Key="FkDim" Color="#8A9898"/>
     <SolidColorBrush x:Key="FkAccent" Color="#183739"/>
     <SolidColorBrush x:Key="FkStatusRunning" Color="#0F1414"/>
@@ -62,8 +64,8 @@
   <Style x:Key="FkSegmentActive" TargetType="Button"><Setter Property="Background" Value="{ThemeResource FkSurface}"/><Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="4"/><Setter Property="Foreground" Value="{ThemeResource FkForeground}"/><Setter Property="FontWeight" Value="Medium"/><Setter Property="FontSize" Value="11"/><Setter Property="Padding" Value="14,4"/></Style>
   <Style x:Key="FkSegmentInactive" TargetType="Button"><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="CornerRadius" Value="4"/><Setter Property="Foreground" Value="{ThemeResource FkSecondary}"/><Setter Property="FontWeight" Value="Normal"/><Setter Property="FontSize" Value="11"/><Setter Property="Padding" Value="14,4"/></Style>
   <Style x:Key="FkChartGridLine" TargetType="Border"><Setter Property="Height" Value="1"/><Setter Property="Background" Value="{ThemeResource CardStrokeColorDefaultBrush}"/><Setter Property="Opacity" Value="0.5"/><Setter Property="HorizontalAlignment" Value="Stretch"/></Style>
-  <Style x:Key="FkOverlayCard" TargetType="Button"><Setter Property="Padding" Value="16,14"/><Setter Property="CornerRadius" Value="6"/><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="VerticalContentAlignment" Value="Center"/><Setter Property="HorizontalAlignment" Value="Stretch"/><Setter Property="Background" Value="{ThemeResource FkSurface}"/><Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/><Setter Property="BorderThickness" Value="1"/></Style>
-  <Style x:Key="FkOverlayCardSelected" TargetType="Button" BasedOn="{StaticResource FkOverlayCard}"><Setter Property="Background" Value="{ThemeResource FkSurface2}"/><Setter Property="BorderThickness" Value="2"/></Style>
-  <Style x:Key="FkOverlayStopButton" TargetType="Button"><Setter Property="Height" Value="36"/><Setter Property="Padding" Value="16,0"/><Setter Property="CornerRadius" Value="4"/><Setter Property="FontSize" Value="13"/><Setter Property="FontWeight" Value="Medium"/><Setter Property="HorizontalAlignment" Value="Stretch"/><Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="VerticalContentAlignment" Value="Center"/><Setter Property="Background" Value="{ThemeResource FkSurface2}"/><Setter Property="Foreground" Value="{ThemeResource FkForeground}"/><Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/><Setter Property="BorderThickness" Value="1"/></Style>
+  <Style x:Key="FkOverlayCard" TargetType="Button"><Setter Property="Padding" Value="20,18"/><Setter Property="CornerRadius" Value="4"/><Setter Property="HorizontalContentAlignment" Value="Left"/><Setter Property="VerticalContentAlignment" Value="Center"/><Setter Property="HorizontalAlignment" Value="Stretch"/><Setter Property="BorderThickness" Value="1"/></Style>
+  <Style x:Key="FkOverlayCardSelected" TargetType="Button" BasedOn="{StaticResource FkOverlayCard}"><Setter Property="BorderThickness" Value="1"/></Style>
+  <Style x:Key="FkOverlayStopButton" TargetType="Button"><Setter Property="MinHeight" Value="0"/><Setter Property="Height" Value="30"/><Setter Property="Padding" Value="14,0"/><Setter Property="CornerRadius" Value="4"/><Setter Property="FontSize" Value="12"/><Setter Property="FontWeight" Value="Normal"/><Setter Property="HorizontalAlignment" Value="Right"/><Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="VerticalContentAlignment" Value="Center"/><Setter Property="Background" Value="{ThemeResource FkSurface2}"/><Setter Property="Foreground" Value="{ThemeResource FkSecondary}"/><Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/><Setter Property="BorderThickness" Value="1"/></Style>
  </ResourceDictionary></Application.Resources>
 </Application>

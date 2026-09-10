@@ -1,4 +1,4 @@
-﻿namespace FocusKey.Foundation.Settings;
+namespace FocusKey.Foundation.Settings;
 
 public sealed record ThemeConfiguration
 {
@@ -12,10 +12,10 @@ public sealed record ThemeConfiguration
 
     public static ThemeConfiguration DefaultDark { get; } = new()
     {
-        Preset = "default",
-        Background = HexColor.Parse("#0A0D0D"),
-        Foreground = HexColor.Parse("#F0F4F4"),
-        Accent = HexColor.Parse("#2D6669"),
+        Preset = "carbon",
+        Background = HexColor.Parse("#121212"),
+        Foreground = HexColor.Parse("#E0E0E0"),
+        Accent = HexColor.Parse("#4CC2FF"),
     };
 
     public required string Preset { get; init; }
@@ -23,8 +23,8 @@ public sealed record ThemeConfiguration
     public required HexColor Foreground { get; init; }
     public required HexColor Accent { get; init; }
 
-    public ThemePalette ResolvePalette(bool isDark) =>
-        ThemePresets.ResolvePalette(Preset, Background, Foreground, Accent, isDark);
+    public ThemePalette ResolvePalette(bool isDark, Contrast contrast = Contrast.Standard) =>
+        ThemePresets.ResolvePalette(Preset, Background, Foreground, Accent, isDark, contrast);
 
     public void Validate(bool isDark)
     {

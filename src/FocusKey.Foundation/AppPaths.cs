@@ -35,6 +35,18 @@ public sealed class AppPaths
     public string LogFile => Path.Combine(LogsDirectory, LogFileName);
 
     /// <summary>
+    /// Constructs paths pointing to the standard per-user local application data folder.
+    /// </summary>
+    public static AppPaths ForLocalApplicationData()
+    {
+        string localAppData = Environment.GetFolderPath(
+            Environment.SpecialFolder.LocalApplicationData,
+            Environment.SpecialFolderOption.DoNotVerify);
+
+        return ForRoot(Path.Combine(localAppData, ApplicationFolderName));
+    }
+
+    /// <summary>
     /// The layout the application actually runs against: <see cref="DataRootEnvironmentVariable"/>
     /// when it is set, otherwise the standard per-user location.
     /// </summary>
@@ -43,7 +55,7 @@ public sealed class AppPaths
         string? overrideRoot = Environment.GetEnvironmentVariable(DataRootEnvironmentVariable);
 
         return string.IsNullOrWhiteSpace(overrideRoot)
-            ? ForRoot(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), ApplicationFolderName))
+            ? ForLocalApplicationData()
             : ForRoot(overrideRoot);
     }
 

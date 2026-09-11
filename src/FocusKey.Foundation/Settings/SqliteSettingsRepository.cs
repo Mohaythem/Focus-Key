@@ -13,7 +13,7 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
         await using SqliteCommand command = connection.CreateCommand();
         command.CommandText =
             """
-            SELECT work_duration_seconds, break_duration_seconds, appearance, work_color, break_color
+            SELECT work_duration_seconds, break_duration_seconds, appearance, work_color, break_color, session_sounds_enabled
             FROM application_settings WHERE singleton = 1;
             """;
         await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
@@ -26,6 +26,7 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
             var appearance = AppearanceText.Parse(reader.GetString(2));
             var workColor = ParsePersistedColor(reader.GetString(3), "work_color");
             var breakColor = ParsePersistedColor(reader.GetString(4), "break_color");
+            var soundsEnabled = reader.GetInt64(5) != 0;
             if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
                 throw new InvalidDataException("More than one authoritative application settings record exists.");
             await reader.CloseAsync().ConfigureAwait(false);
@@ -42,6 +43,7 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
                 BreakColor = breakColor,
                 LightTheme = lightTheme,
                 DarkTheme = darkTheme,
+                SessionSoundsEnabled = soundsEnabled,
             };
             settings.Validate();
             return settings;
@@ -68,7 +70,8 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
                 break_duration_seconds = $break,
                 appearance = $appearance,
                 work_color = $workColor,
-                break_color = $breakColor
+                break_color = $breakColor,
+                session_sounds_enabled = $sounds
             WHERE singleton = 1;
             """;
         var light = settings.LightTheme ?? ThemeConfiguration.DefaultLight;
@@ -78,6 +81,7 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
         command.Parameters.AddWithValue("$appearance", AppearanceText.Format(settings.Appearance));
         command.Parameters.AddWithValue("$workColor", settings.WorkColor.Value);
         command.Parameters.AddWithValue("$breakColor", settings.BreakColor.Value);
+        command.Parameters.AddWithValue("$sounds", settings.SessionSoundsEnabled ? 1 : 0);
         if (await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
             throw new InvalidDataException("The authoritative application settings record is missing.");
 

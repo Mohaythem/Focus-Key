@@ -21,9 +21,9 @@ public sealed class SessionSchemaTests
 
         Assert.True(store.Initialization.DatabaseFileCreated);
         Assert.Equal(0, store.Initialization.SchemaVersionBefore);
-        Assert.Equal(3, store.Initialization.SchemaVersionAfter);
-        Assert.Equal(3, SchemaMigrations.TargetVersion);
-        Assert.Equal([1, 2, 3], store.Initialization.AppliedMigrations);
+        Assert.Equal(SchemaMigrations.TargetVersion, store.Initialization.SchemaVersionAfter);
+        Assert.Equal(6, SchemaMigrations.TargetVersion);
+        Assert.Equal(Enumerable.Range(1, SchemaMigrations.TargetVersion), store.Initialization.AppliedMigrations);
         Assert.Equal(1, store.ScalarRaw<long>(
             "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'sessions';"));
     }
@@ -55,8 +55,8 @@ public sealed class SessionSchemaTests
 
         Assert.False(result.DatabaseFileCreated);
         Assert.Equal(1, result.SchemaVersionBefore);
-        Assert.Equal(3, result.SchemaVersionAfter);
-        Assert.Equal([2, 3], result.AppliedMigrations);
+        Assert.Equal(SchemaMigrations.TargetVersion, result.SchemaVersionAfter);
+        Assert.Equal(Enumerable.Range(2, SchemaMigrations.TargetVersion - 1), result.AppliedMigrations);
         Assert.Equal(1, CountTable(connections, "sessions"));
 
         // The original migration row is still exactly as Phase 0 wrote it.
@@ -90,10 +90,10 @@ public sealed class SessionSchemaTests
         DatabaseInitializationResult second = new DatabaseBootstrapper(connections).Initialize();
 
         Assert.Empty(second.AppliedMigrations);
-        Assert.Equal(3, second.SchemaVersionAfter);
+        Assert.Equal(SchemaMigrations.TargetVersion, second.SchemaVersionAfter);
         Assert.Equal(finished, await repository.GetAsync(finished.Id));
         Assert.Equal(running.Id, (await repository.GetRunningAsync())!.Id);
-        Assert.Equal(3, Scalar<long>(connections, "SELECT COUNT(*) FROM schema_migrations;"));
+        Assert.Equal(SchemaMigrations.TargetVersion, Scalar<long>(connections, "SELECT COUNT(*) FROM schema_migrations;"));
 
         using (SqliteConnection connection = connections.OpenConnection()) SqliteConnection.ClearPool(connection);
     }
@@ -110,8 +110,8 @@ public sealed class SessionSchemaTests
 
         Assert.Empty(again.AppliedMigrations);
         Assert.Empty(andAgain.AppliedMigrations);
-        Assert.Equal(3, andAgain.SchemaVersionBefore);
-        Assert.Equal(3, andAgain.SchemaVersionAfter);
+        Assert.Equal(SchemaMigrations.TargetVersion, andAgain.SchemaVersionBefore);
+        Assert.Equal(SchemaMigrations.TargetVersion, andAgain.SchemaVersionAfter);
         Assert.Equal(session, await store.Repository.GetAsync(session.Id));
         Assert.Equal(1, store.ScalarRaw<long>("SELECT COUNT(*) FROM sessions;"));
     }

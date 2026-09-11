@@ -38,6 +38,8 @@ internal static class FoundationBootstrap
             var connections = new SqliteConnectionFactory(paths.DatabaseFile);
             DatabaseInitializationResult database = new DatabaseBootstrapper(connections, logger).Initialize();
             var repository = new SqliteSessionRepository(connections);
+            var historicalRepo = new FocusKey.Foundation.History.SqliteHistoricalFocusRepository(connections);
+            var historyService = new FocusKey.Foundation.History.HistoricalFocusService(historicalRepo, repository);
             var settings = new SettingsService(new SqliteSettingsRepository(connections));
             var sessions = new SessionCoordinator(repository,
                 durationProvider: new SettingsSessionDurationProvider(settings));
@@ -56,9 +58,11 @@ internal static class FoundationBootstrap
                 Database = database,
                 Sessions = sessions,
                 Today = new TodayService(repository),
-                Reports = new ReportsService(repository),
+                Reports = new ReportsService(repository, historicalRepo),
                 Settings = settings,
                 Appearance = appearance,
+                HistoricalFocusRepository = historicalRepo,
+                History = historyService,
             };
         }
         catch (Exception exception)

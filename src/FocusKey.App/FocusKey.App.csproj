@@ -20,7 +20,9 @@
     <EnableMsixTooling>true</EnableMsixTooling>
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
     
-    <Version>1.0.0.0</Version>
+    <Version>1.1.0.0</Version>
+    <AssemblyVersion>1.1.0.0</AssemblyVersion>
+    <FileVersion>1.1.0.0</FileVersion>
     <Company>Focus Key</Company>
     <Product>Focus Key</Product>
     <Description>Focus Key - Native Windows Desktop Productivity Timer</Description>
@@ -35,6 +37,9 @@
 
   <ItemGroup>
     <Content Include="Assets\AppIcon.ico" />
+    <Content Include="Assets\Sounds\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>

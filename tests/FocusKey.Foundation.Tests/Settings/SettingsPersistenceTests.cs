@@ -12,8 +12,8 @@ public sealed class SettingsPersistenceTests
     public async Task FreshDatabaseCreatesExactlyOneDefaultSettingsRecord()
     {
         using var fixture = new Fixture();
-        Assert.Equal(3, fixture.Initialization.SchemaVersionAfter);
-        Assert.Equal([1, 2, 3], fixture.Initialization.AppliedMigrations);
+        Assert.Equal(SchemaMigrations.TargetVersion, fixture.Initialization.SchemaVersionAfter);
+        Assert.Equal(Enumerable.Range(1, SchemaMigrations.TargetVersion), fixture.Initialization.AppliedMigrations);
         Assert.Equal(1, fixture.Scalar<long>("SELECT COUNT(*) FROM application_settings;"));
         Assert.Equal(ApplicationSettings.Default, await fixture.Repository.LoadAsync());
     }
@@ -32,8 +32,8 @@ public sealed class SettingsPersistenceTests
         DatabaseInitializationResult result = new DatabaseBootstrapper(connections).Initialize();
 
         Assert.Equal(2, result.SchemaVersionBefore);
-        Assert.Equal(3, result.SchemaVersionAfter);
-        Assert.Equal([3], result.AppliedMigrations);
+        Assert.Equal(SchemaMigrations.TargetVersion, result.SchemaVersionAfter);
+        Assert.Equal(Enumerable.Range(3, SchemaMigrations.TargetVersion - 2), result.AppliedMigrations);
         Assert.Equal(expected, await sessions.GetAsync(expected.Id));
         Assert.Equal(ApplicationSettings.Default, await new SqliteSettingsRepository(connections).LoadAsync());
         Assert.Equal(1L, Scalar<long>(connections, "SELECT COUNT(*) FROM sessions;"));
@@ -101,8 +101,8 @@ public sealed class SettingsPersistenceTests
         var third = new DatabaseBootstrapper(fixture.Connections).Initialize();
         Assert.Empty(second.AppliedMigrations);
         Assert.Empty(third.AppliedMigrations);
-        Assert.Equal(3, second.SchemaVersionBefore);
-        Assert.Equal(3, third.SchemaVersionAfter);
+        Assert.Equal(SchemaMigrations.TargetVersion, second.SchemaVersionBefore);
+        Assert.Equal(SchemaMigrations.TargetVersion, third.SchemaVersionAfter);
         Assert.Equal(saved, await fixture.Repository.LoadAsync());
         Assert.Equal(1, fixture.Scalar<long>("SELECT COUNT(*) FROM application_settings;"));
     }

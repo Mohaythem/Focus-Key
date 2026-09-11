@@ -1,3 +1,4 @@
+using FocusKey.Foundation.History;
 using FocusKey.Foundation.Sessions;
 
 namespace FocusKey.Foundation.Reports;
@@ -59,12 +60,32 @@ public sealed record ReportsSnapshot(ReportPeriod Period, ReportRange Range, Tim
 }
 
 /// <summary>Read-only report projection; UTC storage, local start-date membership, no lifecycle writes.</summary>
-public sealed class ReportsService(ISessionRepository repository, TimeProvider? timeProvider = null,
-    Func<TimeZoneInfo>? localTimeZone = null)
+public sealed class ReportsService
 {
-    private readonly ISessionRepository _repository = repository ?? throw new ArgumentNullException(nameof(repository));
-    private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
-    private readonly Func<TimeZoneInfo> _zone = localTimeZone ?? (() => TimeZoneInfo.Local);
+    private readonly ISessionRepository _repository;
+    private readonly IHistoricalFocusRepository? _history;
+    private readonly TimeProvider _time;
+    private readonly Func<TimeZoneInfo> _zone;
+
+    public ReportsService(
+        ISessionRepository repository,
+        IHistoricalFocusRepository? historicalFocus,
+        TimeProvider? timeProvider = null,
+        Func<TimeZoneInfo>? localTimeZone = null)
+    {
+        _repository = repository ?? throw new ArgumentNullException(nameof(repository));
+        _history = historicalFocus;
+        _time = timeProvider ?? TimeProvider.System;
+        _zone = localTimeZone ?? (() => TimeZoneInfo.Local);
+    }
+
+    public ReportsService(
+        ISessionRepository repository,
+        TimeProvider? timeProvider = null,
+        Func<TimeZoneInfo>? localTimeZone = null)
+        : this(repository, null, timeProvider, localTimeZone)
+    {
+    }
 
     public DateOnly CurrentDate() => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(_time.GetUtcNow(), _zone()).DateTime);
 
@@ -78,51 +99,82 @@ public sealed class ReportsService(ISessionRepository repository, TimeProvider? 
         var to = range.End > week.End ? range.End : week.End;
         TimeZoneInfo zone = _zone();
         DateTimeOffset now = _time.GetUtcNow();
-        // One repository read gives totals, trends and comparisons the same persisted snapshot.
-        // The +/-14h envelope includes DST/ambiguous midnight; actual local dates decide membership.
+
+        // 1. Read native sessions
         var records = await _repository.GetStartedBetweenAsync(
             new DateTimeOffset(from.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc)).AddHours(-14),
             new DateTimeOffset(to.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc)).AddHours(14), cancellationToken).ConfigureAwait(false);
         var localized = records.Select(s => (Session: s, Local: TimeZoneInfo.ConvertTime(s.StartedAt, zone))).ToArray();
         var selected = localized.Where(s => range.Contains(DateOnly.FromDateTime(s.Local.DateTime))).ToArray();
         var totals = ReportTotals.From(selected.Select(s => s.Session));
+
+        // 2. Read imported historical focus
+        var historyRecords = _history is not null
+            ? await _history.GetBetweenAsync(from, to, cancellationToken).ConfigureAwait(false)
+            : [];
+        var rangeHistory = historyRecords.Where(h => range.Contains(h.Date)).ToArray();
+        var rangeHistoryDuration = rangeHistory.Aggregate(TimeSpan.Zero, (acc, h) => acc + h.Duration);
+
+        // Historical focus adds directly to FocusTime without fabricating native sessions or distorting completion rate
+        totals = totals with { FocusTime = totals.FocusTime + rangeHistoryDuration };
+
         var buckets = new List<ReportBucket>();
         if (period == ReportPeriod.Daily)
         {
+            var dayHistoryTime = rangeHistory.Where(h => h.Date == date).Aggregate(TimeSpan.Zero, (acc, h) => acc + h.Duration);
+            long ticksPerHour = dayHistoryTime.Ticks / 24;
+            long remainderTicks = dayHistoryTime.Ticks % 24;
             for (int hour = 0; hour < 24; hour++)
-                buckets.Add(new($"{hour:00}:00", ReportTotals.From(selected.Where(s => s.Local.Hour == hour).Select(s => s.Session))));
+            {
+                var nativeBucket = ReportTotals.From(selected.Where(s => s.Local.Hour == hour).Select(s => s.Session));
+                TimeSpan extra = TimeSpan.FromTicks(ticksPerHour + (hour == 0 ? remainderTicks : 0));
+                buckets.Add(new($"{hour:00}:00", nativeBucket with { FocusTime = nativeBucket.FocusTime + extra }));
+            }
         }
         else if (period == ReportPeriod.Weekly)
         {
             for (var day = range.Start; day < range.End; day = day.AddDays(1))
-                buckets.Add(new(day.ToString("yyyy-MM-dd"), ReportTotals.From(selected
-                    .Where(s => DateOnly.FromDateTime(s.Local.DateTime) == day).Select(s => s.Session))));
+            {
+                var nativeBucket = ReportTotals.From(selected.Where(s => DateOnly.FromDateTime(s.Local.DateTime) == day).Select(s => s.Session));
+                var dayHistoryTime = rangeHistory.Where(h => h.Date == day).Aggregate(TimeSpan.Zero, (acc, h) => acc + h.Duration);
+                buckets.Add(new(day.ToString("yyyy-MM-dd"), nativeBucket with { FocusTime = nativeBucket.FocusTime + dayHistoryTime }));
+            }
         }
         else
         {
-            // Calendar weeks clipped to the selected month; never borrow adjacent-month data.
             for (var start = range.Start; start < range.End;)
             {
                 var nextMonday = ReportRange.WeekStart(start).AddDays(7);
                 var end = nextMonday < range.End ? nextMonday : range.End;
                 var slice = new ReportRange(start, end);
-                buckets.Add(new($"{start:yyyy-MM-dd} – {end.AddDays(-1):yyyy-MM-dd}", ReportTotals.From(selected
-                    .Where(s => slice.Contains(DateOnly.FromDateTime(s.Local.DateTime))).Select(s => s.Session))));
+                var nativeBucket = ReportTotals.From(selected.Where(s => slice.Contains(DateOnly.FromDateTime(s.Local.DateTime))).Select(s => s.Session));
+                var sliceHistoryTime = rangeHistory.Where(h => slice.Contains(h.Date)).Aggregate(TimeSpan.Zero, (acc, h) => acc + h.Duration);
+                buckets.Add(new($"{start:yyyy-MM-dd} – {end.AddDays(-1):yyyy-MM-dd}", nativeBucket with { FocusTime = nativeBucket.FocusTime + sliceHistoryTime }));
                 start = end;
             }
         }
+
         var focus = selected.Where(s => s.Session.Type == SessionType.Work && s.Session.Status == SessionStatus.Completed)
             .GroupBy(s => s.Local.Hour / 3 * 3).Select(g => new FocusPeriod(g.Key, g.Count())).ToArray();
         var leading = focus.Length == 0 ? [] : focus.Where(p => p.CompletedWork == focus.Max(f => f.CompletedWork)).OrderBy(p => p.StartHour).ToArray();
-        TimeSpan WeekTime(ReportRange span) => ReportTotals.From(localized
-            .Where(s => span.Contains(DateOnly.FromDateTime(s.Local.DateTime))).Select(s => s.Session)).FocusTime;
 
-        // User-level streak statistics derived from all persisted historical sessions
+        TimeSpan WeekTime(ReportRange span)
+        {
+            var native = ReportTotals.From(localized.Where(s => span.Contains(DateOnly.FromDateTime(s.Local.DateTime))).Select(s => s.Session)).FocusTime;
+            var hist = historyRecords.Where(h => span.Contains(h.Date)).Aggregate(TimeSpan.Zero, (acc, h) => acc + h.Duration);
+            return native + hist;
+        }
+
+        // 3. Streak statistics combining native completed sessions and imported focus days (hours > 0)
         var allRecords = await _repository.GetStartedBetweenAsync(
             DateTimeOffset.MinValue,
             DateTimeOffset.MaxValue,
             cancellationToken).ConfigureAwait(false);
-        var streaks = StreakCalculator.Calculate(allRecords, CurrentDate(), zone);
+        var allHistory = _history is not null
+            ? await _history.GetAllAsync(cancellationToken).ConfigureAwait(false)
+            : [];
+        var qualifyingDates = allHistory.Where(h => h.SourceHours > 0).Select(h => h.Date).Distinct();
+        var streaks = StreakCalculator.Calculate(allRecords, qualifyingDates, CurrentDate(), zone);
 
         cancellationToken.ThrowIfCancellationRequested();
         return new(period, range, zone, now, totals, buckets.AsReadOnly(), Array.AsReadOnly(leading),

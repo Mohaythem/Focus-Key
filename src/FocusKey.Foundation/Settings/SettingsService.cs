@@ -34,6 +34,8 @@ public sealed class SettingsService(ISettingsRepository repository)
         UpdateAsync(current => current with { LightTheme = value }, cancellationToken);
     public Task<ApplicationSettings> UpdateDarkThemeAsync(ThemeConfiguration value, CancellationToken cancellationToken = default) =>
         UpdateAsync(current => current with { DarkTheme = value }, cancellationToken);
+    public Task<ApplicationSettings> UpdateSessionSoundsEnabledAsync(bool value, CancellationToken cancellationToken = default) =>
+        UpdateAsync(current => current with { SessionSoundsEnabled = value }, cancellationToken);
 
     private async Task<ApplicationSettings> UpdateAsync(
         Func<ApplicationSettings, ApplicationSettings> change, CancellationToken cancellationToken)

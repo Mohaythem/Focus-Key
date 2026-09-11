@@ -1,0 +1,194 @@
+using FocusKey.Foundation.Data;
+using FocusKey.Foundation.History;
+using FocusKey.Foundation.Reports;
+using FocusKey.Foundation.Sessions;
+using FocusKey.Foundation.Tests.Sessions;
+
+namespace FocusKey.Foundation.Tests.Reports;
+
+public sealed class ReportsHistoricalFocusTests
+{
+    [Fact]
+    public async Task ReadAsync_CombinesNativeSessionsAndHistoricalFocus()
+    {
+        using var temp = new TempDirectory();
+        string file = Path.Combine(temp.Path, "focus_key.db");
+        var connections = new SqliteConnectionFactory(file);
+        new DatabaseBootstrapper(connections).Initialize();
+
+        var sessionRepo = new SqliteSessionRepository(connections);
+        var historyRepo = new SqliteHistoricalFocusRepository(connections);
+
+        var date = new DateOnly(2026, 9, 10);
+        var startTime = new DateTimeOffset(2026, 9, 10, 10, 0, 0, TimeSpan.Zero);
+
+        // 1 native completed work session: 30 minutes
+        var nativeSession = new SessionRecord
+        {
+            Id = SessionId.New(),
+            Type = SessionType.Work,
+            Status = SessionStatus.Completed,
+            StartedAt = startTime,
+            PlannedDuration = TimeSpan.FromMinutes(30),
+            EndedAt = startTime.AddMinutes(30),
+            CreatedAt = startTime,
+        };
+        await sessionRepo.AddAsync(nativeSession);
+
+        // 1 imported historical focus record: 5.5 hours on the same date
+        var historyEntries = new List<HistoricalFocusEntry>
+        {
+            new(date, "", 5.5)
+        };
+        await historyRepo.ImportAsync(historyEntries, 1, 0);
+
+        var timeProvider = new ManualTimeProvider(startTime.AddHours(2));
+        var reportsService = new ReportsService(sessionRepo, historyRepo, timeProvider, () => TimeZoneInfo.Utc);
+
+        var snapshot = await reportsService.ReadAsync(ReportPeriod.Daily, date);
+
+        // Totals: native (30m) + imported (5.5h = 330m) = 360m = 6 hours
+        Assert.Equal(TimeSpan.FromHours(6), snapshot.Totals.FocusTime);
+
+        // Native session counts must remain strictly 1 — NO fake session records fabricated
+        Assert.Equal(1, snapshot.Totals.Started);
+        Assert.Equal(1, snapshot.Totals.WorkStarted);
+        Assert.Equal(1, snapshot.Totals.CompletedWork);
+        Assert.Equal(0, snapshot.Totals.BreakStarted);
+        Assert.Equal(100.0, snapshot.Totals.CompletionRate);
+    }
+
+    [Fact]
+    public async Task ReadAsync_HistoricalFocusWithoutNativeSessions_DoesNotDistortSessionCounts()
+    {
+        using var temp = new TempDirectory();
+        string file = Path.Combine(temp.Path, "focus_key.db");
+        var connections = new SqliteConnectionFactory(file);
+        new DatabaseBootstrapper(connections).Initialize();
+
+        var sessionRepo = new SqliteSessionRepository(connections);
+        var historyRepo = new SqliteHistoricalFocusRepository(connections);
+
+        var date = new DateOnly(2026, 9, 10);
+        var historyEntries = new List<HistoricalFocusEntry>
+        {
+            new(date, "", 4.0)
+        };
+        await historyRepo.ImportAsync(historyEntries, 1, 0);
+
+        var timeProvider = new ManualTimeProvider(new DateTimeOffset(2026, 9, 10, 12, 0, 0, TimeSpan.Zero));
+        var reportsService = new ReportsService(sessionRepo, historyRepo, timeProvider, () => TimeZoneInfo.Utc);
+
+        var snapshot = await reportsService.ReadAsync(ReportPeriod.Daily, date);
+
+        Assert.Equal(TimeSpan.FromHours(4), snapshot.Totals.FocusTime);
+        Assert.Equal(0, snapshot.Totals.Started);
+        Assert.Equal(0, snapshot.Totals.CompletedWork);
+        Assert.Null(snapshot.Totals.CompletionRate); // 0 started = null completion rate, NOT corrupted
+    }
+
+    [Fact]
+    public async Task ReadAsync_DailyTrend_DistributesHistoricalHoursAcrossHours()
+    {
+        using var temp = new TempDirectory();
+        string file = Path.Combine(temp.Path, "focus_key.db");
+        var connections = new SqliteConnectionFactory(file);
+        new DatabaseBootstrapper(connections).Initialize();
+
+        var sessionRepo = new SqliteSessionRepository(connections);
+        var historyRepo = new SqliteHistoricalFocusRepository(connections);
+
+        var date = new DateOnly(2026, 9, 10);
+        var historyEntries = new List<HistoricalFocusEntry>
+        {
+            new(date, "", 12.0)
+        };
+        await historyRepo.ImportAsync(historyEntries, 1, 0);
+
+        var timeProvider = new ManualTimeProvider(new DateTimeOffset(2026, 9, 10, 12, 0, 0, TimeSpan.Zero));
+        var reportsService = new ReportsService(sessionRepo, historyRepo, timeProvider, () => TimeZoneInfo.Utc);
+
+        var snapshot = await reportsService.ReadAsync(ReportPeriod.Daily, date);
+
+        // Daily trend has 24 hourly buckets (00:00 to 23:00)
+        Assert.Equal(24, snapshot.Trend.Count);
+        var totalTrendFocus = snapshot.Trend.Aggregate(TimeSpan.Zero, (acc, b) => acc + b.Totals.FocusTime);
+        Assert.Equal(TimeSpan.FromHours(12), totalTrendFocus);
+    }
+
+    [Fact]
+    public async Task ReadAsync_WeeklyAndMonthly_IncludesHistoricalFocusInBuckets()
+    {
+        using var temp = new TempDirectory();
+        string file = Path.Combine(temp.Path, "focus_key.db");
+        var connections = new SqliteConnectionFactory(file);
+        new DatabaseBootstrapper(connections).Initialize();
+
+        var sessionRepo = new SqliteSessionRepository(connections);
+        var historyRepo = new SqliteHistoricalFocusRepository(connections);
+
+        // Add 3 consecutive days of imported focus
+        var historyEntries = new List<HistoricalFocusEntry>
+        {
+            new(new DateOnly(2026, 9, 7), "", 5.0),
+            new(new DateOnly(2026, 9, 8), "", 6.0),
+            new(new DateOnly(2026, 9, 9), "", 7.0),
+        };
+        await historyRepo.ImportAsync(historyEntries, 3, 0);
+
+        var timeProvider = new ManualTimeProvider(new DateTimeOffset(2026, 9, 10, 12, 0, 0, TimeSpan.Zero));
+        var reportsService = new ReportsService(sessionRepo, historyRepo, timeProvider, () => TimeZoneInfo.Utc);
+
+        // Weekly test
+        var weeklySnapshot = await reportsService.ReadAsync(ReportPeriod.Weekly, new DateOnly(2026, 9, 9));
+        Assert.Equal(TimeSpan.FromHours(18), weeklySnapshot.Totals.FocusTime);
+        Assert.Equal(TimeSpan.FromHours(18), weeklySnapshot.WeekFocus);
+
+        // Monthly test
+        var monthlySnapshot = await reportsService.ReadAsync(ReportPeriod.Monthly, new DateOnly(2026, 9, 9));
+        Assert.Equal(TimeSpan.FromHours(18), monthlySnapshot.Totals.FocusTime);
+    }
+
+    [Fact]
+    public async Task ReadAsync_StreakCalculation_IncludesHistoricalFocusDays()
+    {
+        using var temp = new TempDirectory();
+        string file = Path.Combine(temp.Path, "focus_key.db");
+        var connections = new SqliteConnectionFactory(file);
+        new DatabaseBootstrapper(connections).Initialize();
+
+        var sessionRepo = new SqliteSessionRepository(connections);
+        var historyRepo = new SqliteHistoricalFocusRepository(connections);
+
+        // Historical focus on 2026-09-08 and 2026-09-09
+        var historyEntries = new List<HistoricalFocusEntry>
+        {
+            new(new DateOnly(2026, 9, 8), "", 4.0),
+            new(new DateOnly(2026, 9, 9), "", 5.0),
+        };
+        await historyRepo.ImportAsync(historyEntries, 2, 0);
+
+        // Native completed work session today: 2026-09-10
+        var startTime = new DateTimeOffset(2026, 9, 10, 10, 0, 0, TimeSpan.Zero);
+        var nativeSession = new SessionRecord
+        {
+            Id = SessionId.New(),
+            Type = SessionType.Work,
+            Status = SessionStatus.Completed,
+            StartedAt = startTime,
+            PlannedDuration = TimeSpan.FromMinutes(25),
+            EndedAt = startTime.AddMinutes(25),
+            CreatedAt = startTime,
+        };
+        await sessionRepo.AddAsync(nativeSession);
+
+        var timeProvider = new ManualTimeProvider(startTime.AddHours(1));
+        var reportsService = new ReportsService(sessionRepo, historyRepo, timeProvider, () => TimeZoneInfo.Utc);
+
+        var snapshot = await reportsService.ReadAsync(ReportPeriod.Daily, new DateOnly(2026, 9, 10));
+
+        // 3 consecutive days (Sep 8, Sep 9, Sep 10) => Current Streak = 3!
+        Assert.Equal(3, snapshot.Streaks.CurrentStreak);
+        Assert.True(snapshot.Streaks.LongestStreak >= 3);
+    }
+}

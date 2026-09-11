@@ -26,12 +26,34 @@ public static class StreakCalculator
     /// A qualifying streak day is a calendar day containing at least one completed Work session.
     /// Break sessions and stopped/interrupted sessions never extend a streak.
     /// </summary>
-    public static StreakStatistics Calculate(IEnumerable<SessionRecord> sessions, DateOnly today, TimeZoneInfo zone)
+    public static StreakStatistics Calculate(IEnumerable<SessionRecord> sessions, DateOnly today, TimeZoneInfo zone) =>
+        Calculate(sessions, [], today, zone);
+
+    /// <summary>
+    /// Calculates current streak and longest streak from historical sessions and imported focus days.
+    /// A qualifying streak day is a calendar day containing at least one completed Work session
+    /// OR imported historical focus time with hours > 0.
+    /// Break sessions and stopped/interrupted sessions never extend a streak.
+    /// </summary>
+    public static StreakStatistics Calculate(
+        IEnumerable<SessionRecord> sessions,
+        IEnumerable<DateOnly> historicalQualifyingDates,
+        DateOnly today,
+        TimeZoneInfo zone)
     {
         ArgumentNullException.ThrowIfNull(sessions);
+        ArgumentNullException.ThrowIfNull(historicalQualifyingDates);
         ArgumentNullException.ThrowIfNull(zone);
 
         var qualifyingDays = new HashSet<DateOnly>();
+        foreach (var date in historicalQualifyingDates)
+        {
+            if (date <= today)
+            {
+                qualifyingDays.Add(date);
+            }
+        }
+
         foreach (var session in sessions)
         {
             if (session.Type == SessionType.Work && session.Status == SessionStatus.Completed)

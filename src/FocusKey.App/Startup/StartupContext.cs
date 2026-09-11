@@ -22,6 +22,8 @@ internal sealed class StartupContext : IDisposable
     public required ReportsService Reports { get; init; }
     public required SettingsService Settings { get; init; }
     public required AppearanceCoordinator Appearance { get; init; }
+    public required FocusKey.Foundation.History.IHistoricalFocusRepository HistoricalFocusRepository { get; init; }
+    public required FocusKey.Foundation.History.HistoricalFocusService History { get; init; }
 
     public void Dispose() => Logger.Dispose();
 }

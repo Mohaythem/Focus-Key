@@ -55,3 +55,55 @@ The subagents reported `PASS` for the majority of the UI and engine implementati
 After implementing all fixes, the release artifact was rebuilt and packaged using Inno Setup.
 The `release` directory now contains the final installer `FocusKeySetup.exe`.
 All identified release blockers have been successfully resolved. The application installs correctly to the user's Local AppData Programs directory without requiring elevation, persists data locally outside the execution path, successfully uninstalls via Windows Settings, and the project has passed final end-to-end evaluation.
+
+## 6. Feature Pass — Website CSV Import/Export, Session Sounds, and v1.1.0 Release
+
+### 6.1 Website CSV Import & Export Compatibility
+- **Authoritative Format**: Direct, lossless compatibility with the user's website export:
+  - Extension: `.csv`
+  - Delimiter: TAB (`\t`)
+  - Columns: `date\tproject\thours`
+  - Date format: `yyyyMMdd` (e.g. `20260904`)
+  - Project: string or empty quotes `""`
+  - Hours: Invariant decimal hours (e.g. `5.98`, `11.49`, `5`)
+- **Storage & Schema Migration**:
+  - Added Migration 5: `historical_focus` table with `(date, project)` unique constraint, `duration_seconds`, `source_hours`, and `imported_at_utc`.
+  - Stored strictly as historical aggregates; **NEVER fabricates fake `SessionRecord` rows**.
+- **Reports Integration**:
+  - Contributes to Focus Time totals across Daily, Weekly, and Monthly projections.
+  - Distributes historical hours into daily hourly buckets (24h) and weekly/monthly day/week buckets.
+  - Days with historical focus (> 0 hours) count as qualifying focus days in `StreakCalculator` for Current and Longest Streak calculations.
+  - Does **NOT** alter native session metrics: Started count, Completed Work sessions, Completed Break sessions, Break Time, or Completion Rate remain uncorrupted.
+- **Idempotency & Duplicate Policy**:
+  - Intra-file duplicate entries for the same `(date, project)` are consolidated by summing hours (capped at 24h).
+  - Database upsert is idempotent: re-importing the same CSV file reports duplicate records and does not multiply hours. Importing modified hours updates the record in-place.
+- **UI Integration**:
+  - Added native `DATA` section in `SettingsView.cs` with "Import history…" and "Export history…" buttons.
+  - Integrated WinUI 3 `FileOpenPicker` and `FileSavePicker` with Win32 HWND window association.
+  - Displays clear `ContentDialog` feedback with rows found, imported count, duplicates skipped, and invalid rows.
+
+### 6.2 Session Start and Completion Sounds
+- **Audio Synthesizer & Bundled Assets**:
+  - `FocusKey.Foundation.Sounds.SoundSynthesizer`: Pure C# mathematical synthesizer generating studio-grade 16-bit PCM RIFF WAV audio (44.1 kHz, mono) with zero external or online dependencies.
+  - `Assets/Sounds/start_tick.wav`: Subtle 140ms mechanical tick on session start.
+  - `Assets/Sounds/completion_bell.wav`: Calm 2.2s meditation chime / singing bowl on natural session completion.
+- **Playback Behavior**:
+  - Start sound plays strictly on successful session start (from Today hero card or Quick Overlay).
+  - Completion sound plays strictly on natural timer countdown completion (even when minimized to tray).
+  - **Stopping or interrupting a session never plays the completion sound**.
+- **Setting & Persistence**:
+  - Added Migration 6: `session_sounds_enabled` column added to `application_settings` (INTEGER NOT NULL DEFAULT 1).
+  - Added "Session sounds" toggle under `SESSIONS` in `SettingsView.cs`.
+  - Default is On (`true`). Persisted in SQLite and loaded across restarts.
+
+### 6.3 Windows Installer & Upgrade Verification (v1.1.0)
+- **Version Bump**: Bumped to `1.1.0.0` in `FocusKey.App.csproj` and `installer.iss`.
+- **Packaging**:
+  - Published self-contained Release build with bundled `Assets\Sounds\*.wav`.
+  - Recompiled Inno Setup installer (`FocusKeySetup.exe`, ~60.0 MB).
+- **Upgrade Test**:
+  - Executed silent upgrade over existing installation (`/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-`).
+  - Verified user data directory (`%LOCALAPPDATA%\FocusKey\focus_key.db`) was preserved intact.
+  - Verified migrations 5 and 6 applied seamlessly on launch to schema version 6.
+  - Verified clean launch of installed executable (`%LOCALAPPDATA%\Programs\Focus Key\FocusKey.exe`).
+- **Test Suite**: 529 automated tests passing cleanly (100% pass rate).

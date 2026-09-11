@@ -64,9 +64,26 @@ internal sealed class SettingsView : UserControl
     private bool _colorDrainRunning;
     private bool _applying;
     private bool _workDirty, _breakDirty;
+    private readonly ToggleSwitch _sessionSounds = new() { OnContent = "On", OffContent = "Off" };
+    private readonly Button _importHistoryButton = new() { Content = "Import history…", FontSize = 12, Padding = new Thickness(12, 6, 12, 6) };
+    private readonly Button _exportHistoryButton = new() { Content = "Export history…", FontSize = 12, Padding = new Thickness(12, 6, 12, 6) };
+    private readonly FocusKey.Foundation.History.HistoricalFocusService _historyService;
+    private readonly Func<Task> _refreshReports;
+    private readonly Func<IntPtr> _getWindowHandle;
+    private readonly Action<Exception> _report;
 
-    internal SettingsView(SettingsService settings, Func<Task> refresh, Action<Exception> report)
+    internal SettingsView(
+        SettingsService settings,
+        FocusKey.Foundation.History.HistoricalFocusService history,
+        Func<Task> refresh,
+        Func<Task> refreshReports,
+        Func<IntPtr> getWindowHandle,
+        Action<Exception> report)
     {
+        _historyService = history ?? throw new ArgumentNullException(nameof(history));
+        _refreshReports = refreshReports ?? throw new ArgumentNullException(nameof(refreshReports));
+        _getWindowHandle = getWindowHandle ?? throw new ArgumentNullException(nameof(getWindowHandle));
+        _report = report ?? throw new ArgumentNullException(nameof(report));
         _controller = new(settings, refresh, report);
         _colorDebounceTimer = DispatcherQueue.CreateTimer();
         _colorDebounceTimer.Interval = TimeSpan.FromMilliseconds(250);
@@ -77,6 +94,9 @@ internal sealed class SettingsView : UserControl
         AutomationProperties.SetName(_contrast, "Contrast");
         AutomationProperties.SetName(_lightPreset, "Light theme preset");
         AutomationProperties.SetName(_darkPreset, "Dark theme preset");
+        AutomationProperties.SetName(_sessionSounds, "Session sounds");
+        AutomationProperties.SetName(_importHistoryButton, "Import history");
+        AutomationProperties.SetName(_exportHistoryButton, "Export history");
         AutomationProperties.SetLiveSetting(_status, AutomationLiveSetting.Polite);
         AutomationProperties.SetAutomationId(_status, "SettingsStatus");
         if (Application.Current?.Resources["FkMutedText"] is Style statusStyle) _status.Style = statusStyle;
@@ -125,7 +145,8 @@ internal sealed class SettingsView : UserControl
         // 5. SESSIONS
         var sessions = new StackPanel { Spacing = 0 };
         sessions.Children.Add(Row("Work duration", null, DurationFields(_workMinutes, _workSeconds)));
-        sessions.Children.Add(Row("Break duration", null, DurationFields(_breakMinutes, _breakSeconds), true));
+        sessions.Children.Add(Row("Break duration", null, DurationFields(_breakMinutes, _breakSeconds)));
+        sessions.Children.Add(Row("Session sounds", "Play a soft tick on start and a chime on completion", _sessionSounds, true));
         _fields.Children.Add(Section("SESSIONS", sessions));
 
         // 6. SHORTCUT
@@ -145,6 +166,12 @@ internal sealed class SettingsView : UserControl
         };
         shortcut.Children.Add(Row("Open overlay", "Global keyboard shortcut", kbdBadge, true));
         _fields.Children.Add(Section("SHORTCUT", shortcut));
+
+        // 7. DATA
+        var data = new StackPanel { Spacing = 0 };
+        data.Children.Add(Row("Import history", "Import website-compatible focus history (tab-delimited CSV)", _importHistoryButton));
+        data.Children.Add(Row("Export history", "Export all focus history to website-compatible tab-delimited CSV", _exportHistoryButton, true));
+        _fields.Children.Add(Section("DATA", data));
 
         var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
         actions.Children.Add(_reload);
@@ -266,6 +293,18 @@ internal sealed class SettingsView : UserControl
                 DebounceColorSave(SettingsField.DarkAccent, () => _controller.UpdateDarkColorAsync(false, false, color));
             }
         };
+
+        _sessionSounds.Toggled += async (_, _) =>
+        {
+            if (!_applying)
+            {
+                await FlushPendingColorSaveAsync();
+                await _controller.UpdateSessionSoundsAsync(_sessionSounds.IsOn);
+            }
+        };
+
+        _importHistoryButton.Click += OnImportHistoryClicked;
+        _exportHistoryButton.Click += OnExportHistoryClicked;
 
         WireDuration(_workMinutes, _workSeconds, true);
         WireDuration(_breakMinutes, _breakSeconds, false);
@@ -407,6 +446,9 @@ internal sealed class SettingsView : UserControl
                 case SettingsField.DarkForeground:
                 case SettingsField.DarkAccent:
                     SetThemeFields(saved.DarkTheme ?? ThemeConfiguration.DefaultDark, _darkPreset, _darkBgColor, _darkFgColor, _darkAccentColor, true);
+                    break;
+                case SettingsField.SessionSounds:
+                    _sessionSounds.IsOn = saved.SessionSoundsEnabled;
                     break;
             }
         }
@@ -664,5 +706,106 @@ internal sealed class SettingsView : UserControl
         grid.Children.Add(control);
 
         return grid;
+    }
+
+    private async void OnImportHistoryClicked(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var picker = new Windows.Storage.Pickers.FileOpenPicker();
+            var hwnd = _getWindowHandle();
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
+            picker.ViewMode = Windows.Storage.Pickers.PickerViewMode.List;
+            picker.SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.DocumentsLibrary;
+            picker.FileTypeFilter.Add(".csv");
+            picker.FileTypeFilter.Add(".txt");
+
+            var file = await picker.PickSingleFileAsync();
+            if (file is null) return;
+
+            string content = await Windows.Storage.FileIO.ReadTextAsync(file);
+            var result = await _historyService.ImportWebsiteCsvAsync(content);
+
+            var dialog = new ContentDialog
+            {
+                Title = result.Success ? "Import Complete" : "Import Failed",
+                Content = result.Success
+                    ? $"Rows found: {result.RowsFound}\n" +
+                      $"New records: {result.NewRecords}\n" +
+                      $"Updated records: {result.UpdatedRecords}\n" +
+                      $"Duplicate / no-change: {result.DuplicateRecords}\n" +
+                      $"Invalid rows: {result.InvalidRows}\n" +
+                      $"Total imported focus time: {result.TotalImportedHours:0.##} hours"
+                    : $"Import failed:\n{result.ErrorMessage}",
+                CloseButtonText = "OK",
+                XamlRoot = this.XamlRoot
+            };
+            await dialog.ShowAsync();
+
+            if (result.Success && (result.NewRecords > 0 || result.UpdatedRecords > 0))
+            {
+                await _refreshReports();
+            }
+        }
+        catch (Exception exception)
+        {
+            _report(exception);
+            try
+            {
+                var dialog = new ContentDialog
+                {
+                    Title = "Import Error",
+                    Content = $"An error occurred during import: {exception.Message}",
+                    CloseButtonText = "OK",
+                    XamlRoot = this.XamlRoot
+                };
+                await dialog.ShowAsync();
+            }
+            catch { }
+        }
+    }
+
+    private async void OnExportHistoryClicked(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var picker = new Windows.Storage.Pickers.FileSavePicker();
+            var hwnd = _getWindowHandle();
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
+            picker.SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.DocumentsLibrary;
+            picker.FileTypeChoices.Add("CSV File (Tab-delimited)", [".csv"]);
+            picker.SuggestedFileName = $"FocusKey-report-{DateTime.Now:yyyyMMdd}.csv";
+
+            var file = await picker.PickSaveFileAsync();
+            if (file is null) return;
+
+            string csvContent = await _historyService.ExportWebsiteCsvAsync();
+            await Windows.Storage.FileIO.WriteTextAsync(file, csvContent);
+
+            var dialog = new ContentDialog
+            {
+                Title = "Export Complete",
+                Content = $"Successfully exported focus history to:\n{file.Name}",
+                CloseButtonText = "OK",
+                XamlRoot = this.XamlRoot
+            };
+            await dialog.ShowAsync();
+        }
+        catch (Exception exception)
+        {
+            _report(exception);
+            try
+            {
+                var dialog = new ContentDialog
+                {
+                    Title = "Export Error",
+                    Content = $"An error occurred during export: {exception.Message}",
+                    CloseButtonText = "OK",
+                    XamlRoot = this.XamlRoot
+                };
+                await dialog.ShowAsync();
+            }
+            catch { }
+        }
     }
 }

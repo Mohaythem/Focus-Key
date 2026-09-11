@@ -185,23 +185,47 @@ public sealed class ThemePresetsTests
         using var temp = new TempDirectory();
         string file = Path.Combine(temp.Path, "focus_key.db");
         var connections = new SqliteConnectionFactory(file);
-        new DatabaseBootstrapper(connections).Initialize();
-
-        // 1. Manually simulate an uncustomized legacy database
+        // 1. Manually simulate an uncustomized legacy database at version 3
         await using (var conn = await connections.OpenConnectionAsync())
         {
             await using var cmd = conn.CreateCommand();
             cmd.CommandText =
                 """
+                CREATE TABLE IF NOT EXISTS schema_migrations (
+                    version INTEGER NOT NULL PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    applied_at_utc TEXT NOT NULL
+                );
+                INSERT INTO schema_migrations VALUES (1, 'schema_metadata', '2026-09-01T00:00:00.0000000Z');
+                INSERT INTO schema_migrations VALUES (2, 'sessions', '2026-09-01T00:00:00.0000000Z');
+                INSERT INTO schema_migrations VALUES (3, 'application_settings', '2026-09-01T00:00:00.0000000Z');
+                PRAGMA user_version = 3;
+
+                CREATE TABLE IF NOT EXISTS application_settings (
+                    singleton INTEGER NOT NULL PRIMARY KEY,
+                    work_duration_seconds INTEGER NOT NULL,
+                    break_duration_seconds INTEGER NOT NULL,
+                    appearance TEXT NOT NULL,
+                    work_color TEXT NOT NULL,
+                    break_color TEXT NOT NULL
+                );
+                INSERT INTO application_settings VALUES (1, 1800, 600, 'system', '#183739', '#434763');
+
                 CREATE TABLE IF NOT EXISTS theme_settings (
                     singleton INTEGER NOT NULL PRIMARY KEY CHECK (singleton = 1),
                     light_preset TEXT NOT NULL, light_background TEXT NOT NULL, light_foreground TEXT NOT NULL, light_accent TEXT NOT NULL,
-                    dark_preset TEXT NOT NULL, dark_background TEXT NOT NULL, dark_foreground TEXT NOT NULL, dark_accent TEXT NOT NULL
+                    dark_preset TEXT NOT NULL, dark_background TEXT NOT NULL, dark_foreground TEXT NOT NULL, dark_accent TEXT NOT NULL,
+                    contrast TEXT NOT NULL DEFAULT 'standard'
                 );
-                INSERT OR REPLACE INTO theme_settings VALUES (1, 'default', '#F2F5F5', '#0F1414', '#183739', 'default', '#0A0D0D', '#F0F4F4', '#2D6669');
+                INSERT OR REPLACE INTO theme_settings (
+                    singleton, light_preset, light_background, light_foreground, light_accent,
+                    dark_preset, dark_background, dark_foreground, dark_accent, contrast)
+                VALUES (1, 'default', '#F2F5F5', '#0F1414', '#183739', 'default', '#0A0D0D', '#F0F4F4', '#2D6669', 'standard');
                 """;
             await cmd.ExecuteNonQueryAsync();
         }
+
+        new DatabaseBootstrapper(connections).Initialize();
 
         var repo = new SqliteSettingsRepository(connections);
         var loaded = await repo.LoadAsync();

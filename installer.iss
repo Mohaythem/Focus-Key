@@ -1,8 +1,8 @@
 [Setup]
 AppId={{A1B2C3D4-FOCUS-KEY1-0000-000000000001}
 AppName=Focus Key
-AppVersion=1.0.0
-VersionInfoVersion=1.0.0.0
+AppVersion=1.1.0
+VersionInfoVersion=1.1.0.0
 AppPublisher=Focus Key
 AppSupportURL=https://github.com/Mohaythem/Focus-Key
 DefaultDirName={userpf}\Focus Key

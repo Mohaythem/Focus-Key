@@ -29,6 +29,8 @@ public partial class App : Application
     private CompletionCoordinator? _completion;
     private bool _isExiting;
     private Appearance? _appliedAppearance;
+    private SoundPlayerService? _sounds;
+    private volatile bool _sessionSoundsEnabled = true;
 
     public App()
     {
@@ -53,12 +55,15 @@ public partial class App : Application
             if (_ownership is null)
             {
                 _activationSignal.Send();
-                _activationSignal.Dispose();
-                Exit();
+                _startup?.Dispose();
+                Environment.Exit(0);
                 return;
             }
 
             _startup = await FoundationBootstrap.RunAsync();
+            var initialSettings = await _startup.Settings.LoadAsync();
+            _sessionSoundsEnabled = initialSettings.SessionSoundsEnabled;
+            _sounds = new SoundPlayerService(() => _sessionSoundsEnabled);
             _startup.Logger.Info("Single-instance shell ownership acquired.");
             ApplyThemePalettes(_startup.Appearance.LightPalette, _startup.Appearance.DarkPalette);
             _window = new MainWindow(_startup, StopSessionAsync,
@@ -184,6 +189,8 @@ public partial class App : Application
     {
         if (_startup is null || _isExiting) return;
         var startup = _startup;
+        var currentSettings = await startup.Settings.LoadAsync();
+        _sessionSoundsEnabled = currentSettings.SessionSoundsEnabled;
         await Task.Run(() => startup.Appearance.RefreshAsync());
         if (_startup is null || _isExiting) return;
         ApplyAppearance(_startup.Appearance.Current);
@@ -306,6 +313,7 @@ public partial class App : Application
     private async Task<SessionRecord> StartSessionAsync(SessionType type, CancellationToken cancellationToken)
     {
         SessionRecord session = await _completion!.StartAsync(type, cancellationToken);
+        _sounds?.PlayStartTick();
         _window?.RefreshPages();
         if (_quickOverlay is not null) await _quickOverlay.RefreshIfVisibleAsync();
         return session;
@@ -345,6 +353,7 @@ public partial class App : Application
             {
                 try
                 {
+                    _sounds?.PlayCompletionBell();
                     integration.NotifyCompleted(session);
                     _startup?.Logger.Info($"Completion notification submitted: {session.Id} {session.Type}; ended={session.EndedAt:O}.");
                 }

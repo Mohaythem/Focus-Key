@@ -132,5 +132,35 @@ public static class SchemaMigrations
                   AND dark_foreground = '#F0F4F4'
                   AND dark_accent = '#2D6669';
                 """),
+
+        new SchemaMigration(
+            Version: 5,
+            Name: "historical_focus",
+            Sql: """
+                CREATE TABLE IF NOT EXISTS historical_focus (
+                    id               INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                    date             TEXT    NOT NULL,
+                    project          TEXT    NOT NULL DEFAULT '',
+                    duration_seconds INTEGER NOT NULL,
+                    source_hours     REAL    NOT NULL,
+                    imported_at_utc  TEXT    NOT NULL,
+
+                    CHECK (length(date) = 10),
+                    CHECK (duration_seconds > 0),
+                    CHECK (source_hours > 0),
+                    CHECK (length(imported_at_utc) = 28),
+                    UNIQUE (date, project)
+                );
+
+                CREATE INDEX IF NOT EXISTS ix_historical_focus_date
+                    ON historical_focus (date);
+                """),
+
+        new SchemaMigration(
+            Version: 6,
+            Name: "session_sounds_setting",
+            Sql: """
+                ALTER TABLE application_settings ADD COLUMN session_sounds_enabled INTEGER NOT NULL DEFAULT 1;
+                """),
     ];
 }

@@ -13,6 +13,7 @@ public sealed record ApplicationSettings
         BreakColor = HexColor.Parse("#434763"),
         LightTheme = ThemeConfiguration.DefaultLight,
         DarkTheme = ThemeConfiguration.DefaultDark,
+        SessionSoundsEnabled = true,
     };
 
     public required TimeSpan WorkDuration { get; init; }
@@ -23,6 +24,7 @@ public sealed record ApplicationSettings
     public required HexColor BreakColor { get; init; }
     public ThemeConfiguration LightTheme { get; init; } = ThemeConfiguration.DefaultLight;
     public ThemeConfiguration DarkTheme { get; init; } = ThemeConfiguration.DefaultDark;
+    public bool SessionSoundsEnabled { get; init; } = true;
 
     public void Validate()
     {

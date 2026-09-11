@@ -80,7 +80,7 @@ public sealed partial class MainWindow : Window
         InitializeComponent();
         _reports = new ReportsView(startup.Reports, report);
         ReportsHost.Content = _reports;
-        _settings = new SettingsView(startup.Settings, refreshSettings, report);
+        _settings = new SettingsView(startup.Settings, startup.History, refreshSettings, () => _reports.RefreshAsync(), () => WindowNative.GetWindowHandle(this), report);
         SettingsHost.Content = _settings;
         var hwnd = WindowNative.GetWindowHandle(this);
         double scale = NativeMethods.GetDpiForWindow(hwnd) / 96.0;

@@ -106,7 +106,7 @@ checked separately. Explorer restart/taskbar restoration, shutdown or suspend, f
 elevated-app interaction remain later reliability work. The shared Windows app icon is minimal
 and brand refinement is deferred.
 
-Final solution and smoke commands, from `D:\Focus Key`:
+Final solution and smoke commands, from `the repository root`:
 
 ```powershell
 dotnet restore FocusKey.slnx

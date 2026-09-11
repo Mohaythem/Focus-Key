@@ -188,7 +188,7 @@ purpose): `.smoke/run-smoke.ps1`, `.smoke/window.png`, `.smoke/appdata/`.
 
 ## Files modified
 
-- `.gitignore` — added one line, `.claude/settings.local.json`, so machine-local assistant
+- `.gitignore` — added one line, `machine-local settings`, so machine-local assistant
   permissions can never be committed from any clone. Everything else in the baseline
   `.gitignore` was already correct for a .NET/WinUI tree and was left untouched.
 
@@ -217,13 +217,13 @@ Default, per user, local (never roaming), matching what `README.md` already docu
     └── focus_key.log
 ```
 
-On this machine that resolves to `%LOCALAPPDATA%\FocusKey\AppData\Local\FocusKey`.
+On this machine that resolves to `%LOCALAPPDATA%\FocusKey`.
 
 A fallback report is written to `logs\startup-failure.log` if startup fails before normal logging
 is usable.
 
 Setting `FOCUSKEY_DATA_ROOT` moves the whole tree to that directory instead. The smoke test used
-`D:\Focus Key NEW\.smoke\appdata` for exactly this reason.
+`.smoke\appdata` for exactly this reason.
 
 Nothing is written anywhere else. No registry keys, no roaming data, no temp files, no network
 calls.
@@ -288,7 +288,7 @@ re-applies migrations or is opened by the wrong build.
 
 ## Verification commands
 
-Run from `D:\Focus Key NEW`:
+Run from `the repository root`:
 
 ```text
 dotnet --info
@@ -327,9 +327,9 @@ All projects are up-to-date for restore.
 **Build**
 
 ```text
-FocusKey.Foundation -> D:\Focus Key NEW\src\FocusKey.Foundation\bin\Debug\net10.0\FocusKey.Foundation.dll
-FocusKey.Foundation.Tests -> D:\Focus Key NEW\tests\FocusKey.Foundation.Tests\bin\Debug\net10.0\FocusKey.Foundation.Tests.dll
-FocusKey.App -> D:\Focus Key NEW\src\FocusKey.App\bin\Debug\net10.0-windows10.0.19041.0\win-x64\FocusKey.dll
+FocusKey.Foundation -> src\FocusKey.Foundation\bin\Debug\net10.0\FocusKey.Foundation.dll
+FocusKey.Foundation.Tests -> tests\FocusKey.Foundation.Tests\bin\Debug\net10.0\FocusKey.Foundation.Tests.dll
+FocusKey.App -> src\FocusKey.App\bin\Debug\net10.0-windows10.0.19041.0\win-x64\FocusKey.dll
 
 Build succeeded.
     0 Warning(s)
@@ -353,7 +353,7 @@ Totals: 38 total, 38 passed, 0 failed, 0 skipped.
 
 Real launch of the built executable
 `src\FocusKey.App\bin\Debug\net10.0-windows10.0.19041.0\win-x64\FocusKey.exe`, twice, against
-the isolated data root `D:\Focus Key NEW\.smoke\appdata` (which did not exist beforehand).
+the isolated data root `.smoke\appdata` (which did not exist beforehand).
 
 **Run 1 — first ever start**
 
@@ -365,7 +365,7 @@ responding            : True
 main window handle    : 22219454
 main window title     : 'Focus Key'
 working set (MB)      : 139.2
-window image          : D:\Focus Key NEW\.smoke\window.png (660 x 400)
+window image          : .smoke\window.png (660 x 400)
 
 close request sent    : True
 exited within 20s     : True
@@ -376,20 +376,20 @@ Runtime data created by that launch:
 
 ```text
 Size  LastWriteTimeUtc      FullName
-1     9/2/2026 4:45:45 AM   D:\Focus Key NEW\.smoke\appdata\logs
-8192  9/2/2026 4:45:53 AM   D:\Focus Key NEW\.smoke\appdata\focus_key.db
-843   9/2/2026 4:45:53 AM   D:\Focus Key NEW\.smoke\appdata\logs\focus_key.log
+1     9/2/2026 4:45:45 AM   .smoke\appdata\logs
+8192  9/2/2026 4:45:53 AM   .smoke\appdata\focus_key.db
+843   9/2/2026 4:45:53 AM   .smoke\appdata\logs\focus_key.log
 ```
 
 Log written by that launch:
 
 ```text
 04:45:45.776Z [INFO ] Focus Key 1.0.0+17ae9a886c21a8305ee9dd67708506372cf16d1c starting (process 9924).
-04:45:45.778Z [INFO ] Application data root: D:\Focus Key NEW\.smoke\appdata
+04:45:45.778Z [INFO ] Application data root: .smoke\appdata
 04:45:45.778Z [WARN ] Data root came from FOCUSKEY_DATA_ROOT.
-04:45:45.778Z [INFO ] Log file: D:\Focus Key NEW\.smoke\appdata\logs\focus_key.log
+04:45:45.778Z [INFO ] Log file: .smoke\appdata\logs\focus_key.log
 04:45:45.859Z [INFO ] Applied database migration 1 (schema_metadata).
-04:45:45.860Z [INFO ] Created database file 'D:\Focus Key NEW\.smoke\appdata\focus_key.db'.
+04:45:45.860Z [INFO ] Created database file '.smoke\appdata\focus_key.db'.
 04:45:45.860Z [INFO ] Database ready at schema version 1.
 04:45:45.861Z [INFO ] Foundation initialization complete.
 04:45:45.974Z [INFO ] Placeholder window displayed.
@@ -409,7 +409,7 @@ exit code             : 0
 
 ```text
 04:45:53.451Z [INFO ] Focus Key 1.0.0+17ae9a88... starting (process 18672).
-04:45:53.454Z [INFO ] Application data root: D:\Focus Key NEW\.smoke\appdata
+04:45:53.454Z [INFO ] Application data root: .smoke\appdata
 04:45:53.514Z [INFO ] Database ready at schema version 1.
 04:45:53.515Z [INFO ] Foundation initialization complete.
 04:45:53.573Z [INFO ] Placeholder window displayed.
@@ -470,7 +470,7 @@ remains Phase 4 scope and was **not** implemented here.
 ## Known limitations
 
 1. **Pre-existing user data at the default path needs a decision.**
-   `%LOCALAPPDATA%\FocusKey\AppData\Local\FocusKey` already contained `focus_key.db` (20,480 bytes,
+   `%LOCALAPPDATA%\FocusKey` already contained `focus_key.db` (20,480 bytes,
    modified 2026-09-02 04:06) and `logs\focus_key.log` (1,494 bytes, 04:28) before this phase
    started — left by the previous implementation. It was **not read, not opened, not modified,
    and not deleted**, and the smoke test was redirected precisely so it would stay untouched. On a

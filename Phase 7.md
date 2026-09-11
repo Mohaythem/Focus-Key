@@ -1,6 +1,6 @@
 # Phase 7 — Today (functional UI)
 
-Status: PASS — implementation and verification complete. Workspace: `D:\Focus Key`.
+Status: PASS — implementation and verification complete. Workspace: `the repository root`.
 Branch: `native/phased-rewrite`.
 
 ## Scope and baseline

@@ -4,7 +4,7 @@
 Finalize the Focus Key application by integrating the official brand mark, configuring the WinUI 3 distribution architecture, validating a clean release package, conducting an exhaustive 10-agent independent review, and resolving any final blocking defects.
 
 ## 2. Branding Integration
-- Confirmed `D:\Focus Key\logo.png` as the authoritative brand mark.
+- Confirmed `logo.png` as the authoritative brand mark.
 - Generated `AppIcon.ico` (multi-resolution up to 256x256) from the official PNG.
 - Embedded the icon into the native executable using the `<ApplicationIcon>` MSBuild property.
 - Modified `WindowsShellIntegration.cs` to load the module's native `IDI_APPLICATION` icon via `GetModuleHandle` and `LoadIcon`, projecting it properly to the System Tray.
@@ -145,4 +145,4 @@ All identified release blockers have been successfully resolved. The application
 - **Verification & Release**:
   - Automated test suite: 557 automated tests passing cleanly (100% pass rate).
   - Runtime verification: Verified identical duplicate skipping, conflicting file transactional rejection, and leftover-second rounding against isolated database instances.
-  - Packaged via Inno Setup into `D:\Focus Key\release\FocusKeySetup.exe` (~62.9 MB). Silent upgrade over existing user installation verified with database preserved intact.
+  - Packaged via Inno Setup into `release\FocusKeySetup.exe` (~62.9 MB). Silent upgrade over existing user installation verified with database preserved intact.

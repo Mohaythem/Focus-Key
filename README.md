@@ -1,96 +1,105 @@
-# Focus Key
+﻿# Focus Key
 
-Focus Key is a small, local-first Windows focus utility.
+Focus Key is a lightweight, local-first Windows focus utility designed to get out of your way and let you work.
 
-The whole product is one interaction:
+The entire experience revolves around one seamless shortcut:
 
 ```text
-Shift + F3  ->  Work (30 min) or Break (10 min)  ->  Start  ->  keep working
+Shift + F3  ->  Work (30 min) or Break (10 min)  ->  Start  ->  Keep Working
 ```
 
-It lives quietly in the system tray, runs one session at a time, records each finished session
-locally, and can tell you when a session ends. Later it also answers two questions — *what is
-happening today* and *how has my focus looked* — and nothing more.
+It lives quietly in the Windows system tray, runs one focus session at a time, records completed sessions locally, and provides simple, actionable focus reports without activity tracking, website blocking, or cloud accounts.
 
-## What Focus Key is not
+---
 
-Focus Key is deliberately small. It is not a task manager, and it will not grow into one.
+## Key Features
 
-No tasks, projects, accounts, cloud sync, AI, gamification, website blocking, activity
-monitoring, or keyboard and mouse monitoring. Focus Key only knows about sessions the user
-explicitly started.
+- **Instant Global Access**: Press `Shift + F3` anywhere in Windows to open the Quick Overlay, pick Work or Break, and start immediately.
+- **System Tray Resident**: Runs in the background with minimal memory footprint; closing the main window minimizes to tray.
+- **Customizable Timers & Themes**: Curated Work/Break color presets, custom hex selection, Light/Dark/System theme support, and configurable session durations.
+- **Audio & Visual Alerts**: Session start and completion chimes, coupled with native Windows desktop notifications.
+- **Today Dashboard**: At-a-glance view of today's completed sessions, total focus time, current streak, and activity timeline.
+- **Focus Reports**: Detailed Daily, Weekly, and Monthly charts showing focus and break distributions over time.
+- **Data Portability**: Import and export historical focus data using standard tab-delimited CSV formats (supporting both hours and minutes aggregate exports).
+- **100% Local-First**: All data is stored in a local SQLite database on your machine. Zero telemetry, zero cloud accounts, zero background surveillance.
 
-**Golden rule:** every feature must either make starting a focus session easier, or help the user
-understand their focus sessions. If it does neither, it does not belong in Focus Key.
+---
 
-## Technology
+## System Requirements
 
-The application is a true native Windows app:
+- **Operating System**: Windows 10 (version 19041 / 20H1 or higher) or Windows 11 (x64)
+- **Architecture**: x64
 
-- C#
-- Modern .NET
-- WinUI 3
-- Windows App SDK
-- SQLite for local persistence
+---
 
-It does not depend on Python, PySide6, Electron, a browser UI, a web server, Docker, or any
-external backend.
+## Installation
 
-## Official colors
+1. Download the latest installer (`FocusKeySetup.exe`) from the [Releases](https://github.com/Mohaythem/Focus-Key/releases) page.
+2. Run `FocusKeySetup.exe`. The installer performs a clean, per-user installation without requiring administrator privileges:
+   ```text
+   %LOCALAPPDATA%\Programs\Focus Key\
+   ```
+3. Launch **Focus Key** from the Start Menu, Windows Search, or the Desktop shortcut.
 
-| Role       | Value     |
-| ---------- | --------- |
-| Background | `#0a0d0d` |
-| Work       | `#183739` |
-| Break      | `#434763` |
-| Main text  | `#f0f4f4` |
+To uninstall, open **Windows Settings > Apps > Installed apps**, search for **Focus Key**, and select **Uninstall**.
 
-## Repository layout
+---
 
-| Branch                  | Purpose                                                       |
-| ----------------------- | ------------------------------------------------------------- |
-| `main`                  | Reviewed baseline. No unreviewed implementation work lands here. |
-| `native/phased-rewrite` | All implementation work, one verified phase at a time.        |
+## Building from Source
 
-## How this project is built
+### Prerequisites
 
-Focus Key is implemented strictly phase by phase. A phase is designed, implemented, compiled,
-tested, smoke-verified, reviewed, documented, committed, and pushed before the next phase starts.
-Nothing is implemented early because it will be needed later.
+- Windows 10 (build 19041+) or Windows 11
+- [.NET 10 SDK](https://dotnet.microsoft.com/download)
+- Windows App SDK / WinUI 3 build workloads
+- [Inno Setup 6](https://jrsoftware.org/isinfo.php) (optional, only required for building the standalone setup installer)
 
-Phase records live at the repository root and contain the factual implementation and
-verification evidence for each phase: [`Phase 0.md`](Phase%200.md), [`Phase 1.md`](Phase%201.md),
-[`Phase 2.md`](Phase%202.md), [`Phase 3.md`](Phase%203.md), [`Phase 4.md`](Phase%204.md),
-[`Phase 5.md`](Phase%205.md), [`Phase 6.md`](Phase%206.md), [`Phase 7.md`](Phase%207.md),
-[`Phase 8.md`](Phase%208.md), and [`Phase 9.md`](Phase%209.md) (in progress).
+### Build Commands
 
-| Phase | Scope                                 |
-| ----- | ------------------------------------- |
-| 0     | Native foundation                     |
-| 1     | Session data layer                    |
-| 2     | Session engine                        |
-| 3     | Recovery and application coordination |
-| 4     | Windows background shell              |
-| 5     | Quick overlay                         |
-| 6     | Notifications and completion UX       |
-| 7     | Today                                 |
-| 8     | Reports                               |
-| 9     | Settings                              |
-| 10    | Mini timer                            |
-| 11    | Reliability and edge cases            |
-| 12    | Design fidelity and polish            |
-| 13    | Packaging and release                 |
+Clone the repository and build using the .NET CLI:
 
-## Runtime data
+```powershell
+# Restore dependencies
+dotnet restore FocusKey.slnx
 
-Focus Key keeps everything on the machine it runs on, under the current user's local application
-data folder:
+# Build in Release configuration
+dotnet build FocusKey.slnx -c Release
+
+# Run automated unit tests
+dotnet test FocusKey.slnx -c Release
+```
+
+### Packaging the Installer
+
+To produce the production installer (`release\FocusKeySetup.exe`):
+
+```powershell
+# Publish self-contained native application
+dotnet publish src\FocusKey.App\FocusKey.App.csproj -c Release -r win-x64 --self-contained -o publish
+
+# Compile Inno Setup installer script
+iscc installer.iss
+```
+
+The output installer will be located in `release\FocusKeySetup.exe`.
+
+---
+
+## Local Data Storage
+
+Focus Key keeps all persistent state strictly on your local machine:
 
 ```text
 %LOCALAPPDATA%\FocusKey\
-├── focus_key.db
+├── focus_key.db       # SQLite database (sessions, settings, history)
 └── logs\
-    └── focus_key.log
+    └── focus_key.log  # Application runtime log
 ```
 
-Nothing is sent anywhere.
+Setting the `FOCUSKEY_DATA_ROOT` environment variable allows redirecting this directory for testing or portable profiles.
+
+---
+
+## License
+
+No open-source license is currently applied to this repository. All rights reserved by the author.

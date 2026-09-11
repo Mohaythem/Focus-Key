@@ -414,7 +414,7 @@ an integer in the duration column.
 
 ## Verification commands
 
-Run from `D:\Focus Key NEW`:
+Run from `the repository root`:
 
 ```text
 dotnet restore FocusKey.slnx

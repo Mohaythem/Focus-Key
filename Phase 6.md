@@ -1,7 +1,7 @@
 # Phase 6 — Notifications & Completion UX
 
 Status: PASS — implementation and final verification complete.
-Workspace: `D:\Focus Key`. Branch: `native/phased-rewrite`.
+Workspace: `the repository root`. Branch: `native/phased-rewrite`.
 
 ## Baseline and scope
 

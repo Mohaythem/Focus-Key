@@ -2,7 +2,7 @@
 
 Status: **complete, verified, and pushed**.
 Date: 2026-09-05
-Workspace: `D:\Focus Key`
+Workspace: `the repository root`
 Branch: `native/phased-rewrite` (not renamed)
 Preceding commit: `294218513034e4f00628842f3624d889b31f60a7`
 
@@ -162,7 +162,7 @@ ignored; only the smoke script itself is intentionally added from `.smoke`.
 
 ## Verification commands and results
 
-Run from `D:\Focus Key`:
+Run from `the repository root`:
 
 ```powershell
 dotnet restore FocusKey.slnx
@@ -193,13 +193,13 @@ Native smoke: PASS outside the sandbox. The first restricted launch displayed a 
 before application initialization. It was not counted as a pass; its exact test process was closed.
 The same executable/script then passed with approved native execution:
 
-- Isolated root: `D:\Focus Key\.smoke\p2-9ddaff509a0742a4bd42bf952f185cbf`.
+- Isolated root: `.smoke\p2-9ddaff509a0742a4bd42bf952f185cbf`.
 - First process 16768: responsive `Focus Key` window, migrations 1 and 2 applied, schema 2,
   foundation initialized, placeholder displayed, clean shutdown, exit 0.
 - Second process 26628: responsive window, schema 2, no migrations applied, clean shutdown, exit 0.
 - Database header independently reports schema 2 after shutdown.
 
-The smoke helper derives the workspace from its own path (no old `D:\Focus Key NEW` dependency),
+The smoke helper derives the workspace from its own path (no old `the repository root` dependency),
 requires a fresh contained data root, validates only each run's appended log text, checks both
 schema migrations and second-launch idempotency, and restores the caller's data-root environment.
 

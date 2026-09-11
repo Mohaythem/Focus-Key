@@ -1,6 +1,6 @@
 # Phase 10 — Mini Timer
 
-Workspace: `D:\Focus Key`. Branch: `native/phased-rewrite`.
+Workspace: `the repository root`. Branch: `native/phased-rewrite`.
 Baseline: `cc05c9a684c9cdfc0867542f6cd60d2cb9c20157` (Phase 9 complete).
 
 Status: PASS — implementation and verification complete.

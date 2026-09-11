@@ -446,7 +446,21 @@ internal static class ShellProbe
         if (string.Equals(root, "default", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(root, "user", StringComparison.OrdinalIgnoreCase))
             return AppPaths.Resolve();
-        string baseRoot = Path.GetFullPath(@"D:\Focus Key\.smoke");
+        string? probeDir = AppContext.BaseDirectory;
+        string? smokeDir = null;
+        while (!string.IsNullOrEmpty(probeDir))
+        {
+            string candidate = Path.Combine(probeDir, ".smoke");
+            if (Directory.Exists(candidate))
+            {
+                smokeDir = candidate;
+                break;
+            }
+            string? parent = Path.GetDirectoryName(probeDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+            if (string.IsNullOrEmpty(parent) || parent == probeDir) break;
+            probeDir = parent;
+        }
+        string baseRoot = smokeDir ?? Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, ".smoke"));
         string full = Path.GetFullPath(root);
         if (!full.StartsWith(baseRoot.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) throw new ArgumentException($"Data root must be strictly under '{baseRoot}'.");
         return AppPaths.ForRoot(full);

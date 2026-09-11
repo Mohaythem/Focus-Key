@@ -9,8 +9,8 @@ DefaultDirName={userpf}\Focus Key
 DefaultGroupName=Focus Key
 DisableProgramGroupPage=yes
 OutputBaseFilename=FocusKeySetup
-OutputDir=D:\Focus Key\release
-SetupIconFile=D:\Focus Key\src\FocusKey.App\Assets\AppIcon.ico
+OutputDir=release
+SetupIconFile=src\FocusKey.App\Assets\AppIcon.ico
 UninstallDisplayIcon={app}\FocusKey.exe
 WizardStyle=modern
 Compression=lzma2/ultra64
@@ -25,7 +25,7 @@ RestartApplications=no
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "D:\Focus Key\publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\Focus Key"; Filename: "{app}\FocusKey.exe"

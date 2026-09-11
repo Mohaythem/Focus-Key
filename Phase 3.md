@@ -40,7 +40,7 @@ Final result: **236 passed, 0 failed, 0 skipped** (209 existing plus 27 Phase 3 
 
 Deterministic tests cover empty startup; before/exactly/after expiry; planned-end completion; conservative interruption; backwards clocks; clean shutdown; repeated initialization/recovery/shutdown; all pre-init and post-shutdown operation guards; forwarded engine behavior; independent-instance recovery races; stale recovery versus completion/new session/edited Running fields; queued Start/shutdown ordering; cancellation while queued, after read and after commit; failure retry; and real SQLite trigger-induced rollback. TaskCompletionSource barriers control interleavings without sleeps or wall-clock waiting.
 
-Commands run from `D:\Focus Key`:
+Commands run from `the repository root`:
 
 ```powershell
 dotnet restore FocusKey.slnx
@@ -54,7 +54,7 @@ git diff --stat
 git status --short
 ```
 
-Restore succeeded (all projects up to date). Full build succeeded with **0 warnings and 0 errors**. Complete test suite passed. Native smoke passed two responsive launches and exit-code-0 shutdowns under `D:\Focus Key\.smoke\p3-1e22102edc26424e94acb36ed6951bdf`; first launch applied migrations 1 and 2, second applied none, schema remained 2, and both logged NoActiveSession startup/shutdown outcomes. Smoke uses bounded polling for native window readiness, separate from deterministic tests. Recovery of populated databases is covered by real SQLite tests; the native smoke uses an empty isolated database.
+Restore succeeded (all projects up to date). Full build succeeded with **0 warnings and 0 errors**. Complete test suite passed. Native smoke passed two responsive launches and exit-code-0 shutdowns under `.smoke\p3-1e22102edc26424e94acb36ed6951bdf`; first launch applied migrations 1 and 2, second applied none, schema remained 2, and both logged NoActiveSession startup/shutdown outcomes. Smoke uses bounded polling for native window readiness, separate from deterministic tests. Recovery of populated databases is covered by real SQLite tests; the native smoke uses an empty isolated database.
 
 Final source/diff review found no remaining Phase 3 correctness issue. `chat_history.txt`, specification and design ZIP hashes remain unchanged. The default/legacy local database was not opened. Smoke artifacts are ignored and not committed.
 

@@ -1,6 +1,6 @@
 # Phase 8 — Reports (functional UI)
 
-Workspace: `D:\Focus Key`. Branch: `native/phased-rewrite`.
+Workspace: `the repository root`. Branch: `native/phased-rewrite`.
 Status: PASS — implementation and verification complete.
 
 ## Baseline and scope

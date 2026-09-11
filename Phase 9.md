@@ -1,6 +1,6 @@
 # Phase 9 — Settings
 
-Workspace: `D:\Focus Key`. Branch: `native/phased-rewrite`.
+Workspace: `the repository root`. Branch: `native/phased-rewrite`.
 
 Phase 9 is complete. This document records sub-phases 9.1–9.6. The final behavior is described in Phase 9.6 below; earlier sections describe their historical delivery state.
 

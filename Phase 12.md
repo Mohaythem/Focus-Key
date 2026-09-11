@@ -1,6 +1,6 @@
 # Phase 12 — Final Design Fidelity & Polish
 
-Workspace: `D:\Focus Key`. Branch: `native/phased-rewrite`.
+Workspace: `the repository root`. Branch: `native/phased-rewrite`.
 
 Status: PHASE 12 PASS.
 
@@ -86,7 +86,7 @@ Settings provides a curated two-tier theme configuration model:
 - Tests cover Session Coordinator, Completion Coordinator, Settings Persistence & Presets, Quick Overlay Controller, Background Shell lifecycle, and countdown formatting.
 
 ### C. Runtime Desktop Smoke Verification (ShellProbe)
-Verified against an isolated runtime environment (`D:\Focus Key\.smoke\p12-visual`):
+Verified against an isolated runtime environment (`.smoke\p12-visual`):
 1. **Single-Instance Shell Startup**: Process launched cleanly on `WinSta0\default`, acquired mutex lease, registered tray icon, and registered `Shift + F3` hotkey.
 2. **Mini Timer Elimination Verification**:
    - Sent command 3 (legacy `mini` tray/sidebar command): Successfully routed to open the Quick Overlay rather than a separate window.

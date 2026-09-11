@@ -141,7 +141,7 @@ public partial class App : Application
                 if (_isExiting || _startup is null) return;
                 if (_quickOverlay is not null)
                 {
-                    await _quickOverlay.HandleActivationAsync(ShellActivationKind.Hotkey);
+                    await _quickOverlay.HandleActivationAsync(kind);
                 }
             }
         }

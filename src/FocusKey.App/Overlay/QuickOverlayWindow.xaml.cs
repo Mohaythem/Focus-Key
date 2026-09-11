@@ -47,6 +47,8 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
         presenter.IsMaximizable = false;
         presenter.IsAlwaysOnTop = true;
         presenter.SetBorderAndTitleBar(false, false);
+        var hIcon = NativeMethods.LoadIcon(NativeMethods.GetModuleHandle(null), (IntPtr)NativeMethods.IDI_APPLICATION);
+        AppWindow.SetIcon(Microsoft.UI.Win32Interop.GetIconIdFromIcon(hIcon));
         AppWindow.SetPresenter(presenter);
         try { AppWindow.IsShownInSwitchers = false; }
         catch { }
@@ -356,15 +358,16 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
         // so keyboard hints and text scaling never clip or collide with the bottom window border.
         double widthDip = _state.Active is not null ? 379 : 420;
         double heightDip;
+        Surface.Width = widthDip;
+        Surface.Height = double.NaN;
+        Surface.Measure(new Windows.Foundation.Size(widthDip, double.PositiveInfinity));
+
         if (_state.Active is not null)
         {
-            heightDip = 198;
+            heightDip = Math.Max(198, Math.Ceiling(Surface.DesiredSize.Height));
         }
         else
         {
-            Surface.Width = widthDip;
-            Surface.Height = double.NaN;
-            Surface.Measure(new Windows.Foundation.Size(widthDip, double.PositiveInfinity));
             // Baseline 286 DIP provides comfortable bottom breathing room; expands dynamically for text scaling or feedback
             heightDip = Math.Max(286, Math.Ceiling(Surface.DesiredSize.Height));
             if (_state.Feedback is not null)

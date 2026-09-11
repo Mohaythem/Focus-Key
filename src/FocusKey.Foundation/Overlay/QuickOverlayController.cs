@@ -43,7 +43,7 @@ public sealed class QuickOverlayController : IDisposable
 
     public async Task HandleActivationAsync(ShellActivationKind kind)
     {
-        if (_disposed || kind != ShellActivationKind.Hotkey) return;
+        if (_disposed || (kind != ShellActivationKind.Hotkey && kind != ShellActivationKind.MiniTimer)) return;
         if (_view is null)
         {
             _view = _createView();
@@ -62,7 +62,7 @@ public sealed class QuickOverlayController : IDisposable
 
         _visible = true;
         int observation = ++_observation;
-        SetState(new(SessionType.Work, true, false, null));
+        SetState(_state with { IsBusy = true, CanStart = false, Feedback = null });
         _view.ShowAndFocus();
         try
         {

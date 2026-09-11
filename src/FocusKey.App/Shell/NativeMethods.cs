@@ -27,6 +27,7 @@ internal static class NativeMethods
     internal const uint NIF_TIP = 0x00000004;
     internal const uint NIF_INFO = 0x00000010;
     internal const uint NIIF_INFO = 0x00000001;
+    internal const uint NIIF_USER = 0x00000004;
     internal const uint NIIF_RESPECT_QUIET_TIME = 0x00000080;
     internal const uint NIF_SHOWTIP = 0x00000080;
     internal const uint NIM_ADD = 0x00000000;

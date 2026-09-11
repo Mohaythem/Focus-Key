@@ -85,6 +85,8 @@ public sealed partial class MainWindow : Window
         var hwnd = WindowNative.GetWindowHandle(this);
         double scale = NativeMethods.GetDpiForWindow(hwnd) / 96.0;
         if (scale <= 0) scale = 1.0;
+        var hIcon = NativeMethods.LoadIcon(NativeMethods.GetModuleHandle(null), (IntPtr)NativeMethods.IDI_APPLICATION);
+        AppWindow.SetIcon(Microsoft.UI.Win32Interop.GetIconIdFromIcon(hIcon));
         AppWindow.Resize(new SizeInt32((int)Math.Ceiling(880 * scale), (int)Math.Ceiling(660 * scale)));
         MainSurface.ActualThemeChanged += (_, _) => { if (_appearance == Appearance.System) UpdateAppearance(); };
         MainSurface.SizeChanged += (_, _) =>

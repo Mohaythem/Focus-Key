@@ -41,9 +41,12 @@ internal sealed class WindowsShellIntegration : IShellIntegration
         var data = TrayData(NativeMethods.NIF_INFO);
         data.szInfoTitle = "Focus Key";
         data.szInfo = session.Type == SessionType.Work ? "Work session completed." : "Break session completed.";
-        data.dwInfoFlags = NativeMethods.NIIF_INFO | NativeMethods.NIIF_RESPECT_QUIET_TIME;
+        data.dwInfoFlags = NativeMethods.NIIF_USER | NativeMethods.NIIF_RESPECT_QUIET_TIME;
+        data.hBalloonIcon = _icon;
         if (!NativeMethods.Shell_NotifyIcon(NativeMethods.NIM_MODIFY, ref data))
-            throw LastError("Could not submit the session completion notification.");
+        {
+            // Notifications are best-effort. If Explorer fails, do not crash the app.
+        }
     }
 
     public void Start()
@@ -57,8 +60,8 @@ internal sealed class WindowsShellIntegration : IShellIntegration
         var wc = new NativeMethods.WNDCLASSEX
         {
             cbSize = (uint)Marshal.SizeOf<NativeMethods.WNDCLASSEX>(), lpfnWndProc = _windowProcedure,
-            hInstance = _instance, hIcon = NativeMethods.LoadIcon(IntPtr.Zero, (IntPtr)NativeMethods.IDI_APPLICATION),
-            hIconSm = NativeMethods.LoadIcon(IntPtr.Zero, (IntPtr)NativeMethods.IDI_APPLICATION),
+            hInstance = _instance, hIcon = NativeMethods.LoadIcon(_instance, (IntPtr)NativeMethods.IDI_APPLICATION),
+            hIconSm = NativeMethods.LoadIcon(_instance, (IntPtr)NativeMethods.IDI_APPLICATION),
             lpszClassName = _className, lpszMenuName = string.Empty
         };
         if (NativeMethods.RegisterClassEx(ref wc) == 0) throw LastError("Could not register the shell window class.");
@@ -71,8 +74,14 @@ internal sealed class WindowsShellIntegration : IShellIntegration
             _powerRegistration = NativeMethods.RegisterSuspendResumeNotification(_window, 0); // DEVICE_NOTIFY_WINDOW_HANDLE
             if (_powerRegistration == IntPtr.Zero) throw LastError("Could not subscribe to system resume notifications.");
             if (!NativeMethods.RegisterHotKey(_window, HotkeyId, NativeMethods.MOD_SHIFT | NativeMethods.MOD_NOREPEAT, NativeMethods.VK_F3))
-                throw new Win32Exception(Marshal.GetLastWin32Error(), "Could not register Shift+F3 global hotkey; it may already be in use by another application.");
-            _hotkeyRegistered = true;
+            {
+                // Hotkey is a convenience; do not crash the application if it is taken.
+                _hotkeyRegistered = false;
+            }
+            else
+            {
+                _hotkeyRegistered = true;
+            }
             AddTrayIcon();
             _started = true;
         }
@@ -89,7 +98,8 @@ internal sealed class WindowsShellIntegration : IShellIntegration
 
     private void AddTrayIcon()
     {
-        _icon = NativeMethods.LoadIcon(IntPtr.Zero, (IntPtr)NativeMethods.IDI_APPLICATION);
+        _icon = NativeMethods.LoadIcon(_instance, (IntPtr)NativeMethods.IDI_APPLICATION);
+        if (_icon == IntPtr.Zero) _icon = NativeMethods.LoadIcon(IntPtr.Zero, (IntPtr)NativeMethods.IDI_APPLICATION);
         if (_icon == IntPtr.Zero) return;
         var data = TrayData(NativeMethods.NIF_MESSAGE | NativeMethods.NIF_ICON | NativeMethods.NIF_TIP | NativeMethods.NIF_SHOWTIP);
         for (int retry = 0; retry < 5; retry++)

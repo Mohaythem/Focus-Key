@@ -43,27 +43,8 @@ public sealed class AppPaths
         string? overrideRoot = Environment.GetEnvironmentVariable(DataRootEnvironmentVariable);
 
         return string.IsNullOrWhiteSpace(overrideRoot)
-            ? ForLocalApplicationData()
+            ? ForRoot(Path.Combine(AppContext.BaseDirectory, "data"))
             : ForRoot(overrideRoot);
-    }
-
-    /// <summary>
-    /// Standard location: <c>%LOCALAPPDATA%\FocusKey</c>. Local (not roaming) on purpose —
-    /// Focus Key data never leaves the machine it was recorded on.
-    /// </summary>
-    public static AppPaths ForLocalApplicationData()
-    {
-        string localAppData = Environment.GetFolderPath(
-            Environment.SpecialFolder.LocalApplicationData,
-            Environment.SpecialFolderOption.DoNotVerify);
-
-        if (string.IsNullOrWhiteSpace(localAppData))
-        {
-            throw new InvalidOperationException(
-                "The local application data folder could not be resolved for the current user.");
-        }
-
-        return ForRoot(Path.Combine(localAppData, ApplicationFolderName));
     }
 
     /// <summary>

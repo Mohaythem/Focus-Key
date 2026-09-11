@@ -91,5 +91,46 @@ public static class SchemaMigrations
                     appearance, work_color, break_color)
                 VALUES (1, 1800, 600, 'system', '#183739', '#434763');
                 """),
+
+        new SchemaMigration(
+            Version: 4,
+            Name: "theme_settings",
+            Sql: """
+                CREATE TABLE IF NOT EXISTS theme_settings (
+                    singleton        INTEGER NOT NULL PRIMARY KEY,
+                    light_preset     TEXT    NOT NULL,
+                    light_background TEXT    NOT NULL,
+                    light_foreground TEXT    NOT NULL,
+                    light_accent     TEXT    NOT NULL,
+                    dark_preset      TEXT    NOT NULL,
+                    dark_background  TEXT    NOT NULL,
+                    dark_foreground  TEXT    NOT NULL,
+                    dark_accent      TEXT    NOT NULL,
+                    contrast         TEXT    NOT NULL DEFAULT 'standard',
+                    CHECK (singleton = 1)
+                );
+
+                -- Since version 4 is newly introduced but some dev environments might have the table already:
+                -- Wait, we can just alter if it exists, or if it doesn't, we create it.
+                -- SQLite does not support ADD COLUMN IF NOT EXISTS gracefully in older versions,
+                -- but since this is version 4, clean installs will just run this block.
+                
+                INSERT OR IGNORE INTO theme_settings (
+                    singleton, light_preset, light_background, light_foreground, light_accent,
+                    dark_preset, dark_background, dark_foreground, dark_accent, contrast)
+                VALUES (1, 'default', '#F2F5F5', '#0F1414', '#183739',
+                           'carbon', '#121212', '#E0E0E0', '#4CC2FF', 'standard');
+                           
+                UPDATE theme_settings
+                SET dark_preset = 'carbon',
+                    dark_background = '#121212',
+                    dark_foreground = '#E0E0E0',
+                    dark_accent = '#4CC2FF'
+                WHERE singleton = 1
+                  AND dark_preset = 'default'
+                  AND dark_background = '#0A0D0D'
+                  AND dark_foreground = '#F0F4F4'
+                  AND dark_accent = '#2D6669';
+                """),
     ];
 }

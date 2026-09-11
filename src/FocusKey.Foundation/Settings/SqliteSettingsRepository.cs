@@ -58,7 +58,6 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
         ArgumentNullException.ThrowIfNull(settings);
         settings.Validate();
         await using SqliteConnection connection = await _connections.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
-        await EnsureThemeTableAsync(connection, cancellationToken).ConfigureAwait(false);
         await using SqliteTransaction transaction = connection.BeginTransaction(deferred: false);
         await using SqliteCommand command = connection.CreateCommand();
         command.Transaction = transaction;
@@ -112,7 +111,6 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
     private static async Task<(ThemeConfiguration light, ThemeConfiguration dark, Contrast contrast)> LoadThemeSettingsAsync(
         SqliteConnection connection, CancellationToken cancellationToken)
     {
-        await EnsureThemeTableAsync(connection, cancellationToken).ConfigureAwait(false);
         await using SqliteCommand cmd = connection.CreateCommand();
         cmd.CommandText =
             """
@@ -143,69 +141,7 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
         return (light, dark, contrast);
     }
 
-    private static async Task EnsureThemeTableAsync(SqliteConnection connection, CancellationToken cancellationToken)
-    {
-        await using (var createCmd = connection.CreateCommand())
-        {
-            createCmd.CommandText =
-                """
-                CREATE TABLE IF NOT EXISTS theme_settings (
-                    singleton        INTEGER NOT NULL PRIMARY KEY,
-                    light_preset     TEXT    NOT NULL,
-                    light_background TEXT    NOT NULL,
-                    light_foreground TEXT    NOT NULL,
-                    light_accent     TEXT    NOT NULL,
-                    dark_preset      TEXT    NOT NULL,
-                    dark_background  TEXT    NOT NULL,
-                    dark_foreground  TEXT    NOT NULL,
-                    dark_accent      TEXT    NOT NULL,
-                    contrast         TEXT    NOT NULL DEFAULT 'standard',
-                    CHECK (singleton = 1)
-                );
-                """;
-            await createCmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-        }
 
-        try
-        {
-            await using var alterCmd = connection.CreateCommand();
-            alterCmd.CommandText = "ALTER TABLE theme_settings ADD COLUMN contrast TEXT NOT NULL DEFAULT 'standard';";
-            await alterCmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-        }
-        catch (SqliteException) { }
-
-        await using (var insertCmd = connection.CreateCommand())
-        {
-            insertCmd.CommandText =
-                """
-                INSERT OR IGNORE INTO theme_settings (
-                    singleton, light_preset, light_background, light_foreground, light_accent,
-                    dark_preset, dark_background, dark_foreground, dark_accent, contrast)
-                VALUES (1, 'default', '#F2F5F5', '#0F1414', '#183739',
-                           'carbon', '#121212', '#E0E0E0', '#4CC2FF', 'standard');
-                """;
-            await insertCmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-        }
-
-        // Migrate uncustomized legacy default dark row to Carbon Studio
-        await using (var migrateCmd = connection.CreateCommand())
-        {
-            migrateCmd.CommandText =
-                """
-                UPDATE theme_settings
-                SET dark_preset = 'carbon',
-                    dark_background = '#121212',
-                    dark_foreground = '#E0E0E0',
-                    dark_accent = '#4CC2FF'
-                WHERE singleton = 1
-                  AND dark_preset = 'default'
-                  AND dark_background = '#0A0D0D'
-                  AND dark_foreground = '#F0F4F4'
-                  AND dark_accent = '#2D6669';
-                """;
-            await migrateCmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-        }
-    }
 
     private static HexColor ParsePersistedColor(string value, string column)
     {

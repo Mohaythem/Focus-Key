@@ -10,18 +10,32 @@
     <UseWinUI>true</UseWinUI>
 
     <!--
-      Unpackaged for development: the app runs as a plain .exe against the
-      machine-wide Windows App Runtime. Nothing here commits the product to a
-      final packaging strategy; that decision belongs to Phase 13.
+      Phase 13 Release Configuration
+      Unpackaged portable distribution with embedded resources.
     -->
     <WindowsPackageType>None</WindowsPackageType>
-    <WindowsAppSDKSelfContained>false</WindowsAppSDKSelfContained>
-    <SelfContained>false</SelfContained>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <SelfContained>true</SelfContained>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
+    
+    <Version>1.0.0.0</Version>
+    <Company>Focus Key</Company>
+    <Product>Focus Key</Product>
+    <Description>Focus Key - Native Windows Desktop Productivity Timer</Description>
+    <Copyright>Copyright © 2026 Focus Key</Copyright>
+
+    <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>
+    <DebugSymbols Condition="'$(Configuration)' == 'Release'">false</DebugSymbols>
 
     <!-- Required by the source-generated MessageBoxW interop used for startup failures. -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\AppIcon.ico" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.4.0" />

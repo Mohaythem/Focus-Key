@@ -68,29 +68,29 @@ public sealed class HistoricalFocusService(
         var historical = await _history.GetAllAsync(cancellationToken).ConfigureAwait(false);
 
         // 3. Merge: key is (Date, Project)
-        var exportDict = new Dictionary<(DateOnly Date, string Project), double>();
+        var exportDict = new Dictionary<(DateOnly Date, string Project), TimeSpan>();
 
         // Add imported records first
         foreach (var rec in historical)
         {
             var key = (rec.Date, rec.Project);
-            exportDict[key] = rec.SourceHours;
+            exportDict[key] = rec.Duration;
         }
 
         // Add native focus records (native sessions have empty project "")
         foreach (var kvp in nativeFocusByDate)
         {
             var key = (kvp.Key, "");
-            double nativeHours = Math.Round(kvp.Value.TotalSeconds / 3600.0, 2);
+            TimeSpan nativeDuration = kvp.Value;
 
-            if (exportDict.TryGetValue(key, out double existingHours))
+            if (exportDict.TryGetValue(key, out TimeSpan existingDuration))
             {
                 // Both imported history and native sessions exist for this day with empty project
-                exportDict[key] = Math.Round(existingHours + nativeHours, 2);
+                exportDict[key] = existingDuration + nativeDuration;
             }
             else
             {
-                exportDict[key] = nativeHours;
+                exportDict[key] = nativeDuration;
             }
         }
 

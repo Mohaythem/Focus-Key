@@ -98,24 +98,25 @@ public sealed class SqliteHistoricalFocusRepository(SqliteConnectionFactory conn
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 string dateStr = entry.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-                long durationSeconds = (long)Math.Round(entry.Hours * 3600);
-                totalHours += entry.Hours;
+                long durationSeconds = (long)entry.Duration.TotalSeconds;
+                double hours = entry.Hours;
+                totalHours += entry.Duration.TotalHours;
 
                 // Check existing record
                 await using var checkCmd = connection.CreateCommand();
                 checkCmd.Transaction = transaction;
                 checkCmd.CommandText =
                     """
-                    SELECT source_hours FROM historical_focus
+                    SELECT duration_seconds, source_hours FROM historical_focus
                     WHERE date = $date AND project = $project;
                     """;
                 checkCmd.Parameters.AddWithValue("$date", dateStr);
                 checkCmd.Parameters.AddWithValue("$project", entry.Project);
 
-                object? existingObj = await checkCmd.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
-
-                if (existingObj is null)
+                await using var reader = await checkCmd.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+                if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
                 {
+                    await reader.CloseAsync().ConfigureAwait(false);
                     // New record
                     await using var insertCmd = connection.CreateCommand();
                     insertCmd.Transaction = transaction;
@@ -127,22 +128,24 @@ public sealed class SqliteHistoricalFocusRepository(SqliteConnectionFactory conn
                     insertCmd.Parameters.AddWithValue("$date", dateStr);
                     insertCmd.Parameters.AddWithValue("$project", entry.Project);
                     insertCmd.Parameters.AddWithValue("$duration", durationSeconds);
-                    insertCmd.Parameters.AddWithValue("$hours", entry.Hours);
+                    insertCmd.Parameters.AddWithValue("$hours", hours);
                     insertCmd.Parameters.AddWithValue("$now", nowUtc);
                     await insertCmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
                     newRecords++;
                 }
                 else
                 {
-                    double existingHours = Convert.ToDouble(existingObj, CultureInfo.InvariantCulture);
-                    if (Math.Abs(existingHours - entry.Hours) < 0.0001)
+                    long existingSeconds = reader.GetInt64(0);
+                    await reader.CloseAsync().ConfigureAwait(false);
+
+                    if (existingSeconds == durationSeconds || Math.Abs(existingSeconds - durationSeconds) <= 1)
                     {
                         // Duplicate identical record — no change needed
                         duplicateRecords++;
                     }
                     else
                     {
-                        // Updated record with new hours value
+                        // Updated record with new duration value
                         await using var updateCmd = connection.CreateCommand();
                         updateCmd.Transaction = transaction;
                         updateCmd.CommandText =
@@ -152,7 +155,7 @@ public sealed class SqliteHistoricalFocusRepository(SqliteConnectionFactory conn
                             WHERE date = $date AND project = $project;
                             """;
                         updateCmd.Parameters.AddWithValue("$duration", durationSeconds);
-                        updateCmd.Parameters.AddWithValue("$hours", entry.Hours);
+                        updateCmd.Parameters.AddWithValue("$hours", hours);
                         updateCmd.Parameters.AddWithValue("$now", nowUtc);
                         updateCmd.Parameters.AddWithValue("$date", dateStr);
                         updateCmd.Parameters.AddWithValue("$project", entry.Project);

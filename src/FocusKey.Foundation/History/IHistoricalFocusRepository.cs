@@ -1,6 +1,21 @@
 namespace FocusKey.Foundation.History;
 
-public sealed record HistoricalFocusEntry(DateOnly Date, string Project, double Hours);
+public sealed record HistoricalFocusEntry(DateOnly Date, string Project, TimeSpan Duration, double Hours)
+{
+    public HistoricalFocusEntry(DateOnly date, string project, double hours)
+        : this(date, project, TimeSpan.FromSeconds((long)Math.Round(hours * 3600.0)), hours)
+    {
+    }
+
+    public static HistoricalFocusEntry FromHours(DateOnly date, string project, double hours) =>
+        new(date, project, TimeSpan.FromSeconds((long)Math.Round(hours * 3600.0)), hours);
+
+    public static HistoricalFocusEntry FromMinutes(DateOnly date, string project, double minutes)
+    {
+        long seconds = (long)Math.Round(minutes * 60.0);
+        return new(date, project, TimeSpan.FromSeconds(seconds), Math.Round(minutes / 60.0, 2));
+    }
+}
 
 public sealed record CsvImportResult(
     bool Success,

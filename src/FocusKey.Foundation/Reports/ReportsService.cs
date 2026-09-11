@@ -173,7 +173,7 @@ public sealed class ReportsService
         var allHistory = _history is not null
             ? await _history.GetAllAsync(cancellationToken).ConfigureAwait(false)
             : [];
-        var qualifyingDates = allHistory.Where(h => h.SourceHours > 0).Select(h => h.Date).Distinct();
+        var qualifyingDates = allHistory.Where(h => h.Duration > TimeSpan.Zero || h.SourceHours > 0).Select(h => h.Date).Distinct();
         var streaks = StreakCalculator.Calculate(allRecords, qualifyingDates, CurrentDate(), zone);
 
         cancellationToken.ThrowIfCancellationRequested();

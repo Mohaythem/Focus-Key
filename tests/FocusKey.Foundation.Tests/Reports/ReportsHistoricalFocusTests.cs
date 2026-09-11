@@ -191,4 +191,74 @@ public sealed class ReportsHistoricalFocusTests
         Assert.Equal(3, snapshot.Streaks.CurrentStreak);
         Assert.True(snapshot.Streaks.LongestStreak >= 3);
     }
+
+    [Fact]
+    public async Task ReadAsync_15ConsecutiveImportedPositiveFocusDates_Produces15DayStreak()
+    {
+        using var temp = new TempDirectory();
+        string file = Path.Combine(temp.Path, "focus_key.db");
+        var connections = new SqliteConnectionFactory(file);
+        new DatabaseBootstrapper(connections).Initialize();
+
+        var sessionRepo = new SqliteSessionRepository(connections);
+        var historyRepo = new SqliteHistoricalFocusRepository(connections);
+
+        // 15 consecutive days with imported minutes focus (e.g. 2026-09-01 to 2026-09-15)
+        var entries = new List<HistoricalFocusEntry>();
+        for (int i = 1; i <= 15; i++)
+        {
+            entries.Add(HistoricalFocusEntry.FromMinutes(new DateOnly(2026, 9, i), "", 120)); // 2 hours each day
+        }
+        await historyRepo.ImportAsync(entries, 15, 0);
+
+        var timeProvider = new ManualTimeProvider(new DateTimeOffset(2026, 9, 15, 18, 0, 0, TimeSpan.Zero));
+        var reportsService = new ReportsService(sessionRepo, historyRepo, timeProvider, () => TimeZoneInfo.Utc);
+
+        var snapshot = await reportsService.ReadAsync(ReportPeriod.Daily, new DateOnly(2026, 9, 15));
+
+        Assert.Equal(15, snapshot.Streaks.CurrentStreak);
+        Assert.True(snapshot.Streaks.LongestStreak >= 15);
+        Assert.Equal(TimeSpan.FromHours(2), snapshot.Totals.FocusTime);
+    }
+
+    [Fact]
+    public async Task ReadAsync_OverlappingImports_DoesNotInflateStreakOrFocusTime()
+    {
+        using var temp = new TempDirectory();
+        string file = Path.Combine(temp.Path, "focus_key.db");
+        var connections = new SqliteConnectionFactory(file);
+        new DatabaseBootstrapper(connections).Initialize();
+
+        var sessionRepo = new SqliteSessionRepository(connections);
+        var historyRepo = new SqliteHistoricalFocusRepository(connections);
+
+        var date = new DateOnly(2026, 9, 10);
+
+        // First import via hours schema: 11.5 hours
+        var hoursEntries = new List<HistoricalFocusEntry>
+        {
+            HistoricalFocusEntry.FromHours(date, "", 11.5)
+        };
+        var res1 = await historyRepo.ImportAsync(hoursEntries, 1, 0);
+        Assert.Equal(1, res1.NewRecords);
+
+        // Second import via minutes schema: 690 minutes (11.5 hours)
+        var minutesEntries = new List<HistoricalFocusEntry>
+        {
+            HistoricalFocusEntry.FromMinutes(date, "", 690)
+        };
+        var res2 = await historyRepo.ImportAsync(minutesEntries, 1, 0);
+        Assert.Equal(0, res2.NewRecords);
+        Assert.Equal(1, res2.DuplicateRecords); // Already exists with identical duration
+
+        var timeProvider = new ManualTimeProvider(new DateTimeOffset(2026, 9, 10, 18, 0, 0, TimeSpan.Zero));
+        var reportsService = new ReportsService(sessionRepo, historyRepo, timeProvider, () => TimeZoneInfo.Utc);
+
+        var snapshot = await reportsService.ReadAsync(ReportPeriod.Daily, date);
+
+        // Total focus time must remain exactly 11.5 hours (690 minutes), NOT duplicated to 23 hours
+        Assert.Equal(TimeSpan.FromMinutes(690), snapshot.Totals.FocusTime);
+        Assert.Equal(1, snapshot.Streaks.CurrentStreak);
+    }
 }
+

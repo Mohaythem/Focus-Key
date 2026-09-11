@@ -43,7 +43,7 @@ public sealed class AppPaths
         string? overrideRoot = Environment.GetEnvironmentVariable(DataRootEnvironmentVariable);
 
         return string.IsNullOrWhiteSpace(overrideRoot)
-            ? ForRoot(Path.Combine(AppContext.BaseDirectory, "data"))
+            ? ForRoot(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), ApplicationFolderName))
             : ForRoot(overrideRoot);
     }
 

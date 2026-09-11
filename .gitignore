@@ -74,3 +74,4 @@ focus_key.db-wal
 focus_key.log
 settings.json
 logs/
+setup_log*.txt

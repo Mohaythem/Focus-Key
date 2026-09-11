@@ -12,12 +12,13 @@ Finalize the Focus Key application by integrating the official brand mark, confi
 - Configured native Windows notifications to utilize `NIIF_USER` to render the official app icon in toast/balloon tips rather than the generic Windows information symbol.
 
 ## 3. Release Architecture & Packaging
-- Configured a **Portable Unpackaged** release model. 
-  - *Rationale*: Aligns strictly with the requirement to avoid complex installers and certificate hurdles while still providing a native Windows 11 experience.
-- Set `<WindowsPackageType>None</WindowsPackageType>` and `<WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>`.
-- The final artifact in `D:\Focus Key\release\` includes `.NET 10` and `Windows App SDK` components baked in, allowing execution on a clean Windows machine without prerequisite installations.
-- Configured the SQLite `AppPaths` to target `AppContext.BaseDirectory/data` (a local `data` folder next to the executable), assuring complete portability without leaving orphaned files in `%LOCALAPPDATA%`.
-- Updated assembly metadata in the `.csproj` (`Company`, `Product`, `Description`, `Version 1.0.0.0`) and disabled debug symbol generation (`<DebugType>none</DebugType>`) for a clean, professional output directory.
+- **Decision Revision**: The initial decision to ship a loose portable folder was superseded in favor of a proper Windows installer (`FocusKeySetup.exe`).
+- **Installer Technology**: Inno Setup (with LZMA2/Ultra64 compression) was selected for its simplicity, lightweight overhead, and robust offline support.
+- **Runtime Strategy**: The `.NET 10` and `Windows App SDK` components are bundled natively (`SelfContained=true`) to guarantee an offline-capable, clean installation without demanding external downloads from the user.
+- **Application Data**: Overrode `AppPaths.cs` to correctly point SQLite and logs to `%LOCALAPPDATA%\FocusKey` for the installed application, ensuring mutable data remains in the correct user-profile location.
+- **Install Path & Elevation**: Configured the installer to target the per-user program directory (`%LOCALAPPDATA%\Programs\Focus Key`) without requiring Administrator elevation (`PrivilegesRequired=lowest`). This significantly reduces install friction.
+- **Uninstall Behavior**: Clean uninstall is supported via Windows Settings > Apps. The uninstaller securely removes the application binaries but deliberately preserves the user's focus sessions database (`%LOCALAPPDATA%\FocusKey`) by default to prevent accidental data loss.
+- **Release Output**: The final output is an isolated `FocusKeySetup.exe` setup binary, completely isolating the end-user from the raw DLL internals of WinUI 3.
 
 ## 4. 10-Agent Independent Review
 To guarantee absolute release quality, exactly 10 independent review subagents were launched. Each analyzed the Release Candidate codebase across a targeted domain.
@@ -51,6 +52,6 @@ The subagents reported `PASS` for the majority of the UI and engine implementati
   - *Fix*: Removed the exception throw and treated notifications as best-effort.
 
 ## 5. Final Release Acceptance
-After implementing all fixes, the release artifact was rebuilt using `dotnet publish`.
-The `release` directory now contains the final, portable, self-contained `FocusKey.exe`. 
-All identified release blockers have been successfully resolved, and the project has passed final end-to-end evaluation.
+After implementing all fixes, the release artifact was rebuilt and packaged using Inno Setup.
+The `release` directory now contains the final installer `FocusKeySetup.exe`.
+All identified release blockers have been successfully resolved. The application installs correctly to the user's Local AppData Programs directory without requiring elevation, persists data locally outside the execution path, successfully uninstalls via Windows Settings, and the project has passed final end-to-end evaluation.

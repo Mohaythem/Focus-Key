@@ -1,5 +1,6 @@
 using FocusKey.Foundation.Data;
 using FocusKey.Foundation.History;
+using FocusKey.Foundation.Sessions;
 
 namespace FocusKey.Foundation.Tests.History;
 
@@ -302,5 +303,106 @@ public sealed class HistoricalFocusRepositoryTests
         Assert.Equal(2, inRange.Count);
         Assert.Equal(new DateOnly(2026, 9, 1), inRange[0].Date);
         Assert.Equal(new DateOnly(2026, 9, 2), inRange[1].Date);
+    }
+
+    [Fact]
+    public async Task ImportWebsiteCsvAsync_ConflictingDuplicateRows_CommitsNothing()
+    {
+        using var temp = new TempDirectory();
+        string file = Path.Combine(temp.Path, "focus_key.db");
+        var connections = new SqliteConnectionFactory(file);
+        new DatabaseBootstrapper(connections).Initialize();
+
+        var repo = new SqliteHistoricalFocusRepository(connections);
+        var sessionRepo = new SqliteSessionRepository(connections);
+        var service = new HistoricalFocusService(repo, sessionRepo);
+
+        // Pre-populate with 1 legitimate record
+        var existing = new List<HistoricalFocusEntry>
+        {
+            HistoricalFocusEntry.FromMinutes(new DateOnly(2026, 9, 1), "", 120)
+        };
+        await repo.ImportAsync(existing, 1, 0);
+
+        // Ambiguous CSV with conflicting durations for 20260906 (690 vs 700)
+        string conflictingCsv =
+            "date\tproject\tminutes\r\n" +
+            "20260905\t\"\"\t271\r\n" +
+            "20260906\t\"\"\t690\r\n" +
+            "20260906\t\"\"\t700\r\n" +
+            "20260907\t\"\"\t507\r\n";
+
+        var result = await service.ImportWebsiteCsvAsync(conflictingCsv);
+
+        // 1. Must report failure
+        Assert.False(result.Success);
+        Assert.Contains("Conflicting duplicate rows", result.ErrorMessage);
+        Assert.Contains("20260906", result.ErrorMessage);
+
+        // 2. Transactional safety: database must remain untouched (only original record survives)
+        var all = await repo.GetAllAsync();
+        Assert.Single(all);
+        Assert.Equal(new DateOnly(2026, 9, 1), all[0].Date);
+        Assert.Equal(TimeSpan.FromMinutes(120), all[0].Duration);
+    }
+
+    [Fact]
+    public async Task ImportAsync_ConflictingEntriesInBatch_RollsBackAndCommitsNothing()
+    {
+        using var temp = new TempDirectory();
+        string file = Path.Combine(temp.Path, "focus_key.db");
+        var connections = new SqliteConnectionFactory(file);
+        new DatabaseBootstrapper(connections).Initialize();
+
+        var repo = new SqliteHistoricalFocusRepository(connections);
+
+        // Batch with conflicting durations for same date/project
+        var entries = new List<HistoricalFocusEntry>
+        {
+            HistoricalFocusEntry.FromMinutes(new DateOnly(2026, 9, 6), "", 690),
+            HistoricalFocusEntry.FromMinutes(new DateOnly(2026, 9, 6), "", 700),
+        };
+
+        var result = await repo.ImportAsync(entries, 2, 0);
+
+        Assert.False(result.Success);
+        Assert.Contains("Conflicting duplicate entries in import batch", result.ErrorMessage);
+
+        var all = await repo.GetAllAsync();
+        Assert.Empty(all);
+    }
+
+    [Fact]
+    public async Task ImportWebsiteCsvAsync_IdenticalDuplicateInSingleFile_ReportsDuplicateAndDoesNotMultiplyDuration()
+    {
+        using var temp = new TempDirectory();
+        string file = Path.Combine(temp.Path, "focus_key.db");
+        var connections = new SqliteConnectionFactory(file);
+        new DatabaseBootstrapper(connections).Initialize();
+
+        var repo = new SqliteHistoricalFocusRepository(connections);
+        var sessionRepo = new SqliteSessionRepository(connections);
+        var service = new HistoricalFocusService(repo, sessionRepo);
+
+        string csv =
+            "date\tproject\tminutes\r\n" +
+            "20260906\t\"\"\t690\r\n" +
+            "20260906\t\"\"\t690\r\n";
+
+        var result = await service.ImportWebsiteCsvAsync(csv);
+
+        Assert.True(result.Success);
+        Assert.Equal(2, result.RowsFound);
+        Assert.Equal(1, result.NewRecords);
+        Assert.Equal(1, result.DuplicateRecords);
+        Assert.Equal(0, result.UpdatedRecords);
+        Assert.Equal(0, result.InvalidRows);
+
+        var all = await repo.GetAllAsync();
+        Assert.Single(all);
+        Assert.Equal(new DateOnly(2026, 9, 6), all[0].Date);
+        // Duration must remain 690 minutes (41400s), NOT 1380 minutes
+        Assert.Equal(TimeSpan.FromMinutes(690), all[0].Duration);
+        Assert.Equal(41400, all[0].Duration.TotalSeconds);
     }
 }

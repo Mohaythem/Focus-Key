@@ -36,6 +36,7 @@ public sealed class HistoricalFocusService(
             parseResult.ValidEntries,
             parseResult.TotalRowsFound,
             parseResult.InvalidRows,
+            parseResult.DuplicateRows,
             cancellationToken).ConfigureAwait(false);
 
         if (result.Success && (result.NewRecords > 0 || result.UpdatedRecords > 0))

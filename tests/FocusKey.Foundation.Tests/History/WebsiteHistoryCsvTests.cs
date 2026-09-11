@@ -168,26 +168,85 @@ public sealed class WebsiteHistoryCsvTests
     }
 
     [Fact]
-    public void Parse_IntraFileDuplicates_ConsolidatesMinutesUpTo24Hours()
+    public void Parse_IdenticalDuplicateMinutesInSingleFile_AreSkippedNotSummed()
     {
         string csv =
             "date\tproject\tminutes\r\n" +
-            "20260901\t\"Focus\"\t180\r\n" +
-            "20260901\t\"Focus\"\t270\r\n" +
-            "20260901\t\"Other\"\t120\r\n";
+            "20260906\t\"\"\t690\r\n" +
+            "20260906\t\"\"\t690\r\n";
 
         var result = WebsiteHistoryCsv.Parse(csv);
 
         Assert.True(result.Success);
-        Assert.Equal(3, result.TotalRowsFound);
+        Assert.Equal(2, result.TotalRowsFound);
         Assert.Equal(0, result.InvalidRows);
-        Assert.Equal(2, result.ValidEntries.Count);
+        Assert.Equal(1, result.DuplicateRows);
+        Assert.Single(result.ValidEntries);
 
-        var focus = result.ValidEntries.First(e => e.Project == "Focus");
-        Assert.Equal(TimeSpan.FromMinutes(450), focus.Duration);
+        // Crucial requirement: Duration remains 690 minutes (41400s), NOT summed to 1380 minutes
+        Assert.Equal(new DateOnly(2026, 9, 6), result.ValidEntries[0].Date);
+        Assert.Equal(TimeSpan.FromMinutes(690), result.ValidEntries[0].Duration);
+        Assert.Equal(41400, result.ValidEntries[0].Duration.TotalSeconds);
+    }
 
-        var other = result.ValidEntries.First(e => e.Project == "Other");
-        Assert.Equal(TimeSpan.FromMinutes(120), other.Duration);
+    [Fact]
+    public void Parse_IdenticalDuplicateHoursInSingleFile_AreSkippedNotSummed()
+    {
+        string csv =
+            "date\tproject\thours\r\n" +
+            "20260906\t\"\"\t11.5\r\n" +
+            "20260906\t\"\"\t11.5\r\n";
+
+        var result = WebsiteHistoryCsv.Parse(csv);
+
+        Assert.True(result.Success);
+        Assert.Equal(2, result.TotalRowsFound);
+        Assert.Equal(0, result.InvalidRows);
+        Assert.Equal(1, result.DuplicateRows);
+        Assert.Single(result.ValidEntries);
+
+        // Crucial requirement: Duration remains 11.5 hours (41400s), NOT summed to 23 hours
+        Assert.Equal(new DateOnly(2026, 9, 6), result.ValidEntries[0].Date);
+        Assert.Equal(TimeSpan.FromHours(11.5), result.ValidEntries[0].Duration);
+        Assert.Equal(41400, result.ValidEntries[0].Duration.TotalSeconds);
+    }
+
+    [Fact]
+    public void Parse_ConflictingDuplicateMinutesInSingleFile_RejectsImport()
+    {
+        string csv =
+            "date\tproject\tminutes\r\n" +
+            "20260906\t\"\"\t690\r\n" +
+            "20260906\t\"\"\t700\r\n";
+
+        var result = WebsiteHistoryCsv.Parse(csv);
+
+        // Must reject entire file
+        Assert.False(result.Success);
+        Assert.Empty(result.ValidEntries);
+        Assert.NotNull(result.ErrorMessage);
+        Assert.Contains("Conflicting duplicate rows", result.ErrorMessage);
+        Assert.Contains("20260906", result.ErrorMessage);
+        Assert.Contains("690 minutes", result.ErrorMessage);
+        Assert.Contains("700 minutes", result.ErrorMessage);
+    }
+
+    [Fact]
+    public void Parse_ConflictingDuplicateHoursInSingleFile_RejectsImport()
+    {
+        string csv =
+            "date\tproject\thours\r\n" +
+            "20260906\t\"Work\"\t4.0\r\n" +
+            "20260906\t\"Work\"\t5.5\r\n";
+
+        var result = WebsiteHistoryCsv.Parse(csv);
+
+        Assert.False(result.Success);
+        Assert.Empty(result.ValidEntries);
+        Assert.NotNull(result.ErrorMessage);
+        Assert.Contains("Conflicting duplicate rows", result.ErrorMessage);
+        Assert.Contains("20260906", result.ErrorMessage);
+        Assert.Contains("Work", result.ErrorMessage);
     }
 
     [Fact]
@@ -210,8 +269,44 @@ public sealed class WebsiteHistoryCsvTests
         Assert.Equal(expected, exported);
     }
 
+    [Theory]
+    [InlineData(1800, 30)] // 1800 / 60 = 30.0 -> 30
+    [InlineData(1825, 30)] // 1825 / 60 = 30.4166.. -> 30
+    [InlineData(1829, 30)] // 1829 / 60 = 30.4833.. -> 30
+    [InlineData(1830, 31)] // 1830 / 60 = 30.5 -> 31 (AwayFromZero)
+    [InlineData(1859, 31)] // 1859 / 60 = 30.9833.. -> 31
+    [InlineData(1860, 31)] // 1860 / 60 = 31.0 -> 31
+    public void Export_ExplicitWholeMinuteRounding_AwayFromZero(int seconds, int expectedMinutes)
+    {
+        var record = new DailyFocusExportRecord(new DateOnly(2026, 9, 10), "", TimeSpan.FromSeconds(seconds));
+        Assert.Equal(expectedMinutes, record.TotalMinutes);
+
+        string csv = WebsiteHistoryCsv.Export([record]);
+        Assert.Contains($"20260910\t\"\"\t{expectedMinutes}\r\n", csv);
+    }
+
     [Fact]
-    public void RoundTrip_ExportThenParse_PreservesData()
+    public void Export_ImportedWebsiteWholeMinuteHistory_ExportsBackToSameMinuteValue()
+    {
+        string originalCsv =
+            "date\tproject\tminutes\r\n" +
+            "20260905\t\"\"\t271\r\n" +
+            "20260906\t\"\"\t690\r\n" +
+            "20260907\t\"\"\t507\r\n";
+
+        var parsed = WebsiteHistoryCsv.Parse(originalCsv);
+        Assert.True(parsed.Success);
+
+        var exportRecords = parsed.ValidEntries
+            .Select(e => new DailyFocusExportRecord(e.Date, e.Project, e.Duration))
+            .ToList();
+
+        string exportedCsv = WebsiteHistoryCsv.Export(exportRecords);
+        Assert.Equal(originalCsv, exportedCsv);
+    }
+
+    [Fact]
+    public void RoundTrip_ExportThenParse_PreservesWholeMinuteData()
     {
         var records = new List<DailyFocusExportRecord>
         {

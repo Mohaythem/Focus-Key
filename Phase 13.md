@@ -107,27 +107,42 @@ All identified release blockers have been successfully resolved. The application
   - Verified migrations 5 and 6 applied seamlessly on launch to schema version 6.
   - Verified clean launch of installed executable (`%LOCALAPPDATA%\Programs\Focus Key\FocusKey.exe`).
 
-### 6.4 Website CSV Dual-Schema Support & Canonical Minutes Export
-- **Problem Statement**: Real website exports present two distinct tab-delimited schemas:
+### 6.4 Website CSV Dual-Schema Support, Intra-File Duplicate Safety, and Export Rounding
+- **Supported Schemas**: Real website exports present two distinct tab-delimited schemas:
   1. `date\tproject\thours` (floating-point decimal hours, e.g. `11.49`)
   2. `date\tproject\tminutes` (integer minutes, e.g. `690`)
 - **Schema Auto-Detection**:
-  - `WebsiteHistoryCsv.DetectSchema`: Inspects header row for `date\tproject\thours` vs `date\tproject\tminutes`.
-  - Rejects unknown headers with a clear descriptive error message instructing expected format.
+  - `WebsiteHistoryCsv.DetectSchema`: Inspects the header row for `date\tproject\thours` vs `date\tproject\tminutes`.
+  - Rejects unknown headers with a descriptive error message instructing expected formats.
   - Robustly handles UTF-8 BOM, varying whitespace, and quoted or unquoted column tokens.
-- **Precision & Normalization**:
-  - Normalizes durations directly to exact integer seconds (`duration_seconds`) upon parse:
-    - Minutes: `TimeSpan.FromSeconds((long)Math.Round(minutes * 60.0))` (e.g. 690 min $\to$ 41,400s exact).
-    - Hours: `TimeSpan.FromSeconds((long)Math.Round(hours * 3600.0))` (e.g. 11.5 hr $\to$ 41,400s exact).
-  - Intra-file duplicates within the same file for `(date, project)` sum durations seamlessly without roundoff drift (capped at 24h/day).
-- **Cross-Schema Idempotency & Duplicate Handling**:
-  - `SqliteHistoricalFocusRepository.ImportAsync` queries existing `duration_seconds` for matching `(date, project)`.
-  - Records with matching seconds (`existingSeconds == newSeconds || Math.Abs(existingSeconds - newSeconds) <= 1`) are treated as identical duplicates and skipped without duplicating or inflating focus time.
-  - Records with updated values update the existing entry in-place (`UPDATE historical_focus SET duration_seconds = ...`).
+- **Intra-File Duplicate Safety**:
+  - The CSV format represents *daily aggregates*. Multiple rows with the same `(date, project)` within a single file are **never summed**.
+  - **Identical Duplicate Rows**: Subsequent identical or equivalent rows (e.g. `20260906\t""\t690` repeated) are treated as duplicates/no-ops. The duration remains 690 minutes (not 1380 minutes), and the duplicate row is reported as skipped.
+  - **Equivalent Cross-Unit Duplicates**: Values that normalize to the same duration in seconds (e.g. `11.5` hours vs `690` minutes $\to 41,400$ seconds) are treated as identical duplicates.
+  - **Conflicting Duplicate Rows**: If a single file contains the same `(date, project)` with conflicting durations (e.g. `690` vs `700` minutes), the import is **rejected immediately before committing any changes**. A descriptive error identifying the date, project, and conflicting durations is shown, guaranteeing transactional safety with zero partial writes.
+- **Cross-File Database Upsert Behavior**:
+  - Distinguishes intra-file ambiguity from legitimate subsequent exports:
+    - Identical `(date, project, duration)` across separate imports $\to$ idempotent no-op / duplicate.
+    - Same `(date, project)` with a changed duration in a later export $\to$ updates the historical record in-place.
+- **Canonical Export Format & Explicit Rounding Policy**:
+  - Focus Key canonical export outputs in the modern website format: `date\tproject\tminutes` with whole integer minutes.
+  - **Rounding Rule**: Durations with second-level precision are converted to minutes using deterministic nearest-minute rounding with `MidpointRounding.AwayFromZero`:
+    $$\text{exportMinutes} = \text{round}\left(\frac{\text{totalDurationSeconds}}{60.0}, \text{AwayFromZero}\right)$$
+    - `1800s` $\to 30$ minutes
+    - `1825s` $\to 30$ minutes
+    - `1829s` $\to 30$ minutes
+    - `1830s` $\to 31$ minutes
+    - `1859s` $\to 31$ minutes
+    - `1860s` $\to 31$ minutes
+  - Export rounding applies **only** to the external CSV serialization. Internal database records and Reports snapshots retain full second-level precision without modification.
+- **Representation Fidelity & Limitations**:
+  - Website-originated whole-minute data round-trips exactly.
+  - Focus Key native sessions with leftover seconds are rounded to the nearest whole minute when exported to the external website-compatible format (maximum representation difference $\le 30$ seconds per exported aggregate row).
 - **Streak Calculation Resilience**:
-  - Qualifying positive focus days (`Duration > TimeSpan.Zero`) cleanly feed `StreakCalculator`.
-  - Verified that a 15-consecutive-day import produces an exact 15-day streak.
-  - Overlapping imports (e.g. hours export followed by minutes export) do not double-count focus time or inflate streaks.
-- **Canonical Export**:
-  - Focus Key canonical export format updated to `date\tproject\tminutes` with whole integer minutes (e.g. `690`), avoiding floating-point rounding errors and guaranteeing 100% round-trip lossless compatibility with the latest website format.
-- **Automated Test Suite**: 543 automated tests passing cleanly (100% pass rate).
+  - Qualifying positive focus days (`Duration > TimeSpan.Zero`) feed `StreakCalculator`.
+  - Verified: 15-consecutive-day import produces an exact 15-day streak.
+  - Overlapping imports do not double-count focus time or inflate streaks.
+- **Verification & Release**:
+  - Automated test suite: 557 automated tests passing cleanly (100% pass rate).
+  - Runtime verification: Verified identical duplicate skipping, conflicting file transactional rejection, and leftover-second rounding against isolated database instances.
+  - Packaged via Inno Setup into `D:\Focus Key\release\FocusKeySetup.exe` (~62.9 MB). Silent upgrade over existing user installation verified with database preserved intact.

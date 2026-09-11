@@ -15,17 +15,18 @@ public sealed record CsvParseResult(
     int TotalRowsFound,
     int InvalidRows,
     string? ErrorMessage = null,
-    CsvHistorySchema? DetectedSchema = null);
+    CsvHistorySchema? DetectedSchema = null,
+    int DuplicateRows = 0);
 
 public sealed record DailyFocusExportRecord(DateOnly Date, string Project, TimeSpan Duration)
 {
     public DailyFocusExportRecord(DateOnly date, string project, double hours)
-        : this(date, project, TimeSpan.FromSeconds((long)Math.Round(hours * 3600.0)))
+        : this(date, project, TimeSpan.FromSeconds((long)Math.Round(hours * 3600.0, MidpointRounding.AwayFromZero)))
     {
     }
 
-    public long TotalMinutes => (long)Math.Round(Duration.TotalSeconds / 60.0);
-    public double Hours => Math.Round(Duration.TotalHours, 2);
+    public long TotalMinutes => (long)Math.Round(Duration.TotalSeconds / 60.0, MidpointRounding.AwayFromZero);
+    public double Hours => Math.Round(Duration.TotalHours, 2, MidpointRounding.AwayFromZero);
 }
 
 /// <summary>
@@ -99,7 +100,8 @@ public static class WebsiteHistoryCsv
 
         int totalRowsFound = 0;
         int invalidRows = 0;
-        // Group and consolidate duplicate rows within the same file by (date, project)
+        int duplicateRows = 0;
+        // Track entries within the same file by (date, project)
         var durationByDayProject = new Dictionary<(DateOnly Date, string Project), TimeSpan>();
 
         for (; lineIndex < lines.Length; lineIndex++)
@@ -146,7 +148,7 @@ public static class WebsiteHistoryCsv
                     invalidRows++;
                     continue;
                 }
-                long seconds = (long)Math.Round(minutes * 60.0);
+                long seconds = (long)Math.Round(minutes * 60.0, MidpointRounding.AwayFromZero);
                 duration = TimeSpan.FromSeconds(seconds);
             }
             else
@@ -157,16 +159,41 @@ public static class WebsiteHistoryCsv
                     invalidRows++;
                     continue;
                 }
-                long seconds = (long)Math.Round(hours * 3600.0);
+                long seconds = (long)Math.Round(hours * 3600.0, MidpointRounding.AwayFromZero);
                 duration = TimeSpan.FromSeconds(seconds);
             }
 
             var key = (date, project);
             if (durationByDayProject.TryGetValue(key, out TimeSpan existingDuration))
             {
-                // Consolidate intra-file duplicate rows by summing duration up to 24h
-                long sumSeconds = Math.Min(86400, (long)existingDuration.TotalSeconds + (long)duration.TotalSeconds);
-                durationByDayProject[key] = TimeSpan.FromSeconds(sumSeconds);
+                long existingSeconds = (long)existingDuration.TotalSeconds;
+                long newSeconds = (long)duration.TotalSeconds;
+
+                if (existingSeconds == newSeconds || Math.Abs(existingSeconds - newSeconds) <= 1)
+                {
+                    // Identical / equivalent duplicate row inside this file: skip, do NOT sum!
+                    duplicateRows++;
+                }
+                else
+                {
+                    // Conflicting duplicate row with different durations: reject import immediately
+                    string projectDisplay = string.IsNullOrEmpty(project) ? "''" : $"'{project}'";
+                    string existingDisplay = schema == CsvHistorySchema.Minutes
+                        ? $"{Math.Round(existingDuration.TotalMinutes, MidpointRounding.AwayFromZero)} minutes"
+                        : $"{Math.Round(existingDuration.TotalHours, 2, MidpointRounding.AwayFromZero)} hours";
+                    string newDisplay = schema == CsvHistorySchema.Minutes
+                        ? $"{Math.Round(duration.TotalMinutes, MidpointRounding.AwayFromZero)} minutes"
+                        : $"{Math.Round(duration.TotalHours, 2, MidpointRounding.AwayFromZero)} hours";
+
+                    return new CsvParseResult(
+                        Success: false,
+                        ValidEntries: [],
+                        TotalRowsFound: totalRowsFound,
+                        InvalidRows: invalidRows,
+                        ErrorMessage: $"Conflicting duplicate rows found for date '{dateStr}' and project {projectDisplay} with conflicting durations ({existingDisplay} vs {newDisplay}). The import was rejected to prevent data corruption.",
+                        DetectedSchema: schema,
+                        DuplicateRows: duplicateRows);
+                }
             }
             else
             {
@@ -179,12 +206,12 @@ public static class WebsiteHistoryCsv
                 kvp.Key.Date,
                 kvp.Key.Project,
                 kvp.Value,
-                Math.Round(kvp.Value.TotalHours, 2)))
+                Math.Round(kvp.Value.TotalHours, 2, MidpointRounding.AwayFromZero)))
             .OrderBy(e => e.Date)
             .ThenBy(e => e.Project)
             .ToList();
 
-        return new CsvParseResult(true, validList.AsReadOnly(), totalRowsFound, invalidRows, null, schema);
+        return new CsvParseResult(true, validList.AsReadOnly(), totalRowsFound, invalidRows, null, schema, duplicateRows);
     }
 
     /// <summary>

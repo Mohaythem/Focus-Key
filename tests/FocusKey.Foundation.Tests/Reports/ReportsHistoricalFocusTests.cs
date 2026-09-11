@@ -260,5 +260,50 @@ public sealed class ReportsHistoricalFocusTests
         Assert.Equal(TimeSpan.FromMinutes(690), snapshot.Totals.FocusTime);
         Assert.Equal(1, snapshot.Streaks.CurrentStreak);
     }
+
+    [Fact]
+    public async Task ReadAsync_ExportWebsiteCsv_DoesNotModifyInternalReportDurationWithLeftoverSeconds()
+    {
+        using var temp = new TempDirectory();
+        string file = Path.Combine(temp.Path, "focus_key.db");
+        var connections = new SqliteConnectionFactory(file);
+        new DatabaseBootstrapper(connections).Initialize();
+
+        var sessionRepo = new SqliteSessionRepository(connections);
+        var historyRepo = new SqliteHistoricalFocusRepository(connections);
+        var historyService = new HistoricalFocusService(historyRepo, sessionRepo, () => TimeZoneInfo.Utc);
+
+        var date = new DateOnly(2026, 9, 10);
+        var startTime = new DateTimeOffset(2026, 9, 10, 10, 0, 0, TimeSpan.Zero);
+
+        // Native completed work session of 1829 seconds (30m 29s)
+        var nativeSession = new SessionRecord
+        {
+            Id = SessionId.New(),
+            Type = SessionType.Work,
+            Status = SessionStatus.Completed,
+            StartedAt = startTime,
+            PlannedDuration = TimeSpan.FromSeconds(1829),
+            EndedAt = startTime.AddSeconds(1829),
+            CreatedAt = startTime,
+        };
+        await sessionRepo.AddAsync(nativeSession);
+
+        var timeProvider = new ManualTimeProvider(startTime.AddHours(2));
+        var reportsService = new ReportsService(sessionRepo, historyRepo, timeProvider, () => TimeZoneInfo.Utc);
+
+        // Internal report snapshot before export: exactly 1829 seconds
+        var snapshotBefore = await reportsService.ReadAsync(ReportPeriod.Daily, date);
+        Assert.Equal(TimeSpan.FromSeconds(1829), snapshotBefore.Totals.FocusTime);
+
+        // Export to website CSV (1829s rounds to 30 minutes via MidpointRounding.AwayFromZero)
+        string exportedCsv = await historyService.ExportWebsiteCsvAsync();
+        Assert.Contains("20260910\t\"\"\t30\r\n", exportedCsv);
+
+        // Internal report snapshot after export: MUST STILL BE exactly 1829 seconds (unmodified by export rounding)
+        var snapshotAfter = await reportsService.ReadAsync(ReportPeriod.Daily, date);
+        Assert.Equal(TimeSpan.FromSeconds(1829), snapshotAfter.Totals.FocusTime);
+        Assert.Equal(TimeSpan.FromSeconds(1829), snapshotBefore.Totals.FocusTime);
+    }
 }
 

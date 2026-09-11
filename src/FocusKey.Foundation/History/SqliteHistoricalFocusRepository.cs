@@ -79,6 +79,7 @@ public sealed class SqliteHistoricalFocusRepository(SqliteConnectionFactory conn
         IEnumerable<HistoricalFocusEntry> entries,
         int totalRowsFound,
         int invalidRows,
+        int duplicateRows = 0,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(entries);
@@ -88,17 +89,49 @@ public sealed class SqliteHistoricalFocusRepository(SqliteConnectionFactory conn
 
         int newRecords = 0;
         int updatedRecords = 0;
-        int duplicateRecords = 0;
+        int duplicateRecords = duplicateRows;
         double totalHours = 0.0;
         string nowUtc = UtcTimestamp.Format(DateTimeOffset.UtcNow);
+
+        // Guard against duplicate or conflicting entries within the passed batch
+        var seenInBatch = new Dictionary<(DateOnly Date, string Project), TimeSpan>();
 
         try
         {
             foreach (var entry in entries)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                string dateStr = entry.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+                var batchKey = (entry.Date, entry.Project);
                 long durationSeconds = (long)entry.Duration.TotalSeconds;
+
+                if (seenInBatch.TryGetValue(batchKey, out TimeSpan prevDuration))
+                {
+                    long prevSeconds = (long)prevDuration.TotalSeconds;
+                    if (prevSeconds == durationSeconds || Math.Abs(prevSeconds - durationSeconds) <= 1)
+                    {
+                        // Identical duplicate row inside this batch: skip DB work, increment duplicate
+                        duplicateRecords++;
+                        continue;
+                    }
+                    else
+                    {
+                        // Conflicting duplicate entries in batch: rollback and reject
+                        transaction.Rollback();
+                        return new CsvImportResult(
+                            Success: false,
+                            RowsFound: totalRowsFound,
+                            NewRecords: 0,
+                            UpdatedRecords: 0,
+                            DuplicateRecords: 0,
+                            InvalidRows: invalidRows,
+                            TotalImportedHours: 0,
+                            ErrorMessage: $"Conflicting duplicate entries in import batch for date '{entry.Date:yyyyMMdd}' and project '{entry.Project}'.");
+                    }
+                }
+                seenInBatch[batchKey] = entry.Duration;
+
+                string dateStr = entry.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
                 double hours = entry.Hours;
                 totalHours += entry.Duration.TotalHours;
 
@@ -173,7 +206,7 @@ public sealed class SqliteHistoricalFocusRepository(SqliteConnectionFactory conn
                 UpdatedRecords: updatedRecords,
                 DuplicateRecords: duplicateRecords,
                 InvalidRows: invalidRows,
-                TotalImportedHours: Math.Round(totalHours, 2));
+                TotalImportedHours: Math.Round(totalHours, 2, MidpointRounding.AwayFromZero));
         }
         catch (Exception exception)
         {

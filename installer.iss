@@ -32,5 +32,8 @@ Name: "{group}\Focus Key"; Filename: "{app}\FocusKey.exe"
 Name: "{autoprograms}\Focus Key"; Filename: "{app}\FocusKey.exe"
 Name: "{autodesktop}\Focus Key"; Filename: "{app}\FocusKey.exe"; Tasks: desktopicon
 
+[Registry]
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueName: "Focus Key"; Flags: dontcreatekey uninsdeletevalue
+
 [Run]
 Filename: "{app}\FocusKey.exe"; Description: "{cm:LaunchProgram,Focus Key}"; Flags: nowait postinstall skipifsilent

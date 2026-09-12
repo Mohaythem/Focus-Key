@@ -35,7 +35,7 @@ public sealed class ReportsPolishVerificationTests
         await store.Repository.AddAsync(Finished(thursday.AddDays(-7).AddHours(10).AddMinutes(10), SessionType.Break, SessionStatus.Completed, 15));
         await store.Repository.AddAsync(Finished(new DateTimeOffset(2026, 8, 31, 11, 0, 0, TimeSpan.Zero), SessionType.Work, SessionStatus.Completed, 90));
 
-        var service = new ReportsService(store.Repository, TimeProvider.System, () => zone);
+        var service = new ReportsService(store.Repository, new ManualTimeProvider(thursday.AddHours(18)), () => zone);
 
         // 1. Daily Verification
         var daily = await service.ReadAsync(ReportPeriod.Daily, DateOnly.FromDateTime(thursday.DateTime));

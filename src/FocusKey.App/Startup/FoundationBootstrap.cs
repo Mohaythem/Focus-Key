@@ -63,6 +63,7 @@ internal static class FoundationBootstrap
                 Appearance = appearance,
                 HistoricalFocusRepository = historicalRepo,
                 History = historyService,
+                WindowsStartup = new FocusKey.Foundation.Shell.WindowsStartupService(new FocusKey.Shell.WindowsRegistryAccessor()),
             };
         }
         catch (Exception exception)

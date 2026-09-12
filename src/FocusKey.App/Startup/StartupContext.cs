@@ -24,6 +24,7 @@ internal sealed class StartupContext : IDisposable
     public required AppearanceCoordinator Appearance { get; init; }
     public required FocusKey.Foundation.History.IHistoricalFocusRepository HistoricalFocusRepository { get; init; }
     public required FocusKey.Foundation.History.HistoricalFocusService History { get; init; }
+    public required FocusKey.Foundation.Shell.IWindowsStartupService WindowsStartup { get; init; }
 
     public void Dispose() => Logger.Dispose();
 }

@@ -45,6 +45,8 @@ public partial class App : Application
     {
         try
         {
+            bool isStartupLaunch = StartupArguments.IsStartupLaunch(Environment.GetCommandLineArgs());
+
             // Same user and interactive Windows session, regardless of data-root override.
             // Acquire before bootstrap: a second launch must never recover the owner's session.
             using var identity = WindowsIdentity.GetCurrent();
@@ -54,7 +56,10 @@ public partial class App : Application
             _ownership = SingleInstanceLease.TryAcquire(instanceName);
             if (_ownership is null)
             {
-                _activationSignal.Send();
+                if (!isStartupLaunch)
+                {
+                    _activationSignal.Send();
+                }
                 _startup?.Dispose();
                 Environment.Exit(0);
                 return;
@@ -98,8 +103,16 @@ public partial class App : Application
             await _completion.EvaluateAsync();
             _activationSignal.Listen(_window.DispatcherQueue, () => _shell.RequestActivation(ShellActivationKind.ShowWindow));
             _startup.Logger.Info("Shell ready: tray added; Shift + F3 registered.");
-            _window.Activate();
-            _window.OpenToday();
+            if (!isStartupLaunch)
+            {
+                _window.Activate();
+                _window.OpenToday();
+            }
+            else
+            {
+                _startup.Logger.Info("Startup launch detected (--startup): starting quietly in system tray.");
+                _window.AppWindow.Hide();
+            }
         }
         catch (Exception exception)
         {

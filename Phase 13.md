@@ -146,3 +146,34 @@ All identified release blockers have been successfully resolved. The application
   - Automated test suite: 557 automated tests passing cleanly (100% pass rate).
   - Runtime verification: Verified identical duplicate skipping, conflicting file transactional rejection, and leftover-second rounding against isolated database instances.
   - Packaged via Inno Setup into `release\FocusKeySetup.exe` (~62.9 MB). Silent upgrade over existing user installation verified with database preserved intact.
+
+## Start with Windows Integration
+
+- **User-Facing Setting**:
+  - Located under a dedicated `SYSTEM` section in `SettingsView`.
+  - Row title: `Start with Windows`, description: `Launch Focus Key automatically when you sign in.`, default: `Off`.
+  - Accessible via standard keyboard navigation and screen readers (`AutomationProperties.Name = "Start with Windows"`).
+- **Per-User Registry Registration**:
+  - Target key: `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
+  - Value name: `Focus Key` (type `REG_SZ`).
+  - Command line format: `"<PathToInstalledExecutable>" --startup`.
+  - Operates strictly per-user without requiring administrator privileges, scheduled tasks, or services.
+  - Stale or invalid entries are automatically repaired to point to the current installed executable path with `--startup` when enabled.
+  - Disabling removes only the `Focus Key` value, leaving all other user startup entries untouched.
+  - Reflects the live Windows registry state directly upon opening Settings.
+- **Quiet Background Startup**:
+  - When launched with `--startup`:
+    - Suppresses main window activation and today page display.
+    - Suppresses startup sound chimes.
+    - Initializes the background shell, system tray icon, and global hotkey (`Shift + F3`).
+    - Recovers session state in the background without stealing user focus.
+  - Normal launches (desktop shortcut, Start Menu, search) display the main window as usual.
+  - Single-instance handling: If a second launch occurs with `--startup` while Focus Key is already running, the secondary process terminates quietly without activating or duplicating UI.
+- **Installer & Uninstaller Coordination**:
+  - Configured in `installer.iss` with `[Registry]` entry:
+    `Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueName: "Focus Key"; Flags: dontcreatekey uninsdeletevalue`
+  - Uninstallation cleanly deletes the `Focus Key` startup value.
+  - Upgrades and clean installations preserve the user's explicit preference without forcing registration.
+- **Verification**:
+  - 573 automated tests passing cleanly (100% pass rate) with complete registry and argument abstraction.
+  - Inno Setup installer rebuilt and verified at `release\FocusKeySetup.exe`.

@@ -65,8 +65,10 @@ internal sealed class SettingsView : UserControl
     private bool _applying;
     private bool _workDirty, _breakDirty;
     private readonly ToggleSwitch _sessionSounds = new() { OnContent = "On", OffContent = "Off" };
+    private readonly ToggleSwitch _startWithWindows = new() { OnContent = "On", OffContent = "Off" };
     private readonly Button _importHistoryButton = new() { Content = "Import history…", FontSize = 12, Padding = new Thickness(12, 6, 12, 6) };
     private readonly Button _exportHistoryButton = new() { Content = "Export history…", FontSize = 12, Padding = new Thickness(12, 6, 12, 6) };
+    private readonly FocusKey.Foundation.Shell.IWindowsStartupService _windowsStartup;
     private readonly FocusKey.Foundation.History.HistoricalFocusService _historyService;
     private readonly Func<Task> _refreshReports;
     private readonly Func<IntPtr> _getWindowHandle;
@@ -75,11 +77,13 @@ internal sealed class SettingsView : UserControl
     internal SettingsView(
         SettingsService settings,
         FocusKey.Foundation.History.HistoricalFocusService history,
+        FocusKey.Foundation.Shell.IWindowsStartupService windowsStartup,
         Func<Task> refresh,
         Func<Task> refreshReports,
         Func<IntPtr> getWindowHandle,
         Action<Exception> report)
     {
+        _windowsStartup = windowsStartup ?? throw new ArgumentNullException(nameof(windowsStartup));
         _historyService = history ?? throw new ArgumentNullException(nameof(history));
         _refreshReports = refreshReports ?? throw new ArgumentNullException(nameof(refreshReports));
         _getWindowHandle = getWindowHandle ?? throw new ArgumentNullException(nameof(getWindowHandle));
@@ -95,6 +99,7 @@ internal sealed class SettingsView : UserControl
         AutomationProperties.SetName(_lightPreset, "Light theme preset");
         AutomationProperties.SetName(_darkPreset, "Dark theme preset");
         AutomationProperties.SetName(_sessionSounds, "Session sounds");
+        AutomationProperties.SetName(_startWithWindows, "Start with Windows");
         AutomationProperties.SetName(_importHistoryButton, "Import history");
         AutomationProperties.SetName(_exportHistoryButton, "Export history");
         AutomationProperties.SetLiveSetting(_status, AutomationLiveSetting.Polite);
@@ -167,7 +172,12 @@ internal sealed class SettingsView : UserControl
         shortcut.Children.Add(Row("Open overlay", "Global keyboard shortcut", kbdBadge, true));
         _fields.Children.Add(Section("SHORTCUT", shortcut));
 
-        // 7. DATA
+        // 7. SYSTEM
+        var system = new StackPanel { Spacing = 0 };
+        system.Children.Add(Row("Start with Windows", "Launch Focus Key automatically when you sign in.", _startWithWindows, true));
+        _fields.Children.Add(Section("SYSTEM", system));
+
+        // 8. DATA
         var data = new StackPanel { Spacing = 0 };
         data.Children.Add(Row("Import history", "Import website-compatible focus history (tab-delimited CSV)", _importHistoryButton));
         data.Children.Add(Row("Export history", "Export all focus history to website-compatible tab-delimited CSV", _exportHistoryButton, true));
@@ -303,6 +313,22 @@ internal sealed class SettingsView : UserControl
             }
         };
 
+        _startWithWindows.Toggled += (_, _) =>
+        {
+            if (!_applying)
+            {
+                try
+                {
+                    _windowsStartup.SetEnabled(_startWithWindows.IsOn);
+                }
+                catch (Exception exception)
+                {
+                    _report(exception);
+                    RefreshStartupToggle();
+                }
+            }
+        };
+
         _importHistoryButton.Click += OnImportHistoryClicked;
         _exportHistoryButton.Click += OnExportHistoryClicked;
 
@@ -324,12 +350,31 @@ internal sealed class SettingsView : UserControl
         _controller.Changed += Render;
         ActualThemeChanged += (_, _) => Render();
         Render();
+        RefreshStartupToggle();
     }
 
     internal async Task OpenAsync()
     {
         await FlushPendingColorSaveAsync();
         await _controller.LoadAsync();
+        RefreshStartupToggle();
+    }
+
+    private void RefreshStartupToggle()
+    {
+        _applying = true;
+        try
+        {
+            _startWithWindows.IsOn = _windowsStartup.IsEnabled();
+        }
+        catch (Exception exception)
+        {
+            _report(exception);
+        }
+        finally
+        {
+            _applying = false;
+        }
     }
 
     private void DebounceColorSave(SettingsField field, Func<Task> saveAction)

@@ -59,7 +59,6 @@ internal sealed class ReportsChart : Grid
         var hLines = new List<Line>();
         var vLines = new List<Line>();
         var gridStroke = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", this);
-        var dashArray = new DoubleCollection { 3, 3 };
 
         // Horizontal lines at each 2h tick
         for (int h = 0; h <= ceilingHours; h += 2)
@@ -74,7 +73,7 @@ internal sealed class ReportsChart : Grid
                 Y2 = y,
                 Stroke = gridStroke,
                 StrokeThickness = 1,
-                StrokeDashArray = dashArray,
+                StrokeDashArray = new DoubleCollection { 3, 3 },
                 Opacity = 0.4
             };
             hLines.Add(line);
@@ -93,7 +92,7 @@ internal sealed class ReportsChart : Grid
                 Y2 = TopHeadroom + PlotAreaHeight,
                 Stroke = gridStroke,
                 StrokeThickness = 1,
-                StrokeDashArray = dashArray,
+                StrokeDashArray = new DoubleCollection { 3, 3 },
                 Opacity = 0.4
             };
             vLines.Add(line);

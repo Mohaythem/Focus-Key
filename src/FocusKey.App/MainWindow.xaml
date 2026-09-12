@@ -31,7 +31,7 @@
     <Border BorderBrush="{ThemeResource FkBorder}" BorderThickness="0,1,0,0" Padding="12,16,12,0" Margin="0,4,0,0"><StackPanel Spacing="2"><TextBlock Text="Shift + F3" Style="{StaticResource FkText}" FontFamily="Consolas" FontSize="11" Foreground="{ThemeResource FkSecondary}"/><TextBlock Text="One focused session." Style="{StaticResource FkDimText}" FontSize="10"/></StackPanel></Border>
    </StackPanel>
   </Grid>
-  <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Disabled">
+  <ScrollViewer x:Name="PageScrollViewer" Grid.Column="1" HorizontalScrollBarVisibility="Disabled">
    <StackPanel x:Name="PageContent" Spacing="20" Padding="40,28,40,36" HorizontalAlignment="Stretch">
     <TextBlock x:Name="PageTitle" Text="Today" Style="{StaticResource FkText}" FontSize="16" FontWeight="Medium" AutomationProperties.HeadingLevel="Level1" CharacterSpacing="-10"/>
     <ContentControl x:Name="SettingsHost" Visibility="Collapsed" HorizontalContentAlignment="Stretch"/>

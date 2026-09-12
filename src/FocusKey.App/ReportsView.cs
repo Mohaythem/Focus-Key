@@ -27,6 +27,7 @@ internal sealed class ReportsView : UserControl, IDisposable
     private readonly TextBlock _dateSubtitle;
     private readonly TextBlock _status;
     private readonly StackPanel _results = new() { Spacing = 12, HorizontalAlignment = HorizontalAlignment.Stretch };
+    private readonly Action<Exception> _report;
     private bool _rendering;
     private SessionColors _colors = SessionColors.From(ApplicationSettings.Default);
     private Contrast _contrast = Contrast.Standard;
@@ -34,6 +35,7 @@ internal sealed class ReportsView : UserControl, IDisposable
 
     internal ReportsView(ReportsService service, Action<Exception> report)
     {
+        _report = report;
         Language = "en-US";
         FlowDirection = FlowDirection.LeftToRight;
         HorizontalAlignment = HorizontalAlignment.Stretch;
@@ -167,40 +169,47 @@ internal sealed class ReportsView : UserControl, IDisposable
 
     private void Render()
     {
-        _rendering = true;
-        _date.Date = DateValue(_reports.Date);
-        UpdatePeriodHighlight();
-        _rendering = false;
-        _status.Text = _reports.IsRefreshing ? "Loading reports…" : _reports.Error ?? string.Empty;
-        _results.Children.Clear();
-
-        if (_reports.Snapshot is not { } snapshot)
+        try
         {
-            _dateSubtitle.Text = string.Empty;
-            if (!_reports.IsRefreshing && _reports.Error is null)
-                _results.Children.Add(Card(Presentation.Text("Choose a reporting period to view completed sessions.")));
-            return;
+            _rendering = true;
+            _date.Date = DateValue(_reports.Date);
+            UpdatePeriodHighlight();
+            _rendering = false;
+            _status.Text = _reports.IsRefreshing ? "Loading reports…" : _reports.Error ?? string.Empty;
+            _results.Children.Clear();
+
+            if (_reports.Snapshot is not { } snapshot)
+            {
+                _dateSubtitle.Text = string.Empty;
+                if (!_reports.IsRefreshing && _reports.Error is null)
+                    _results.Children.Add(Card(Presentation.Text("Choose a reporting period to view completed sessions.")));
+                return;
+            }
+
+            var totals = snapshot.Totals;
+
+            // Date range subtitle in subheader
+            string rangeText = string.Create(CultureInfo.InvariantCulture, $"{snapshot.Range.Start:yyyy-MM-dd} – {snapshot.Range.End.AddDays(-1):yyyy-MM-dd}");
+            _dateSubtitle.Text = $"{rangeText}  ·  {snapshot.TimeZone.DisplayName}";
+
+            // 3-column metric tiles matching Figma layout
+            var metrics = new Grid { ColumnSpacing = 8 };
+            for (var i = 0; i < 3; i++) metrics.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            metrics.Children.Add(Metric("Focus Time", Duration(totals.FocusTime), "work sessions", 0));
+            metrics.Children.Add(Metric("Break Time", Duration(totals.BreakTime), "break sessions", 1));
+            metrics.Children.Add(Metric("Completion Rate", totals.CompletionRate is { } rate ? string.Create(CultureInfo.InvariantCulture, $"{rate:0.#}%") : "—", "sessions finished", 2));
+            _results.Children.Add(metrics);
+
+            // Secondary streak companion card
+            _results.Children.Add(StreaksCard(snapshot.Streaks));
+
+            _results.Children.Add(ChartCard(snapshot));
+            _results.Children.Add(InsightCard(snapshot));
         }
-
-        var totals = snapshot.Totals;
-
-        // Date range subtitle in subheader
-        string rangeText = string.Create(CultureInfo.InvariantCulture, $"{snapshot.Range.Start:yyyy-MM-dd} – {snapshot.Range.End.AddDays(-1):yyyy-MM-dd}");
-        _dateSubtitle.Text = $"{rangeText}  ·  {snapshot.TimeZone.DisplayName}";
-
-        // 3-column metric tiles matching Figma layout
-        var metrics = new Grid { ColumnSpacing = 8 };
-        for (var i = 0; i < 3; i++) metrics.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        metrics.Children.Add(Metric("Focus Time", Duration(totals.FocusTime), "work sessions", 0));
-        metrics.Children.Add(Metric("Break Time", Duration(totals.BreakTime), "break sessions", 1));
-        metrics.Children.Add(Metric("Completion Rate", totals.CompletionRate is { } rate ? string.Create(CultureInfo.InvariantCulture, $"{rate:0.#}%") : "—", "sessions finished", 2));
-        _results.Children.Add(metrics);
-
-        // Secondary streak companion card
-        _results.Children.Add(StreaksCard(snapshot.Streaks));
-
-        _results.Children.Add(ChartCard(snapshot));
-        _results.Children.Add(InsightCard(snapshot));
+        catch (Exception ex)
+        {
+            _report(ex);
+        }
     }
 
     private UIElement StreaksCard(StreakStatistics streaks)

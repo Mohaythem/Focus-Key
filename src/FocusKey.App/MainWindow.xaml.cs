@@ -83,6 +83,7 @@ public sealed partial class MainWindow : Window
         _settings = new SettingsView(startup.Settings, startup.History, startup.WindowsStartup, refreshSettings, () => _reports.RefreshAsync(), () => WindowNative.GetWindowHandle(this), report);
         SettingsHost.Content = _settings;
         var hwnd = WindowNative.GetWindowHandle(this);
+        startup.Logger.Info($"Main window HWND: {hwnd}.");
         double scale = NativeMethods.GetDpiForWindow(hwnd) / 96.0;
         if (scale <= 0) scale = 1.0;
         var hIcon = NativeMethods.LoadIcon(NativeMethods.GetModuleHandle(null), (IntPtr)NativeMethods.IDI_APPLICATION);
@@ -135,13 +136,27 @@ public sealed partial class MainWindow : Window
     }
     internal void ResumeSettings() => _settings.IsEnabled = true;
 
-    private async void OnTodayClick(object sender, RoutedEventArgs args) { _settings.CommitPendingDurations(); _reports.Hide(); await _today.NavigateAsync(MainPage.Today); }
-    private async void OnReportsClick(object sender, RoutedEventArgs args)
+    internal async Task OpenReportsAsync(bool scrollToChart = false)
     {
         _settings.CommitPendingDurations();
         await _today.NavigateAsync(MainPage.Reports);
         await _reports.OpenAsync();
+        if (scrollToChart)
+        {
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(600);
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    PageScrollViewer?.UpdateLayout();
+                    PageScrollViewer?.ChangeView(null, 420, null, false);
+                });
+            });
+        }
     }
+
+    private async void OnTodayClick(object sender, RoutedEventArgs args) { _settings.CommitPendingDurations(); _reports.Hide(); await _today.NavigateAsync(MainPage.Today); }
+    private async void OnReportsClick(object sender, RoutedEventArgs args) => await OpenReportsAsync();
     private async void OnSettingsClick(object sender, RoutedEventArgs args)
     {
         _settings.CommitPendingDurations();

@@ -51,7 +51,8 @@ public partial class App : Application
             // Acquire before bootstrap: a second launch must never recover the owner's session.
             using var identity = WindowsIdentity.GetCurrent();
             string user = identity.User?.Value ?? throw new InvalidOperationException("Cannot identify the current Windows user.");
-            string instanceName = $@"Local\FocusKey.Shell.{user}";
+            string? instanceOverride = Environment.GetEnvironmentVariable("FOCUSKEY_INSTANCE_NAME");
+            string instanceName = string.IsNullOrWhiteSpace(instanceOverride) ? $@"Local\FocusKey.Shell.{user}" : instanceOverride;
             _activationSignal = new InstanceActivationSignal(instanceName + ".Activation");
             _ownership = SingleInstanceLease.TryAcquire(instanceName);
             if (_ownership is null)
@@ -106,7 +107,19 @@ public partial class App : Application
             if (!isStartupLaunch)
             {
                 _window.Activate();
-                _window.OpenToday();
+                var cmdArgs = Environment.GetCommandLineArgs();
+                if (cmdArgs.Any(a => a.Equals("--reports-chart", StringComparison.OrdinalIgnoreCase)))
+                {
+                    await _window.OpenReportsAsync(scrollToChart: true);
+                }
+                else if (cmdArgs.Any(a => a.Equals("--reports", StringComparison.OrdinalIgnoreCase)))
+                {
+                    await _window.OpenReportsAsync();
+                }
+                else
+                {
+                    _window.OpenToday();
+                }
             }
             else
             {

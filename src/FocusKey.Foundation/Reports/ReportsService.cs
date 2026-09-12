@@ -3,7 +3,7 @@ using FocusKey.Foundation.Sessions;
 
 namespace FocusKey.Foundation.Reports;
 
-public enum ReportPeriod { Daily, Weekly, Monthly }
+public enum ReportPeriod { Weekly, Monthly }
 
 public sealed record ReportRange(DateOnly Start, DateOnly End)
 {
@@ -15,8 +15,7 @@ public sealed record ReportRange(DateOnly Start, DateOnly End)
         if (date < MinimumDate || date > MaximumDate) throw new ArgumentOutOfRangeException(nameof(date));
         return period switch
         {
-            ReportPeriod.Daily => new(date, date.AddDays(1)),
-            ReportPeriod.Weekly => new(WeekStart(date), WeekStart(date).AddDays(7)),
+            ReportPeriod.Weekly => new(date.AddDays(-6), date.AddDays(1)),
             ReportPeriod.Monthly => new(new(date.Year, date.Month, 1), new DateOnly(date.Year, date.Month, 1).AddMonths(1)),
             _ => throw new ArgumentOutOfRangeException(nameof(period))
         };
@@ -87,6 +86,18 @@ public sealed class ReportsService
     {
     }
 
+    /// <summary>
+    /// Computes the dynamic Y-axis ceiling in 2-hour increments based on the maximum focus duration.
+    /// axisCeiling = ceil(maxHours / 2) * 2, with a minimum useful ceiling of 2 hours.
+    /// </summary>
+    public static int ComputeCeilingHours(double maxSeconds)
+    {
+        if (maxSeconds <= 0) return 2;
+        double maxHours = maxSeconds / 3600.0;
+        int ceiling = (int)Math.Ceiling(maxHours / 2.0) * 2;
+        return Math.Max(2, ceiling);
+    }
+
     public DateOnly CurrentDate() => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(_time.GetUtcNow(), _zone()).DateTime);
 
     public async Task<ReportsSnapshot> ReadAsync(ReportPeriod period, DateOnly date, CancellationToken cancellationToken = default)
@@ -119,19 +130,7 @@ public sealed class ReportsService
         totals = totals with { FocusTime = totals.FocusTime + rangeHistoryDuration };
 
         var buckets = new List<ReportBucket>();
-        if (period == ReportPeriod.Daily)
-        {
-            var dayHistoryTime = rangeHistory.Where(h => h.Date == date).Aggregate(TimeSpan.Zero, (acc, h) => acc + h.Duration);
-            long ticksPerHour = dayHistoryTime.Ticks / 24;
-            long remainderTicks = dayHistoryTime.Ticks % 24;
-            for (int hour = 0; hour < 24; hour++)
-            {
-                var nativeBucket = ReportTotals.From(selected.Where(s => s.Local.Hour == hour).Select(s => s.Session));
-                TimeSpan extra = TimeSpan.FromTicks(ticksPerHour + (hour == 0 ? remainderTicks : 0));
-                buckets.Add(new($"{hour:00}:00", nativeBucket with { FocusTime = nativeBucket.FocusTime + extra }));
-            }
-        }
-        else if (period == ReportPeriod.Weekly)
+        if (period == ReportPeriod.Weekly)
         {
             for (var day = range.Start; day < range.End; day = day.AddDays(1))
             {

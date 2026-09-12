@@ -1,197 +1,302 @@
 using System.Globalization;
 using FocusKey.Foundation.Reports;
 using FocusKey.Foundation.Settings;
+using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Automation;
+using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Shapes;
 
 namespace FocusKey;
 
-/// <summary>Proportional completed-time bars. The report snapshot remains the only data source.</summary>
+/// <summary>
+/// Reports Focus Activity chart matching the approved rectangular grid visual reference.
+/// Features 2-hour horizontal grid intervals, vertical day/week separators, dynamic Y-axis scaling,
+/// substantial centered focus bars, and exact duration labels above non-zero bars.
+/// </summary>
 internal sealed class ReportsChart : Grid
 {
-    private const double PlotHeight = 180;
+    private const double TopHeadroom = 28;
+    private const double PlotAreaHeight = 210;
+    private const double TotalPlotHeight = TopHeadroom + PlotAreaHeight; // 238 DIP
 
-    internal ReportsChart(IReadOnlyList<ReportBucket> rawTrend, double maximum, ReportsPalette palette)
+    internal ReportsChart(IReadOnlyList<ReportBucket> trend, ReportPeriod period, ReportsPalette palette)
     {
-        ColumnSpacing = 12;
-        ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(56) });
+        ColumnSpacing = 8;
+        ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });
         ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        RowDefinitions.Add(new RowDefinition { Height = new GridLength(PlotHeight) });
+        RowDefinitions.Add(new RowDefinition { Height = new GridLength(TotalPlotHeight) });
         RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-        var trend = PrepareBuckets(rawTrend);
-        double effectiveMax = trend.Count == 0 ? 0 : trend.Max(b => Math.Max(b.Totals.FocusTime.TotalSeconds, b.Totals.BreakTime.TotalSeconds));
-        double scale = NiceScale(effectiveMax);
+        double effectiveMax = trend.Count == 0 ? 0 : trend.Max(b => b.Totals.FocusTime.TotalSeconds);
+        int ceilingHours = ReportsService.ComputeCeilingHours(effectiveMax);
 
-        var axis = new Grid();
-        var plot = new Grid();
+        // 1. Y-Axis column (Column 0): ticks from 0h up to ceilingHours in 2h steps
+        var axisCanvas = new Canvas { Width = 40, Height = TotalPlotHeight };
+        for (int h = 0; h <= ceilingHours; h += 2)
+        {
+            double fraction = (double)h / ceilingHours;
+            double y = TopHeadroom + PlotAreaHeight * (1.0 - fraction);
+            var label = Presentation.DimText($"{h}h", 10);
+            label.Width = 36;
+            label.TextAlignment = TextAlignment.Right;
+            Canvas.SetLeft(label, 0);
+            Canvas.SetTop(label, y - 7);
+            axisCanvas.Children.Add(label);
+        }
+        Children.Add(axisCanvas);
 
+        // 2. Plot Host (Column 1, Row 0): Grid lines + Focus bars
+        var plotGrid = new Grid { Height = TotalPlotHeight, HorizontalAlignment = HorizontalAlignment.Stretch };
+        Grid.SetColumn(plotGrid, 1);
+        Children.Add(plotGrid);
+
+        // Background canvas for dashed rectangular grid lines
+        var gridCanvas = new Canvas { HorizontalAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Stretch };
+        plotGrid.Children.Add(gridCanvas);
+
+        var hLines = new List<Line>();
+        var vLines = new List<Line>();
+        var gridStroke = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", this);
+        var dashArray = new DoubleCollection { 3, 3 };
+
+        // Horizontal lines at each 2h tick
+        for (int h = 0; h <= ceilingHours; h += 2)
+        {
+            double fraction = (double)h / ceilingHours;
+            double y = TopHeadroom + PlotAreaHeight * (1.0 - fraction);
+            var line = new Line
+            {
+                X1 = 0,
+                X2 = 100, // Updated dynamically on SizeChanged
+                Y1 = y,
+                Y2 = y,
+                Stroke = gridStroke,
+                StrokeThickness = 1,
+                StrokeDashArray = dashArray,
+                Opacity = 0.4
+            };
+            hLines.Add(line);
+            gridCanvas.Children.Add(line);
+        }
+
+        // Vertical lines separating day/week columns (plus left and right boundary lines)
+        int count = trend.Count;
+        for (int c = 0; c <= count; c++)
+        {
+            var line = new Line
+            {
+                X1 = 0,
+                X2 = 0,
+                Y1 = TopHeadroom,
+                Y2 = TopHeadroom + PlotAreaHeight,
+                Stroke = gridStroke,
+                StrokeThickness = 1,
+                StrokeDashArray = dashArray,
+                Opacity = 0.4
+            };
+            vLines.Add(line);
+            gridCanvas.Children.Add(line);
+        }
+
+        // Bars grid
+        var barsGrid = new Grid { HorizontalAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Stretch };
+        var barBorders = new List<Border>();
+
+        for (int i = 0; i < count; i++)
+        {
+            barsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            var bucket = trend[i];
+            double focusSecs = bucket.Totals.FocusTime.TotalSeconds;
+
+            var colContainer = new Grid
+            {
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Stretch,
+                Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent) // Ensures hit-testing for tooltips
+            };
+
+            // Single substantial focus bar with rounded top corners + duration label above
+            var barStack = new StackPanel
+            {
+                VerticalAlignment = VerticalAlignment.Bottom,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+
+            string durationText = FormatBarDuration(bucket.Totals.FocusTime);
+            if (!string.IsNullOrEmpty(durationText))
+            {
+                var durationLabel = new TextBlock
+                {
+                    Text = durationText,
+                    FontSize = 11,
+                    FontFamily = new FontFamily("Consolas"),
+                    FontWeight = FontWeights.SemiBold,
+                    Foreground = Presentation.ThemeBrush("FkForeground", this),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Margin = new Thickness(0, 0, 0, 4)
+                };
+                barStack.Children.Add(durationLabel);
+            }
+
+            if (focusSecs > 0)
+            {
+                double rawHeight = (focusSecs / (ceilingHours * 3600.0)) * PlotAreaHeight;
+                double barHeight = Math.Max(4, Math.Min(PlotAreaHeight, rawHeight));
+                var bar = new Border
+                {
+                    Height = barHeight,
+                    Width = 44, // Dynamically adjusted on SizeChanged
+                    Background = SessionColorBrush.Create(palette.Work),
+                    CornerRadius = new CornerRadius(4, 4, 0, 0),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Bottom
+                };
+                barBorders.Add(bar);
+                barStack.Children.Add(bar);
+            }
+
+            colContainer.Children.Add(barStack);
+
+            // Native tooltip & accessibility
+            string tooltip = BuildTooltipText(bucket, period);
+            ToolTipService.SetToolTip(colContainer, tooltip);
+            AutomationProperties.SetName(colContainer, tooltip);
+
+            Grid.SetColumn(colContainer, i);
+            barsGrid.Children.Add(colContainer);
+        }
+
+        plotGrid.Children.Add(barsGrid);
+
+        // Calm empty notice if zero activity across entire period
         if (effectiveMax <= 0)
         {
-            // When no completed sessions exist, draw only the baseline and a calm empty notice.
-            var zeroLabel = Presentation.DimText(Presentation.Duration(TimeSpan.Zero), 10);
-            zeroLabel.HorizontalAlignment = HorizontalAlignment.Right;
-            zeroLabel.VerticalAlignment = VerticalAlignment.Bottom;
-            axis.Children.Add(zeroLabel);
-
-            var baseline = new Border
-            {
-                Style = Application.Current?.Resources["FkChartGridLine"] as Style,
-                VerticalAlignment = VerticalAlignment.Bottom
-            };
-            plot.Children.Add(baseline);
-
             var emptyNotice = Presentation.DimText("No focus activity recorded for this period", 12);
             emptyNotice.HorizontalAlignment = HorizontalAlignment.Center;
             emptyNotice.VerticalAlignment = VerticalAlignment.Center;
-            plot.Children.Add(emptyNotice);
+            emptyNotice.Margin = new Thickness(0, TopHeadroom, 0, 0);
+            plotGrid.Children.Add(emptyNotice);
         }
-        else
+
+        // Responsive resize: adjust line lengths and bar widths
+        plotGrid.SizeChanged += (_, args) =>
         {
-            foreach (double fraction in new[] { 0.0, 0.5, 1.0 })
+            double width = args.NewSize.Width;
+            if (width <= 0) return;
+
+            // Update horizontal lines
+            foreach (var hl in hLines)
             {
-                var label = Presentation.DimText(Presentation.Duration(TimeSpan.FromSeconds(scale * (1 - fraction))), 10);
-                label.HorizontalAlignment = HorizontalAlignment.Right;
-                label.VerticalAlignment = fraction == 0 ? VerticalAlignment.Top : fraction == 1 ? VerticalAlignment.Bottom : VerticalAlignment.Center;
-                axis.Children.Add(label);
-                var line = new Border
-                {
-                    Style = Application.Current?.Resources["FkChartGridLine"] as Style,
-                    VerticalAlignment = label.VerticalAlignment
-                };
-                plot.Children.Add(line);
+                hl.X2 = width;
             }
 
-            var groups = new Grid { ColumnSpacing = 8 };
-            var labels = new Grid { ColumnSpacing = 8, Margin = new Thickness(0, 8, 0, 0) };
-            var barPairs = new List<(Grid Pair, Border? WorkBar, Border? BreakBar)>();
-            for (int i = 0; i < trend.Count; i++)
+            // Update vertical lines
+            if (count > 0)
             {
-                groups.ColumnDefinitions.Add(new ColumnDefinition());
-                labels.ColumnDefinitions.Add(new ColumnDefinition());
-                var bucket = trend[i];
-                var pair = new Grid { ColumnSpacing = 4, HorizontalAlignment = HorizontalAlignment.Center };
-                var col0 = new ColumnDefinition { Width = new GridLength(28) };
-                var col1 = new ColumnDefinition { Width = new GridLength(28) };
-                pair.ColumnDefinitions.Add(col0);
-                pair.ColumnDefinitions.Add(col1);
-                var workBar = AddBar(pair, bucket.Totals.FocusTime.TotalSeconds, scale, palette.Work, "Work", bucket.Label, 0, 28);
-                var breakBar = AddBar(pair, bucket.Totals.BreakTime.TotalSeconds, scale, palette.Break, "Break", bucket.Label, 1, 28);
-                barPairs.Add((pair, workBar, breakBar));
-                Grid.SetColumn(pair, i);
-                groups.Children.Add(pair);
-
-                // Caption:
-                // - 8-block daily view: show starting hour "00:00", "03:00", etc.
-                // - weekly view (7 days): show "Mon", "Tue", etc.
-                // - monthly view (calendar weeks): show "W1", "W2", etc.
-                string caption = rawTrend.Count == 24
-                    ? string.Create(CultureInfo.InvariantCulture, $"{i * 3:00}:00")
-                    : DateOnly.TryParseExact(bucket.Label, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day)
-                        ? day.ToString("ddd", CultureInfo.InvariantCulture)
-                        : $"W{i + 1}";
-                var text = Presentation.DimText(caption, 10);
-                text.HorizontalAlignment = HorizontalAlignment.Center;
-                ToolTipService.SetToolTip(text, bucket.Label);
-                Grid.SetColumn(text, i);
-                labels.Children.Add(text);
-            }
-
-            // Responsively adjust bar widths to fill chart comfortably without becoming chunky
-            groups.SizeChanged += (_, args) =>
-            {
-                double width = args.NewSize.Width;
-                if (width <= 0 || trend.Count == 0) return;
-                double colWidth = width / trend.Count;
-                double dynamicBarWidth = Math.Clamp(Math.Floor((colWidth - 14) / 2.5), 20, 34);
-                foreach (var item in barPairs)
+                double colW = width / count;
+                for (int c = 0; c < vLines.Count; c++)
                 {
-                    item.Pair.ColumnDefinitions[0].Width = new GridLength(dynamicBarWidth);
-                    item.Pair.ColumnDefinitions[1].Width = new GridLength(dynamicBarWidth);
-                    if (item.WorkBar is not null) item.WorkBar.Width = dynamicBarWidth;
-                    if (item.BreakBar is not null) item.BreakBar.Width = dynamicBarWidth;
+                    double x = Math.Min(width, c * colW);
+                    vLines[c].X1 = x;
+                    vLines[c].X2 = x;
                 }
-            };
-            plot.Children.Add(groups);
-            Grid.SetRow(labels, 1);
-            Grid.SetColumn(labels, 1);
-            Children.Add(labels);
-        }
 
-        Children.Add(axis);
-        Grid.SetColumn(plot, 1);
-        Children.Add(plot);
-    }
-
-    private static IReadOnlyList<ReportBucket> PrepareBuckets(IReadOnlyList<ReportBucket> trend)
-    {
-        if (trend.Count != 24) return trend;
-        var blocks = new List<ReportBucket>(8);
-        for (int i = 0; i < 8; i++)
-        {
-            int startHour = i * 3;
-            int endHour = startHour + 3;
-            var window = trend.Skip(startHour).Take(3).ToArray();
-            TimeSpan focus = TimeSpan.FromTicks(window.Sum(b => b.Totals.FocusTime.Ticks));
-            TimeSpan rest = TimeSpan.FromTicks(window.Sum(b => b.Totals.BreakTime.Ticks));
-            int started = window.Sum(b => b.Totals.Started);
-            int workStarted = window.Sum(b => b.Totals.WorkStarted);
-            int breakStarted = window.Sum(b => b.Totals.BreakStarted);
-            int completedWork = window.Sum(b => b.Totals.CompletedWork);
-            int completedBreak = window.Sum(b => b.Totals.CompletedBreak);
-            int stopped = window.Sum(b => b.Totals.Stopped);
-            int interrupted = window.Sum(b => b.Totals.Interrupted);
-            int running = window.Sum(b => b.Totals.Running);
-            var totals = new ReportTotals(started, workStarted, breakStarted, completedWork, completedBreak, stopped, interrupted, running, focus, rest);
-            string label = string.Create(CultureInfo.InvariantCulture, $"{startHour:00}:00–{endHour:00}:00");
-            blocks.Add(new ReportBucket(label, totals));
-        }
-        return blocks;
-    }
-
-    private static double NiceScale(double maxSeconds)
-    {
-        if (maxSeconds <= 0) return 60;
-        double minutes = Math.Ceiling(maxSeconds / 60.0);
-        double niceMinutes;
-        if (minutes <= 5) niceMinutes = 5;
-        else if (minutes <= 10) niceMinutes = 10;
-        else if (minutes <= 15) niceMinutes = 15;
-        else if (minutes <= 20) niceMinutes = 20;
-        else if (minutes <= 30) niceMinutes = 30;
-        else if (minutes <= 45) niceMinutes = 45;
-        else if (minutes <= 60) niceMinutes = 60;
-        else if (minutes <= 90) niceMinutes = 90;
-        else if (minutes <= 120) niceMinutes = 120;
-        else if (minutes <= 180) niceMinutes = 180;
-        else if (minutes <= 240) niceMinutes = 240;
-        else niceMinutes = Math.Ceiling(minutes / 60.0) * 60;
-        return niceMinutes * 60;
-    }
-
-    private static Border? AddBar(Grid parent, double value, double maximum, HexColor color, string kind, string label, int column, double initialWidth = 28)
-    {
-        if (value <= 0) return null;
-
-        var stroke = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", parent);
-        var bar = new Border
-        {
-            Width = initialWidth,
-            Height = Math.Max(4, PlotHeight * value / maximum),
-            Background = SessionColorBrush.Create(color),
-            BorderBrush = stroke,
-            BorderThickness = new Thickness(1, 1, 1, 0),
-            VerticalAlignment = VerticalAlignment.Bottom,
-            CornerRadius = new CornerRadius(3, 3, 0, 0),
-            HorizontalAlignment = HorizontalAlignment.Center
+                // Update bar widths: ~72% of column width, clamped comfortably
+                double dynamicBarWidth = Math.Clamp(Math.Floor(colW * 0.72), 24, 76);
+                foreach (var bar in barBorders)
+                {
+                    bar.Width = dynamicBarWidth;
+                }
+            }
         };
-        string description = $"{label} · {kind}: {Presentation.Duration(TimeSpan.FromSeconds(value))}";
-        ToolTipService.SetToolTip(bar, description);
-        AutomationProperties.SetName(bar, description);
-        Grid.SetColumn(bar, column);
-        parent.Children.Add(bar);
-        return bar;
+
+        // 3. X-Axis Day/Week Labels (Row 1, Column 1)
+        var labelsGrid = new Grid { Margin = new Thickness(0, 8, 0, 0) };
+        Grid.SetRow(labelsGrid, 1);
+        Grid.SetColumn(labelsGrid, 1);
+
+        for (int i = 0; i < count; i++)
+        {
+            labelsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            var bucket = trend[i];
+            bool isRightmost = (i == count - 1);
+
+            var labelStack = new StackPanel
+            {
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Spacing = 2
+            };
+
+            if (period == ReportPeriod.Weekly &&
+                DateOnly.TryParseExact(bucket.Label, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day))
+            {
+                // Two lines per visual reference:
+                // Line 1: Sep 6
+                // Line 2: (Sun)
+                // Rightmost day (Today) has bold emphasis
+                var dateText = new TextBlock
+                {
+                    Text = day.ToString("MMM d", CultureInfo.InvariantCulture),
+                    FontSize = 11,
+                    FontWeight = isRightmost ? FontWeights.SemiBold : FontWeights.Normal,
+                    Foreground = Presentation.ThemeBrush(isRightmost ? "FkForeground" : "FkSecondary", this),
+                    HorizontalAlignment = HorizontalAlignment.Center
+                };
+                var dayText = new TextBlock
+                {
+                    Text = $"({day.ToString("ddd", CultureInfo.InvariantCulture)})",
+                    FontSize = 10,
+                    FontWeight = isRightmost ? FontWeights.SemiBold : FontWeights.Normal,
+                    Foreground = Presentation.ThemeBrush(isRightmost ? "FkForeground" : "FkSecondary", this),
+                    HorizontalAlignment = HorizontalAlignment.Center
+                };
+                labelStack.Children.Add(dateText);
+                labelStack.Children.Add(dayText);
+            }
+            else
+            {
+                // Monthly view: W1, W2, etc.
+                var weekText = new TextBlock
+                {
+                    Text = $"W{i + 1}",
+                    FontSize = 11,
+                    FontWeight = isRightmost ? FontWeights.SemiBold : FontWeights.Normal,
+                    Foreground = Presentation.ThemeBrush(isRightmost ? "FkForeground" : "FkSecondary", this),
+                    HorizontalAlignment = HorizontalAlignment.Center
+                };
+                labelStack.Children.Add(weekText);
+            }
+
+            Grid.SetColumn(labelStack, i);
+            labelsGrid.Children.Add(labelStack);
+        }
+
+        Children.Add(labelsGrid);
+    }
+
+    private static string FormatBarDuration(TimeSpan duration)
+    {
+        if (duration <= TimeSpan.Zero) return string.Empty;
+        int hours = (int)duration.TotalHours;
+        int minutes = duration.Minutes;
+        if (hours > 0 && minutes > 0) return $"{hours}h {minutes}m";
+        if (hours > 0) return $"{hours}h";
+        return $"{Math.Max(1, minutes)}m";
+    }
+
+    private static string BuildTooltipText(ReportBucket bucket, ReportPeriod period)
+    {
+        string focusStr = Presentation.Duration(bucket.Totals.FocusTime);
+        string breakStr = Presentation.Duration(bucket.Totals.BreakTime);
+
+        if (period == ReportPeriod.Weekly &&
+            DateOnly.TryParseExact(bucket.Label, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day))
+        {
+            return $"{day:MMMM d, yyyy} ({day:dddd})\nFocus Time: {focusStr}\nBreak Time: {breakStr}";
+        }
+
+        return $"{bucket.Label}\nFocus Time: {focusStr}\nBreak Time: {breakStr}";
     }
 }

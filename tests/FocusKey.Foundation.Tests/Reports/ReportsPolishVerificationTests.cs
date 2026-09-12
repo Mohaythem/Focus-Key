@@ -37,28 +37,9 @@ public sealed class ReportsPolishVerificationTests
 
         var service = new ReportsService(store.Repository, new ManualTimeProvider(thursday.AddHours(18)), () => zone);
 
-        // 1. Daily Verification
-        var daily = await service.ReadAsync(ReportPeriod.Daily, DateOnly.FromDateTime(thursday.DateTime));
-        Assert.Equal(7, daily.Totals.Started);
-        Assert.Equal(3, daily.Totals.CompletedWork);
-        Assert.Equal(3, daily.Totals.CompletedBreak);
-        Assert.Equal(1, daily.Totals.Stopped);
-        Assert.Equal(TimeSpan.FromMinutes(80), daily.Totals.FocusTime);
-        Assert.Equal(TimeSpan.FromMinutes(20), daily.Totals.BreakTime);
-        Assert.Equal(24, daily.Trend.Count);
-        // Hour 9 has 25m work, 5m break
-        Assert.Equal(TimeSpan.FromMinutes(25), daily.Trend[9].Totals.FocusTime);
-        Assert.Equal(TimeSpan.FromMinutes(5), daily.Trend[9].Totals.BreakTime);
-        // Hour 10 has 25m work, 5m break
-        Assert.Equal(TimeSpan.FromMinutes(25), daily.Trend[10].Totals.FocusTime);
-        Assert.Equal(TimeSpan.FromMinutes(5), daily.Trend[10].Totals.BreakTime);
-        // Hour 14 has 30m work, 10m break
-        Assert.Equal(TimeSpan.FromMinutes(30), daily.Trend[14].Totals.FocusTime);
-        Assert.Equal(TimeSpan.FromMinutes(10), daily.Trend[14].Totals.BreakTime);
-
-        // 2. Weekly Verification
+        // 1. Weekly Verification (Rolling 7-day window ending on Thursday Sept 10: Sept 4 to Sept 10)
         var weekly = await service.ReadAsync(ReportPeriod.Weekly, DateOnly.FromDateTime(thursday.DateTime));
-        Assert.Equal(7, weekly.Trend.Count); // 7 days (Mon-Sun)
+        Assert.Equal(7, weekly.Trend.Count); // 7 rolling days
         Assert.Equal(11, weekly.Totals.Started); // 2 on Mon + 2 on Tue + 7 on Thu
         Assert.Equal(TimeSpan.FromMinutes(45 + 50 + 80), weekly.Totals.FocusTime); // 175m
         Assert.Equal(TimeSpan.FromMinutes(15 + 10 + 20), weekly.Totals.BreakTime); // 45m
@@ -66,14 +47,23 @@ public sealed class ReportsPolishVerificationTests
         Assert.Equal(TimeSpan.FromMinutes(150), weekly.PreviousWeekFocus);
         Assert.Equal(TimeSpan.FromMinutes(25), weekly.WeekDifference);
 
-        // 3. Monthly Verification
+        // Rightmost day (index 6, Thursday Sept 10) has 80m work, 20m break
+        Assert.Equal("2026-09-10", weekly.Trend[6].Label);
+        Assert.Equal(TimeSpan.FromMinutes(80), weekly.Trend[6].Totals.FocusTime);
+        Assert.Equal(TimeSpan.FromMinutes(20), weekly.Trend[6].Totals.BreakTime);
+
+        // Monday Sept 7 (index 3) and Tuesday Sept 8 (index 4)
+        Assert.Equal("2026-09-07", weekly.Trend[3].Label);
+        Assert.Equal(TimeSpan.FromMinutes(45), weekly.Trend[3].Totals.FocusTime);
+        Assert.Equal("2026-09-08", weekly.Trend[4].Label);
+        Assert.Equal(TimeSpan.FromMinutes(50), weekly.Trend[4].Totals.FocusTime);
+
+        // 2. Monthly Verification
         var monthly = await service.ReadAsync(ReportPeriod.Monthly, DateOnly.FromDateTime(thursday.DateTime));
         Assert.True(monthly.Trend.Count >= 4);
         Assert.Equal(TimeSpan.FromMinutes(235), monthly.Totals.FocusTime); // 175m this week + 60m on Sept 3
 
-        // 4. Streak Statistics Verification (User-level, invariant across periods)
-        Assert.Equal(1, daily.Streaks.CurrentStreak);
-        Assert.Equal(2, daily.Streaks.LongestStreak);
+        // 3. Streak Statistics Verification (User-level, invariant across periods)
         Assert.Equal(1, weekly.Streaks.CurrentStreak);
         Assert.Equal(2, weekly.Streaks.LongestStreak);
         Assert.Equal(1, monthly.Streaks.CurrentStreak);

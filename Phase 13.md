@@ -176,4 +176,57 @@ All identified release blockers have been successfully resolved. The application
   - Upgrades and clean installations preserve the user's explicit preference without forcing registration.
 - **Verification**:
   - 573 automated tests passing cleanly (100% pass rate) with complete registry and argument abstraction.
-  - Inno Setup installer rebuilt and verified at `release\FocusKeySetup.exe`.
+  - Inno Setup installer rebuilt and verified at `release\FocusKeySetup.exe`.
+
+## 8. Reports Focus Activity Chart Redesign (Approved Visual Reference)
+
+- **Approved Visual Reference Implementation**:
+  - Redesigned the Reports Focus Activity chart to faithfully match the approved visual reference (`media_1789174224889.png`).
+  - Implemented using native WinUI 3 controls (`Grid`, `Canvas`, `Line`, `Border`, `TextBlock`, `ToolTipService`) with full DPI resilience and theme adaptability (Light, Dark, High Contrast).
+- **Rectangular Grid & Dynamic 2-Hour Scaling**:
+  - Constructed a genuine chart grid made from vertical column separator lines and horizontal interval lines.
+  - **2-Hour Horizontal Intervals**: Every grid row represents exactly 2 hours (0h, 2h, 4h, 6h, etc.).
+  - **Dynamic Y-Axis Ceiling**: Calculated via `ReportsService.ComputeCeilingHours`:
+    $$\text{axisCeiling} = \max\left(2, \left\lceil \frac{\text{maxSeconds}}{3600 \times 2} \right\rceil \times 2\right)$$
+    - 0m $\to$ 2h ceiling (0h, 2h lines)
+    - 45m $\to$ 2h ceiling
+    - 1h 15m $\to$ 2h ceiling
+    - 2h 05m $\to$ 4h ceiling
+    - 4h 00m $\to$ 4h ceiling
+    - 4h 01m $\to$ 6h ceiling
+    - 11h 24m $\to$ 12h ceiling
+    - 12h 00m $\to$ 12h ceiling
+    - 12h 01m $\to$ 14h ceiling
+  - Y-axis labels positioned on the left in column 0 (`0h`, `2h`, `4h`, ...), vertically centered on the tick lines.
+  - Clean rectangular cells without diagonal lines, hatching, stripes, or decorative patterns.
+- **Rolling 7-Day Weekly Semantics**:
+  - Replaced Monday–Sunday calendar week with a rolling 7-day window ending on the anchor date:
+    $$\text{ReportRange.For}(\text{Weekly}, \text{date}) = [\text{date} - 6\text{ days}, \text{date} + 1\text{ day})$$
+  - Today / selected end date is always positioned as the rightmost column.
+  - The previous 6 days appear in chronological order from left to right.
+  - Navigation: Stepping backward/forward in Weekly mode advances or rewinds by exactly 7 days (`Date.AddDays(direction * 7)`), preserving day-of-week alignment.
+- **Substantial Bars & Duration Labels**:
+  - Single prominent focus bar per day column (~72% column width, centered, `CornerRadius(4, 4, 0, 0)`, Work session color).
+  - Exact duration label positioned above each non-zero bar (`11h 24m`, `8h 32m`, `45m`).
+  - Zero-value days maintain a clean baseline without fake labels.
+  - Headroom above the plot area guarantees labels never clip even at 100% of ceiling height.
+  - Responsive `SizeChanged` dynamically recalculates bar widths and gridline lengths.
+- **Two-Line X-Axis Day Labels**:
+  - Two lines per day column:
+    - Line 1: Date (`Sep 6`)
+    - Line 2: Weekday (`(Sun)`)
+  - The rightmost column (Today / selected date) is rendered with bold emphasis (`FontWeight = SemiBold`, primary foreground).
+- **Native Hover Tooltips & Card UX**:
+  - Hovering over any day column displays a native tooltip with full date, weekday, Focus Time, and Break Time.
+  - Card Header: Title `Focus Activity` (15 pt SemiBold), subtitle `Last 7 days (today on the right)`.
+  - Calendar Info Strip: Rounded container at card bottom with calendar icon (`\uE787`) and text `Showing the last 7 days. Today is on the right.`
+  - Weekly Insight: Describes peak focus day with duration, total focus across 7 days, daily average, and weekly comparison difference.
+- **Elimination of Daily Mode**:
+  - `ReportPeriod.Daily` completely removed from `ReportPeriod` enum and segmented selector.
+  - Retained `Weekly` (default) and `Monthly`.
+  - Monthly mode adapted with the same visual language (2h grid intervals, substantial bars, duration labels).
+- **Verification**:
+  - 590 automated tests passing (100% pass rate), including 14 comprehensive tests in `ReportsRollingWeeklyChartTests.cs`.
+  - Release build succeeded with 0 warnings and 0 errors.
+  - Self-contained binary payload published to `publish\`.
+  - Windows installer compiled cleanly to `release\FocusKeySetup.exe`.

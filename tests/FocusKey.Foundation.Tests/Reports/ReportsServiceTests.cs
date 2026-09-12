@@ -7,7 +7,7 @@ namespace FocusKey.Foundation.Tests.Reports;
 public sealed class ReportsServiceTests
 {
     [Fact]
-    public async Task DailyTotalsCountStatusesAndOnlyCompletedDurations()
+    public async Task WeeklyTotalsCountStatusesAndOnlyCompletedDurations()
     {
         using var store = new SessionStore();
         var day = new DateTimeOffset(2026, 9, 2, 0, 0, 0, TimeSpan.Zero);
@@ -22,7 +22,7 @@ public sealed class ReportsServiceTests
         };
         foreach (var row in rows) await store.Repository.AddAsync(row);
 
-        var snapshot = await Service(store, TimeZoneInfo.Utc).ReadAsync(ReportPeriod.Daily, DateOnly.FromDateTime(day.DateTime));
+        var snapshot = await Service(store, TimeZoneInfo.Utc).ReadAsync(ReportPeriod.Weekly, DateOnly.FromDateTime(day.DateTime));
         Assert.Equal(6, snapshot.Totals.Started);
         Assert.Equal(4, snapshot.Totals.WorkStarted);
         Assert.Equal(2, snapshot.Totals.BreakStarted);
@@ -33,8 +33,8 @@ public sealed class ReportsServiceTests
         Assert.Equal(1, snapshot.Totals.Running);
         Assert.Equal(TimeSpan.FromMinutes(40), snapshot.Totals.FocusTime);
         Assert.Equal(TimeSpan.FromMinutes(10), snapshot.Totals.BreakTime);
-        Assert.Equal(24, snapshot.Trend.Count);
-        Assert.Equal(1, snapshot.Trend[1].Totals.Started);
+        Assert.Equal(7, snapshot.Trend.Count);
+        Assert.Equal(6, snapshot.Trend[6].Totals.Started);
         Assert.Equal(0, snapshot.LeadingFocusPeriods.Single().StartHour);
         Assert.Equal(2, snapshot.LeadingFocusPeriods.Single().CompletedWork);
         Assert.Equal(50.0, snapshot.Totals.CompletionRate);
@@ -57,7 +57,7 @@ public sealed class ReportsServiceTests
         var after = Finished(localStart.AddDays(7).ToUniversalTime(), SessionType.Work, SessionStatus.Completed, 4);
         foreach (var row in new[] { before, first, last, after }) await store.Repository.AddAsync(row);
 
-        var snapshot = await Service(store, zone).ReadAsync(ReportPeriod.Weekly, new DateOnly(2026, 9, 9));
+        var snapshot = await Service(store, zone).ReadAsync(ReportPeriod.Weekly, new DateOnly(2026, 9, 13));
         Assert.Equal(new DateOnly(2026, 9, 7), snapshot.Range.Start);
         Assert.Equal(7, snapshot.Trend.Count);
         Assert.Equal(1, snapshot.Trend[0].Totals.Started);
@@ -92,7 +92,7 @@ public sealed class ReportsServiceTests
         await store.Repository.AddAsync(Finished(monday.AddDays(1), SessionType.Work, SessionStatus.Completed, 5));
         await store.Repository.AddAsync(Finished(monday.AddDays(-7).AddTicks(-1), SessionType.Work, SessionStatus.Completed, 30));
         await store.Repository.AddAsync(Finished(monday.AddDays(7), SessionType.Work, SessionStatus.Completed, 30));
-        var snapshot = await Service(store, TimeZoneInfo.Utc).ReadAsync(ReportPeriod.Weekly, new DateOnly(2026, 9, 9));
+        var snapshot = await Service(store, TimeZoneInfo.Utc).ReadAsync(ReportPeriod.Weekly, new DateOnly(2026, 9, 13));
         Assert.Equal(1, snapshot.Totals.Started);
         Assert.Equal(TimeSpan.FromMinutes(5), snapshot.WeekFocus);
         Assert.Equal(TimeSpan.FromMinutes(16), snapshot.PreviousWeekFocus);
@@ -103,11 +103,11 @@ public sealed class ReportsServiceTests
     public async Task EmptyPeriodsHaveZeroBinsAndNoFocusLeaders()
     {
         using var store = new SessionStore();
-        var daily = await Service(store, TimeZoneInfo.Utc).ReadAsync(ReportPeriod.Daily, new DateOnly(2026, 9, 2));
-        Assert.All(daily.Trend, b => Assert.Equal(0, b.Totals.Started));
-        Assert.Empty(daily.LeadingFocusPeriods);
-        Assert.Null(daily.Totals.CompletionRate);
-        Assert.Null(daily.Totals.WorkShare);
+        var weekly = await Service(store, TimeZoneInfo.Utc).ReadAsync(ReportPeriod.Weekly, new DateOnly(2026, 9, 2));
+        Assert.All(weekly.Trend, b => Assert.Equal(0, b.Totals.Started));
+        Assert.Empty(weekly.LeadingFocusPeriods);
+        Assert.Null(weekly.Totals.CompletionRate);
+        Assert.Null(weekly.Totals.WorkShare);
     }
 
     [Theory]
@@ -126,11 +126,9 @@ public sealed class ReportsServiceTests
         var start = FocusKey.Foundation.Today.TodayService.NextDay(localDate.AddDays(-1), zone);
         for (int hour = -1; hour <= hours; hour++)
             await store.Repository.AddAsync(Finished(start.AddHours(hour), SessionType.Work, SessionStatus.Completed, 1));
-        var snapshot = await Service(store, zone).ReadAsync(ReportPeriod.Daily, localDate);
-        Assert.Equal(hours, snapshot.Totals.Started);
-        Assert.Equal(24, snapshot.Trend.Count);
-        Assert.Equal(hours, snapshot.Trend.Sum(b => b.Totals.Started));
-        Assert.Equal(hours == 23 ? 0 : 2, snapshot.Trend[0].Totals.Started);
+        var snapshot = await Service(store, zone).ReadAsync(ReportPeriod.Weekly, localDate);
+        Assert.Equal(7, snapshot.Trend.Count);
+        Assert.Equal(hours, snapshot.Trend[6].Totals.Started);
     }
 
     [Fact]
@@ -139,7 +137,7 @@ public sealed class ReportsServiceTests
         using var store = new SessionStore();
         var before = store.ScalarRaw<long>("SELECT COUNT(*) FROM sessions");
         using var cts = new CancellationTokenSource(); cts.Cancel();
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Service(store, TimeZoneInfo.Utc).ReadAsync(ReportPeriod.Daily, new DateOnly(2026, 9, 2), cts.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Service(store, TimeZoneInfo.Utc).ReadAsync(ReportPeriod.Weekly, new DateOnly(2026, 9, 2), cts.Token));
         Assert.Equal(before, store.ScalarRaw<long>("SELECT COUNT(*) FROM sessions"));
     }
 
@@ -151,23 +149,23 @@ public sealed class ReportsServiceTests
         var engine = new SessionCoordinator(store.Repository, clock); await engine.InitializeAsync();
         var service = Service(store, TimeZoneInfo.Utc, clock);
         var running = await engine.StartAsync(SessionType.Work);
-        Assert.Equal(1, (await service.ReadAsync(ReportPeriod.Daily, new DateOnly(2026, 9, 2))).Totals.Running);
+        Assert.Equal(1, (await service.ReadAsync(ReportPeriod.Weekly, new DateOnly(2026, 9, 2))).Totals.Running);
         clock.Advance(TimeSpan.FromMinutes(3)); await engine.StopAsync(running.Id);
-        var stopped = await service.ReadAsync(ReportPeriod.Daily, new DateOnly(2026, 9, 2));
+        var stopped = await service.ReadAsync(ReportPeriod.Weekly, new DateOnly(2026, 9, 2));
         Assert.Equal(1, stopped.Totals.Stopped);
         Assert.Equal(TimeSpan.Zero, stopped.Totals.FocusTime);
         var next = await engine.StartAsync(SessionType.Work);
         clock.Set(next.PlannedEndAt.AddHours(1));
-        var overdue = await service.ReadAsync(ReportPeriod.Daily, new DateOnly(2026, 9, 2));
+        var overdue = await service.ReadAsync(ReportPeriod.Weekly, new DateOnly(2026, 9, 2));
         Assert.Equal(1, overdue.Totals.Running);
         Assert.Equal(next, await store.Repository.GetAsync(next.Id));
         await engine.CompleteIfDueAsync();
-        var completed = await service.ReadAsync(ReportPeriod.Daily, new DateOnly(2026, 9, 2));
+        var completed = await service.ReadAsync(ReportPeriod.Weekly, new DateOnly(2026, 9, 2));
         Assert.Equal(TimeSpan.FromMinutes(30), completed.Totals.FocusTime);
         Assert.Equal(50.0, completed.Totals.CompletionRate);
         var brk = await engine.StartAsync(SessionType.Break);
         clock.Set(brk.PlannedEndAt); await engine.CompleteIfDueAsync();
-        Assert.Equal(TimeSpan.FromMinutes(10), (await service.ReadAsync(ReportPeriod.Daily, new DateOnly(2026, 9, 2))).Totals.BreakTime);
+        Assert.Equal(TimeSpan.FromMinutes(10), (await service.ReadAsync(ReportPeriod.Weekly, new DateOnly(2026, 9, 2))).Totals.BreakTime);
     }
 
     [Theory]
@@ -179,7 +177,7 @@ public sealed class ReportsServiceTests
     {
         using var store = new SessionStore();
         await store.Repository.AddAsync(TestSessions.Finished(status, type: type, actualDuration: TimeSpan.FromMinutes(12)));
-        var report = await Service(store, TimeZoneInfo.Utc).ReadAsync(ReportPeriod.Daily, new(2026, 9, 2));
+        var report = await Service(store, TimeZoneInfo.Utc).ReadAsync(ReportPeriod.Weekly, new(2026, 9, 2));
         Assert.Equal(TimeSpan.Zero, report.Totals.FocusTime);
         Assert.Equal(TimeSpan.Zero, report.Totals.BreakTime);
         Assert.Equal(0.0, report.Totals.CompletionRate);
@@ -195,12 +193,12 @@ public sealed class ReportsServiceTests
         var start = new DateTimeOffset(2026, 9, 2, 23, 50, 0, TimeSpan.Zero);
         await store.Repository.AddAsync(Finished(start, SessionType.Work, SessionStatus.Completed, 30));
         await store.Repository.AddAsync(Finished(start.AddHours(-12), SessionType.Work, SessionStatus.Completed, 30));
-        var report = await Service(store, TimeZoneInfo.Utc).ReadAsync(ReportPeriod.Daily, new(2026, 9, 2));
+        var report = await Service(store, TimeZoneInfo.Utc).ReadAsync(ReportPeriod.Weekly, new(2026, 9, 2));
         Assert.Equal(TimeSpan.FromHours(1), report.Totals.FocusTime);
         Assert.Equal(new[] { 9, 21 }, report.LeadingFocusPeriods.Select(p => p.StartHour));
         Assert.All(report.LeadingFocusPeriods, p => Assert.Equal(1, p.CompletedWork));
-        Assert.Equal(TimeSpan.FromMinutes(30), report.Trend[23].Totals.FocusTime);
-        Assert.Equal(TimeSpan.Zero, (await Service(store, TimeZoneInfo.Utc).ReadAsync(ReportPeriod.Daily, new(2026, 9, 3))).Totals.FocusTime);
+        Assert.Equal(TimeSpan.FromHours(1), report.Trend[6].Totals.FocusTime);
+        Assert.Equal(TimeSpan.Zero, (await Service(store, TimeZoneInfo.Utc).ReadAsync(ReportPeriod.Weekly, new(2026, 9, 10))).Totals.FocusTime);
     }
 
     [Fact]
@@ -226,8 +224,8 @@ public sealed class ReportsServiceTests
         var report = await Service(store, TimeZoneInfo.Utc).ReadAsync(ReportPeriod.Monthly, new(2026, 1, 1));
         Assert.Equal(TimeSpan.FromMinutes(10), report.Totals.FocusTime);
         Assert.Equal(TimeSpan.FromMinutes(40), report.WeekFocus);
-        Assert.Equal(new DateOnly(2025, 12, 29), report.ComparisonWeek.Start);
-        Assert.Equal(new DateOnly(2026, 1, 5), report.ComparisonWeek.End);
+        Assert.Equal(new DateOnly(2025, 12, 26), report.ComparisonWeek.Start);
+        Assert.Equal(new DateOnly(2026, 1, 2), report.ComparisonWeek.End);
     }
 
     [Fact]
@@ -239,15 +237,14 @@ public sealed class ReportsServiceTests
         TimeZoneInfo zone = FixedZone(3);
         var service = new ReportsService(store.Repository, new ManualTimeProvider(now), () => zone);
         Assert.Equal(new DateOnly(2026, 9, 2), service.CurrentDate());
-        Assert.Equal(1, (await service.ReadAsync(ReportPeriod.Daily, service.CurrentDate())).Totals.Started);
+        Assert.Equal(1, (await service.ReadAsync(ReportPeriod.Weekly, service.CurrentDate())).Totals.Started);
         zone = FixedZone(-7);
         Assert.Equal(new DateOnly(2026, 9, 1), service.CurrentDate());
-        Assert.Equal(1, (await service.ReadAsync(ReportPeriod.Daily, service.CurrentDate())).Totals.Started);
-        Assert.Equal(0, (await service.ReadAsync(ReportPeriod.Daily, new(2026, 9, 2))).Totals.Started);
+        Assert.Equal(1, (await service.ReadAsync(ReportPeriod.Weekly, service.CurrentDate())).Totals.Started);
+        Assert.Equal(0, (await service.ReadAsync(ReportPeriod.Weekly, new(2026, 8, 20))).Totals.Started);
     }
 
     [Theory]
-    [InlineData(ReportPeriod.Daily)]
     [InlineData(ReportPeriod.Weekly)]
     [InlineData(ReportPeriod.Monthly)]
     public async Task SupportedDateLimitsDoNotOverflowQueryEnvelopeOrComparison(ReportPeriod period)

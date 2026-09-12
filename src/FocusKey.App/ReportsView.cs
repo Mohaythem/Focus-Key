@@ -185,9 +185,7 @@ internal sealed class ReportsView : UserControl, IDisposable
         var totals = snapshot.Totals;
 
         // Date range subtitle in subheader
-        string rangeText = snapshot.Period == ReportPeriod.Daily
-            ? string.Create(CultureInfo.InvariantCulture, $"{snapshot.Range.Start:yyyy-MM-dd}")
-            : string.Create(CultureInfo.InvariantCulture, $"{snapshot.Range.Start:yyyy-MM-dd} – {snapshot.Range.End.AddDays(-1):yyyy-MM-dd}");
+        string rangeText = string.Create(CultureInfo.InvariantCulture, $"{snapshot.Range.Start:yyyy-MM-dd} – {snapshot.Range.End.AddDays(-1):yyyy-MM-dd}");
         _dateSubtitle.Text = $"{rangeText}  ·  {snapshot.TimeZone.DisplayName}";
 
         // 3-column metric tiles matching Figma layout
@@ -286,38 +284,61 @@ internal sealed class ReportsView : UserControl, IDisposable
     {
         var body = new StackPanel { Spacing = 14 };
 
-        // Header: title + legend
+        // Header: title + subtitle on left, work swatch / legend on right
         var header = new Grid();
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-        var title = Presentation.Text("FOCUS ACTIVITY", 11, true);
-        title.Style = (Style)Application.Current.Resources["FkSectionText"];
-        header.Children.Add(title);
+        var titleStack = new StackPanel { Spacing = 2 };
+        var title = Presentation.Text("Focus Activity", 15);
+        title.FontWeight = Microsoft.UI.Text.FontWeights.SemiBold;
+        titleStack.Children.Add(title);
+
+        string subtitleText = snapshot.Period == ReportPeriod.Weekly
+            ? "Last 7 days (today on the right)"
+            : "Weekly breakdown for the selected month";
+        var subtitle = Presentation.DimText(subtitleText, 11);
+        titleStack.Children.Add(subtitle);
+        header.Children.Add(titleStack);
 
         var palette = ReportsPalette.Resolve(ActualTheme, _contrast);
-        var legend = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 16 };
-        legend.Children.Add(Swatch("Work", palette.Work));
-        legend.Children.Add(Swatch("Break", palette.Break));
+        var legend = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12, VerticalAlignment = VerticalAlignment.Center };
+        legend.Children.Add(Swatch("Focus Time", palette.Work));
         Grid.SetColumn(legend, 1);
         header.Children.Add(legend);
 
         body.Children.Add(header);
 
-        var max = snapshot.Trend.Count == 0 ? 0 : snapshot.Trend.Max(b => Math.Max(b.Totals.FocusTime.TotalSeconds, b.Totals.BreakTime.TotalSeconds));
-        var chart = new ReportsChart(snapshot.Trend, max, palette);
+        var chart = new ReportsChart(snapshot.Trend, snapshot.Period, palette);
         AutomationProperties.SetName(chart, "Focus activity trend chart");
         body.Children.Add(chart);
 
-        // Concise summary line replaces the verbose Expander; per-bucket values remain in bar tooltips.
-        var totals = snapshot.Totals;
-        if (totals.FocusTime > TimeSpan.Zero || totals.BreakTime > TimeSpan.Zero)
+        // Calendar info strip at bottom of card for Weekly mode
+        if (snapshot.Period == ReportPeriod.Weekly)
         {
-            var summary = Presentation.DimText(
-                string.Create(CultureInfo.InvariantCulture,
-                    $"Total: {Duration(totals.FocusTime)} focus · {Duration(totals.BreakTime)} break"), 11);
-            summary.Margin = new Thickness(0, 2, 0, 0);
-            body.Children.Add(summary);
+            var infoStrip = new Border
+            {
+                Background = Presentation.ThemeBrush("FkSurface2", this),
+                BorderBrush = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", this),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(12, 8, 12, 8),
+                Margin = new Thickness(0, 4, 0, 0)
+            };
+            var infoStack = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, VerticalAlignment = VerticalAlignment.Center };
+            var calIcon = new FontIcon
+            {
+                Glyph = "\uE787", // Calendar icon
+                FontSize = 13,
+                Foreground = Presentation.ThemeBrush("FkSecondary", this),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            infoStack.Children.Add(calIcon);
+            var infoText = Presentation.DimText("Showing the last 7 days. Today is on the right.", 11);
+            infoText.VerticalAlignment = VerticalAlignment.Center;
+            infoStack.Children.Add(infoText);
+            infoStrip.Child = infoStack;
+            body.Children.Add(infoStrip);
         }
 
         return Card(body, 20);
@@ -350,36 +371,32 @@ internal sealed class ReportsView : UserControl, IDisposable
             return string.Create(CultureInfo.InvariantCulture,
                 $"{s.Totals.Started} {(s.Totals.Started == 1 ? "session was" : "sessions were")} started in this period, but none completed yet. Completed sessions will show patterns and comparisons here.");
 
-        if (s.Period == ReportPeriod.Daily)
-        {
-            if (s.LeadingFocusPeriods.Count > 0)
-            {
-                var peak = s.LeadingFocusPeriods[0];
-                return string.Create(CultureInfo.InvariantCulture,
-                    $"Most of your completed Work sessions today occurred between {peak.StartHour:00}:00 and {peak.StartHour + 3:00}:00 ({peak.CompletedWork} completed {(peak.CompletedWork == 1 ? "session" : "sessions")}). Total focus: {Duration(s.Totals.FocusTime)}.");
-            }
-            return string.Create(CultureInfo.InvariantCulture,
-                $"You completed {Duration(s.Totals.FocusTime)} of focus time today with a completion rate of {(s.Totals.CompletionRate ?? 0):0.#}%.");
-        }
-
         if (s.Period == ReportPeriod.Weekly)
         {
-            string peakStr = s.LeadingFocusPeriods.Count > 0
-                ? string.Create(CultureInfo.InvariantCulture, $"Most of your completed Work sessions this week occurred between {s.LeadingFocusPeriods[0].StartHour:00}:00 and {s.LeadingFocusPeriods[0].StartHour + 3:00}:00. ")
-                : "";
+            var topBucket = s.Trend.Count > 0 ? s.Trend.OrderByDescending(b => b.Totals.FocusTime).FirstOrDefault() : null;
+            string peakStr = "";
+            if (topBucket != null && topBucket.Totals.FocusTime > TimeSpan.Zero &&
+                DateOnly.TryParseExact(topBucket.Label, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var topDate))
+            {
+                string topDayName = topDate.ToString("dddd", CultureInfo.InvariantCulture);
+                string topDuration = Duration(topBucket.Totals.FocusTime);
+                peakStr = $"Most of your focus time this week occurred on {topDayName} ({topDuration}). ";
+            }
+
+            TimeSpan dailyAvg = TimeSpan.FromTicks(s.Totals.FocusTime.Ticks / 7);
             string diffStr = s.WeekDifference > TimeSpan.Zero
                 ? $" Up {Duration(s.WeekDifference)} compared to last week."
                 : s.WeekDifference < TimeSpan.Zero
                     ? $" Down {Duration(s.WeekDifference.Duration())} compared to last week."
                     : "";
             return string.Create(CultureInfo.InvariantCulture,
-                $"{peakStr}Total focus: {Duration(s.WeekFocus)} across {s.Totals.CompletedWork} completed sessions (completion rate {(s.Totals.CompletionRate ?? 0):0.#}%).{diffStr}");
+                $"{peakStr}Total focus: {Duration(s.Totals.FocusTime)} across 7 days (daily average: {Duration(dailyAvg)}).{diffStr}");
         }
 
         // Monthly
-        var topBucket = s.Trend.Count > 0 ? s.Trend.OrderByDescending(b => b.Totals.FocusTime).FirstOrDefault() : null;
-        string topStr = topBucket != null && topBucket.Totals.FocusTime > TimeSpan.Zero
-            ? $"{topBucket.Label} had your highest focus output ({Duration(topBucket.Totals.FocusTime)}). "
+        var monthlyTopBucket = s.Trend.Count > 0 ? s.Trend.OrderByDescending(b => b.Totals.FocusTime).FirstOrDefault() : null;
+        string topStr = monthlyTopBucket != null && monthlyTopBucket.Totals.FocusTime > TimeSpan.Zero
+            ? $"{monthlyTopBucket.Label} had your highest focus output ({Duration(monthlyTopBucket.Totals.FocusTime)}). "
             : "";
         return string.Create(CultureInfo.InvariantCulture,
             $"{topStr}Total focus for the month: {Duration(s.Totals.FocusTime)} across {s.Totals.CompletedWork} completed sessions (completion rate {(s.Totals.CompletionRate ?? 0):0.#}%).");

@@ -23,7 +23,7 @@ public sealed class ReportsControllerTests
         int reads = 0;
         using var controller = New((_, _, _) => ++reads == 1 ? first.Task : second.Task);
         Task open = controller.OpenAsync(); Task refresh = controller.RefreshAsync();
-        var latest = Empty(ReportPeriod.Daily); second.SetResult(latest); await refresh;
+        var latest = Empty(ReportPeriod.Weekly); second.SetResult(latest); await refresh;
         first.SetResult(Empty()); await open;
         Assert.Same(latest, controller.Snapshot); Assert.False(controller.IsRefreshing);
     }
@@ -49,10 +49,10 @@ public sealed class ReportsControllerTests
         var calls = new List<(ReportPeriod Period, DateOnly Date)>();
         using var controller = New((period, date, _) => { calls.Add((period, date)); return Task.FromResult(Empty(period)); });
         await controller.OpenAsync();
-        await controller.SelectAsync(ReportPeriod.Daily, new DateOnly(2026, 9, 2));
-        await controller.MoveAsync(1); Assert.Equal(new DateOnly(2026, 9, 3), controller.Date);
+        await controller.SelectAsync(ReportPeriod.Weekly, new DateOnly(2026, 9, 2));
+        await controller.MoveAsync(1); Assert.Equal(new DateOnly(2026, 9, 9), controller.Date);
         await controller.SelectAsync(ReportPeriod.Monthly, new DateOnly(2026, 9, 15));
-        await controller.MoveAsync(-1); Assert.Equal(new DateOnly(2026, 8, 1), controller.Date);
+        await controller.MoveAsync(-1); Assert.Equal(new DateOnly(2026, 8, 15), controller.Date);
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => controller.MoveAsync(0));
         await controller.CurrentAsync(); Assert.Equal(new DateOnly(2026, 9, 2), controller.Date);
         Assert.Equal(6, calls.Count);
@@ -114,7 +114,6 @@ public sealed class ReportsControllerTests
     }
 
     [Theory]
-    [InlineData(ReportPeriod.Daily)]
     [InlineData(ReportPeriod.Weekly)]
     [InlineData(ReportPeriod.Monthly)]
     public async Task NavigationAtSupportedLimitsIsSafe(ReportPeriod period)

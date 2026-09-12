@@ -27,10 +27,8 @@ public sealed class ReportsController(Func<ReportPeriod, DateOnly, CancellationT
     public Task MoveAsync(int direction)
     {
         if (direction is not (-1 or 1)) throw new ArgumentOutOfRangeException(nameof(direction));
-        var range = ReportRange.For(Period, Date);
         DateOnly next;
-        try { next = Period == ReportPeriod.Monthly ? range.Start.AddMonths(direction) :
-            range.Start.AddDays(direction * (Period == ReportPeriod.Weekly ? 7 : 1)); }
+        try { next = Period == ReportPeriod.Monthly ? Date.AddMonths(direction) : Date.AddDays(direction * 7); }
         catch (ArgumentOutOfRangeException) { return Task.CompletedTask; }
         if (next < ReportRange.MinimumDate || next > ReportRange.MaximumDate) return Task.CompletedTask;
         return SelectAsync(Period, next);

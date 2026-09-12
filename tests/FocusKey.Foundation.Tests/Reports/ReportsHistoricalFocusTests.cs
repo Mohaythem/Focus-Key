@@ -45,7 +45,7 @@ public sealed class ReportsHistoricalFocusTests
         var timeProvider = new ManualTimeProvider(startTime.AddHours(2));
         var reportsService = new ReportsService(sessionRepo, historyRepo, timeProvider, () => TimeZoneInfo.Utc);
 
-        var snapshot = await reportsService.ReadAsync(ReportPeriod.Daily, date);
+        var snapshot = await reportsService.ReadAsync(ReportPeriod.Weekly, date);
 
         // Totals: native (30m) + imported (5.5h = 330m) = 360m = 6 hours
         Assert.Equal(TimeSpan.FromHours(6), snapshot.Totals.FocusTime);
@@ -79,7 +79,7 @@ public sealed class ReportsHistoricalFocusTests
         var timeProvider = new ManualTimeProvider(new DateTimeOffset(2026, 9, 10, 12, 0, 0, TimeSpan.Zero));
         var reportsService = new ReportsService(sessionRepo, historyRepo, timeProvider, () => TimeZoneInfo.Utc);
 
-        var snapshot = await reportsService.ReadAsync(ReportPeriod.Daily, date);
+        var snapshot = await reportsService.ReadAsync(ReportPeriod.Weekly, date);
 
         Assert.Equal(TimeSpan.FromHours(4), snapshot.Totals.FocusTime);
         Assert.Equal(0, snapshot.Totals.Started);
@@ -88,7 +88,7 @@ public sealed class ReportsHistoricalFocusTests
     }
 
     [Fact]
-    public async Task ReadAsync_DailyTrend_DistributesHistoricalHoursAcrossHours()
+    public async Task ReadAsync_WeeklyTrend_IncludesHistoricalHoursInDayBuckets()
     {
         using var temp = new TempDirectory();
         string file = Path.Combine(temp.Path, "focus_key.db");
@@ -108,10 +108,12 @@ public sealed class ReportsHistoricalFocusTests
         var timeProvider = new ManualTimeProvider(new DateTimeOffset(2026, 9, 10, 12, 0, 0, TimeSpan.Zero));
         var reportsService = new ReportsService(sessionRepo, historyRepo, timeProvider, () => TimeZoneInfo.Utc);
 
-        var snapshot = await reportsService.ReadAsync(ReportPeriod.Daily, date);
+        var snapshot = await reportsService.ReadAsync(ReportPeriod.Weekly, date);
 
-        // Daily trend has 24 hourly buckets (00:00 to 23:00)
-        Assert.Equal(24, snapshot.Trend.Count);
+        // Weekly trend has 7 rolling day buckets ending on date (index 6 is 2026-09-10)
+        Assert.Equal(7, snapshot.Trend.Count);
+        Assert.Equal("2026-09-10", snapshot.Trend[6].Label);
+        Assert.Equal(TimeSpan.FromHours(12), snapshot.Trend[6].Totals.FocusTime);
         var totalTrendFocus = snapshot.Trend.Aggregate(TimeSpan.Zero, (acc, b) => acc + b.Totals.FocusTime);
         Assert.Equal(TimeSpan.FromHours(12), totalTrendFocus);
     }
@@ -185,7 +187,7 @@ public sealed class ReportsHistoricalFocusTests
         var timeProvider = new ManualTimeProvider(startTime.AddHours(1));
         var reportsService = new ReportsService(sessionRepo, historyRepo, timeProvider, () => TimeZoneInfo.Utc);
 
-        var snapshot = await reportsService.ReadAsync(ReportPeriod.Daily, new DateOnly(2026, 9, 10));
+        var snapshot = await reportsService.ReadAsync(ReportPeriod.Weekly, new DateOnly(2026, 9, 10));
 
         // 3 consecutive days (Sep 8, Sep 9, Sep 10) => Current Streak = 3!
         Assert.Equal(3, snapshot.Streaks.CurrentStreak);
@@ -214,11 +216,11 @@ public sealed class ReportsHistoricalFocusTests
         var timeProvider = new ManualTimeProvider(new DateTimeOffset(2026, 9, 15, 18, 0, 0, TimeSpan.Zero));
         var reportsService = new ReportsService(sessionRepo, historyRepo, timeProvider, () => TimeZoneInfo.Utc);
 
-        var snapshot = await reportsService.ReadAsync(ReportPeriod.Daily, new DateOnly(2026, 9, 15));
+        var snapshot = await reportsService.ReadAsync(ReportPeriod.Weekly, new DateOnly(2026, 9, 15));
 
         Assert.Equal(15, snapshot.Streaks.CurrentStreak);
         Assert.True(snapshot.Streaks.LongestStreak >= 15);
-        Assert.Equal(TimeSpan.FromHours(2), snapshot.Totals.FocusTime);
+        Assert.Equal(TimeSpan.FromHours(14), snapshot.Totals.FocusTime);
     }
 
     [Fact]
@@ -254,7 +256,7 @@ public sealed class ReportsHistoricalFocusTests
         var timeProvider = new ManualTimeProvider(new DateTimeOffset(2026, 9, 10, 18, 0, 0, TimeSpan.Zero));
         var reportsService = new ReportsService(sessionRepo, historyRepo, timeProvider, () => TimeZoneInfo.Utc);
 
-        var snapshot = await reportsService.ReadAsync(ReportPeriod.Daily, date);
+        var snapshot = await reportsService.ReadAsync(ReportPeriod.Weekly, date);
 
         // Total focus time must remain exactly 11.5 hours (690 minutes), NOT duplicated to 23 hours
         Assert.Equal(TimeSpan.FromMinutes(690), snapshot.Totals.FocusTime);
@@ -293,7 +295,7 @@ public sealed class ReportsHistoricalFocusTests
         var reportsService = new ReportsService(sessionRepo, historyRepo, timeProvider, () => TimeZoneInfo.Utc);
 
         // Internal report snapshot before export: exactly 1829 seconds
-        var snapshotBefore = await reportsService.ReadAsync(ReportPeriod.Daily, date);
+        var snapshotBefore = await reportsService.ReadAsync(ReportPeriod.Weekly, date);
         Assert.Equal(TimeSpan.FromSeconds(1829), snapshotBefore.Totals.FocusTime);
 
         // Export to website CSV (1829s rounds to 30 minutes via MidpointRounding.AwayFromZero)
@@ -301,7 +303,7 @@ public sealed class ReportsHistoricalFocusTests
         Assert.Contains("20260910\t\"\"\t30\r\n", exportedCsv);
 
         // Internal report snapshot after export: MUST STILL BE exactly 1829 seconds (unmodified by export rounding)
-        var snapshotAfter = await reportsService.ReadAsync(ReportPeriod.Daily, date);
+        var snapshotAfter = await reportsService.ReadAsync(ReportPeriod.Weekly, date);
         Assert.Equal(TimeSpan.FromSeconds(1829), snapshotAfter.Totals.FocusTime);
         Assert.Equal(TimeSpan.FromSeconds(1829), snapshotBefore.Totals.FocusTime);
     }

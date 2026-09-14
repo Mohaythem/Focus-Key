@@ -18,13 +18,16 @@ namespace FocusKey;
 internal sealed class ReportsChart : Grid
 {
     private const double TopHeadroom = 28;
-    private const double PlotAreaHeight = 210;
-    private const double TotalPlotHeight = TopHeadroom + PlotAreaHeight; // 238 DIP
+    private const double PlotAreaHeight = 252;
+    private const double TotalPlotHeight = TopHeadroom + PlotAreaHeight; // 280 DIP
 
     internal ReportsChart(IReadOnlyList<ReportBucket> trend, ReportPeriod period, ReportsPalette palette)
     {
+        Language = "en-US";
+        FlowDirection = FlowDirection.LeftToRight;
+
         ColumnSpacing = 8;
-        ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });
+        ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(46) });
         ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         RowDefinitions.Add(new RowDefinition { Height = new GridLength(TotalPlotHeight) });
         RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -33,16 +36,31 @@ internal sealed class ReportsChart : Grid
         int ceilingHours = ReportsService.ComputeCeilingHours(effectiveMax);
 
         // 1. Y-Axis column (Column 0): ticks from 0h up to ceilingHours in 2h steps
-        var axisCanvas = new Canvas { Width = 40, Height = TotalPlotHeight };
+        var axisCanvas = new Canvas
+        {
+            Width = 46,
+            Height = TotalPlotHeight,
+            Language = "en-US",
+            FlowDirection = FlowDirection.LeftToRight
+        };
         for (int h = 0; h <= ceilingHours; h += 2)
         {
             double fraction = (double)h / ceilingHours;
             double y = TopHeadroom + PlotAreaHeight * (1.0 - fraction);
-            var label = Presentation.DimText($"{h}h", 10);
-            label.Width = 36;
-            label.TextAlignment = TextAlignment.Right;
+            var label = new TextBlock
+            {
+                Text = ReportsFormatting.FormatAxisHour(h),
+                FontSize = 11,
+                FontWeight = FontWeights.Normal,
+                Foreground = Presentation.ThemeBrush("FkSecondary", this),
+                Width = 40,
+                TextAlignment = TextAlignment.Right,
+                Language = "en-US",
+                FlowDirection = FlowDirection.LeftToRight,
+                TextReadingOrder = TextReadingOrder.UseFlowDirection
+            };
             Canvas.SetLeft(label, 0);
-            Canvas.SetTop(label, y - 7);
+            Canvas.SetTop(label, y - 8);
             axisCanvas.Children.Add(label);
         }
         Children.Add(axisCanvas);
@@ -58,7 +76,8 @@ internal sealed class ReportsChart : Grid
 
         var hLines = new List<Line>();
         var vLines = new List<Line>();
-        var gridStroke = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", this);
+        var gridStroke = Presentation.ThemeBrush("FkSecondary", this);
+        const double gridOpacity = 0.38;
 
         // Horizontal lines at each 2h tick
         for (int h = 0; h <= ceilingHours; h += 2)
@@ -74,7 +93,7 @@ internal sealed class ReportsChart : Grid
                 Stroke = gridStroke,
                 StrokeThickness = 1,
                 StrokeDashArray = new DoubleCollection { 3, 3 },
-                Opacity = 0.4
+                Opacity = gridOpacity
             };
             hLines.Add(line);
             gridCanvas.Children.Add(line);
@@ -93,7 +112,7 @@ internal sealed class ReportsChart : Grid
                 Stroke = gridStroke,
                 StrokeThickness = 1,
                 StrokeDashArray = new DoubleCollection { 3, 3 },
-                Opacity = 0.4
+                Opacity = gridOpacity
             };
             vLines.Add(line);
             gridCanvas.Children.Add(line);
@@ -123,7 +142,7 @@ internal sealed class ReportsChart : Grid
                 HorizontalAlignment = HorizontalAlignment.Center
             };
 
-            string durationText = FormatBarDuration(bucket.Totals.FocusTime);
+            string durationText = ReportsFormatting.FormatBarDuration(bucket.Totals.FocusTime);
             if (!string.IsNullOrEmpty(durationText))
             {
                 var durationLabel = new TextBlock
@@ -134,6 +153,9 @@ internal sealed class ReportsChart : Grid
                     FontWeight = FontWeights.SemiBold,
                     Foreground = Presentation.ThemeBrush("FkForeground", this),
                     HorizontalAlignment = HorizontalAlignment.Center,
+                    Language = "en-US",
+                    FlowDirection = FlowDirection.LeftToRight,
+                    TextReadingOrder = TextReadingOrder.UseFlowDirection,
                     Margin = new Thickness(0, 0, 0, 4)
                 };
                 barStack.Children.Add(durationLabel);
@@ -159,7 +181,7 @@ internal sealed class ReportsChart : Grid
             colContainer.Children.Add(barStack);
 
             // Native tooltip & accessibility
-            string tooltip = BuildTooltipText(bucket, period);
+            string tooltip = ReportsFormatting.FormatTooltip(bucket, period);
             ToolTipService.SetToolTip(colContainer, tooltip);
             AutomationProperties.SetName(colContainer, tooltip);
 
@@ -237,19 +259,25 @@ internal sealed class ReportsChart : Grid
                 // Rightmost day (Today) has bold emphasis
                 var dateText = new TextBlock
                 {
-                    Text = day.ToString("MMM d", CultureInfo.InvariantCulture),
+                    Text = ReportsFormatting.FormatDayDate(day),
                     FontSize = 11,
                     FontWeight = isRightmost ? FontWeights.SemiBold : FontWeights.Normal,
                     Foreground = Presentation.ThemeBrush(isRightmost ? "FkForeground" : "FkSecondary", this),
-                    HorizontalAlignment = HorizontalAlignment.Center
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Language = "en-US",
+                    FlowDirection = FlowDirection.LeftToRight,
+                    TextReadingOrder = TextReadingOrder.UseFlowDirection
                 };
                 var dayText = new TextBlock
                 {
-                    Text = $"({day.ToString("ddd", CultureInfo.InvariantCulture)})",
+                    Text = ReportsFormatting.FormatDayOfWeek(day),
                     FontSize = 10,
                     FontWeight = isRightmost ? FontWeights.SemiBold : FontWeights.Normal,
                     Foreground = Presentation.ThemeBrush(isRightmost ? "FkForeground" : "FkSecondary", this),
-                    HorizontalAlignment = HorizontalAlignment.Center
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Language = "en-US",
+                    FlowDirection = FlowDirection.LeftToRight,
+                    TextReadingOrder = TextReadingOrder.UseFlowDirection
                 };
                 labelStack.Children.Add(dateText);
                 labelStack.Children.Add(dayText);
@@ -259,11 +287,14 @@ internal sealed class ReportsChart : Grid
                 // Monthly view: W1, W2, etc.
                 var weekText = new TextBlock
                 {
-                    Text = $"W{i + 1}",
+                    Text = ReportsFormatting.FormatMonthWeek(i + 1),
                     FontSize = 11,
                     FontWeight = isRightmost ? FontWeights.SemiBold : FontWeights.Normal,
                     Foreground = Presentation.ThemeBrush(isRightmost ? "FkForeground" : "FkSecondary", this),
-                    HorizontalAlignment = HorizontalAlignment.Center
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Language = "en-US",
+                    FlowDirection = FlowDirection.LeftToRight,
+                    TextReadingOrder = TextReadingOrder.UseFlowDirection
                 };
                 labelStack.Children.Add(weekText);
             }
@@ -273,29 +304,5 @@ internal sealed class ReportsChart : Grid
         }
 
         Children.Add(labelsGrid);
-    }
-
-    private static string FormatBarDuration(TimeSpan duration)
-    {
-        if (duration <= TimeSpan.Zero) return string.Empty;
-        int hours = (int)duration.TotalHours;
-        int minutes = duration.Minutes;
-        if (hours > 0 && minutes > 0) return $"{hours}h {minutes}m";
-        if (hours > 0) return $"{hours}h";
-        return $"{Math.Max(1, minutes)}m";
-    }
-
-    private static string BuildTooltipText(ReportBucket bucket, ReportPeriod period)
-    {
-        string focusStr = Presentation.Duration(bucket.Totals.FocusTime);
-        string breakStr = Presentation.Duration(bucket.Totals.BreakTime);
-
-        if (period == ReportPeriod.Weekly &&
-            DateOnly.TryParseExact(bucket.Label, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day))
-        {
-            return $"{day:MMMM d, yyyy} ({day:dddd})\nFocus Time: {focusStr}\nBreak Time: {breakStr}";
-        }
-
-        return $"{bucket.Label}\nFocus Time: {focusStr}\nBreak Time: {breakStr}";
     }
 }

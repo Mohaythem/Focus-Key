@@ -229,4 +229,28 @@ All identified release blockers have been successfully resolved. The application
   - 590 automated tests passing (100% pass rate), including 14 comprehensive tests in `ReportsRollingWeeklyChartTests.cs`.
   - Release build succeeded with 0 warnings and 0 errors.
   - Self-contained binary payload published to `publish\`.
-  - Windows installer compiled cleanly to `release\FocusKeySetup.exe`.
+  - Windows installer compiled cleanly to `release\FocusKeySetup.exe`.
+
+## 9. Reports Chart Polish & Locale-Independent Formatting
+
+- **Deterministic Western Digit & English Date Formatting**:
+  - Centralized in `FocusKey.Foundation.Reports.ReportsFormatting`.
+  - Enforces Western Latin digits (`0 1 2 3 4 5 6 7 8 9`) across all Reports surfaces regardless of active Windows UI culture, regional formats, or Arabic/Persian system locales.
+  - Resolved localized tooltip date bug: tooltips now format deterministically as `Sep 6 (Sun)` followed by `Focus Time: Xh Ym` and `Break Time: Xm`.
+  - Explicitly sets `Language = "en-US"`, `FlowDirection = FlowDirection.LeftToRight`, and `TextReadingOrder = TextReadingOrder.UseFlowDirection` across chart elements to prevent DirectWrite national digit shaping.
+- **Clearly Visible Rectangular Chart Grid**:
+  - Replaced subtle `CardStrokeColorDefaultBrush` with theme-aware `FkSecondary` brush (`#A0A0A0` in Dark, `#5A6A6A` in Light) at a calibrated `0.38` opacity.
+  - Both horizontal 2-hour interval lines and vertical day/week separators share identical stroke properties (`StrokeThickness = 1`, `StrokeDashArray = { 3, 3 }`), producing immediately perceptible rectangular cells.
+  - Subordinate to focus bars while providing clear visual reference in both Dark and Light themes.
+- **Increased Usable Plotting Height**:
+  - Increased `PlotAreaHeight` from 210 DIP to 252 DIP (Total plot height 280 DIP including 28 DIP headroom).
+  - Provides +20% vertical bar expansion and generous breathing room for grid cells.
+  - 252 DIP evenly divides by 2h, 4h, 6h, and 12h intervals ($252 / 6 = 42.0$, $252 / 3 = 84.0$), eliminating subpixel blur on horizontal tick lines.
+- **Enhanced Left Y-Axis Readability**:
+  - Increased font size to 11 pt with `FkSecondary` foreground brush (5.8:1 contrast in Dark theme).
+  - Expanded Y-axis column width to 46 DIP with 40 DIP right-aligned labels, providing 14 DIP total clearance to the plot grid.
+  - Two-digit values (`10h`, `12h`, `14h`) render cleanly without clipping or grid collision.
+- **Verification**:
+  - 595 automated tests passing (100% pass rate), including culture-isolation unit tests in `ReportsFormattingTests.cs` verifying `ar-EG`, `ar-SA`, `fa-IR`, `en-US`, and invariant culture.
+  - Runtime visual verification confirmed across Dark and Light modes (`visual_reports_6h.png`, `visual_reports_12h.png`, `visual_reports_light_12h.png`).
+

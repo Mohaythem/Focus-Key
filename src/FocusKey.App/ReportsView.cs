@@ -189,15 +189,15 @@ internal sealed class ReportsView : UserControl, IDisposable
             var totals = snapshot.Totals;
 
             // Date range subtitle in subheader
-            string rangeText = string.Create(CultureInfo.InvariantCulture, $"{snapshot.Range.Start:yyyy-MM-dd} – {snapshot.Range.End.AddDays(-1):yyyy-MM-dd}");
+            string rangeText = ReportsFormatting.FormatDateRange(snapshot.Range.Start, snapshot.Range.End.AddDays(-1));
             _dateSubtitle.Text = $"{rangeText}  ·  {snapshot.TimeZone.DisplayName}";
 
             // 3-column metric tiles matching Figma layout
             var metrics = new Grid { ColumnSpacing = 8 };
             for (var i = 0; i < 3; i++) metrics.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            metrics.Children.Add(Metric("Focus Time", Duration(totals.FocusTime), "work sessions", 0));
-            metrics.Children.Add(Metric("Break Time", Duration(totals.BreakTime), "break sessions", 1));
-            metrics.Children.Add(Metric("Completion Rate", totals.CompletionRate is { } rate ? string.Create(CultureInfo.InvariantCulture, $"{rate:0.#}%") : "—", "sessions finished", 2));
+            metrics.Children.Add(Metric("Focus Time", ReportsFormatting.FormatDuration(totals.FocusTime), "work sessions", 0));
+            metrics.Children.Add(Metric("Break Time", ReportsFormatting.FormatDuration(totals.BreakTime), "break sessions", 1));
+            metrics.Children.Add(Metric("Completion Rate", totals.CompletionRate is { } rate ? ReportsFormatting.FormatRate(rate) : "—", "sessions finished", 2));
             _results.Children.Add(metrics);
 
             // Secondary streak companion card
@@ -223,7 +223,7 @@ internal sealed class ReportsView : UserControl, IDisposable
         var left = new StackPanel { Spacing = 2 };
         var curValue = new TextBlock
         {
-            Text = StreakStatistics.Format(streaks.CurrentStreak),
+            Text = ReportsFormatting.FormatStreak(streaks.CurrentStreak),
             FontSize = 20,
             FontFamily = new FontFamily("Consolas"),
             FontWeight = Microsoft.UI.Text.FontWeights.Normal,
@@ -260,7 +260,7 @@ internal sealed class ReportsView : UserControl, IDisposable
         var right = new StackPanel { Spacing = 2 };
         var longValue = new TextBlock
         {
-            Text = StreakStatistics.Format(streaks.LongestStreak),
+            Text = ReportsFormatting.FormatStreak(streaks.LongestStreak),
             FontSize = 20,
             FontFamily = new FontFamily("Consolas"),
             FontWeight = Microsoft.UI.Text.FontWeights.Normal,
@@ -387,28 +387,28 @@ internal sealed class ReportsView : UserControl, IDisposable
             if (topBucket != null && topBucket.Totals.FocusTime > TimeSpan.Zero &&
                 DateOnly.TryParseExact(topBucket.Label, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var topDate))
             {
-                string topDayName = topDate.ToString("dddd", CultureInfo.InvariantCulture);
-                string topDuration = Duration(topBucket.Totals.FocusTime);
+                string topDayName = ReportsFormatting.FormatDayOfWeekLong(topDate);
+                string topDuration = ReportsFormatting.FormatDuration(topBucket.Totals.FocusTime);
                 peakStr = $"Most of your focus time this week occurred on {topDayName} ({topDuration}). ";
             }
 
             TimeSpan dailyAvg = TimeSpan.FromTicks(s.Totals.FocusTime.Ticks / 7);
             string diffStr = s.WeekDifference > TimeSpan.Zero
-                ? $" Up {Duration(s.WeekDifference)} compared to last week."
+                ? $" Up {ReportsFormatting.FormatDuration(s.WeekDifference)} compared to last week."
                 : s.WeekDifference < TimeSpan.Zero
-                    ? $" Down {Duration(s.WeekDifference.Duration())} compared to last week."
+                    ? $" Down {ReportsFormatting.FormatDuration(s.WeekDifference.Duration())} compared to last week."
                     : "";
             return string.Create(CultureInfo.InvariantCulture,
-                $"{peakStr}Total focus: {Duration(s.Totals.FocusTime)} across 7 days (daily average: {Duration(dailyAvg)}).{diffStr}");
+                $"{peakStr}Total focus: {ReportsFormatting.FormatDuration(s.Totals.FocusTime)} across 7 days (daily average: {ReportsFormatting.FormatDuration(dailyAvg)}).{diffStr}");
         }
 
         // Monthly
         var monthlyTopBucket = s.Trend.Count > 0 ? s.Trend.OrderByDescending(b => b.Totals.FocusTime).FirstOrDefault() : null;
         string topStr = monthlyTopBucket != null && monthlyTopBucket.Totals.FocusTime > TimeSpan.Zero
-            ? $"{monthlyTopBucket.Label} had your highest focus output ({Duration(monthlyTopBucket.Totals.FocusTime)}). "
+            ? $"{monthlyTopBucket.Label} had your highest focus output ({ReportsFormatting.FormatDuration(monthlyTopBucket.Totals.FocusTime)}). "
             : "";
         return string.Create(CultureInfo.InvariantCulture,
-            $"{topStr}Total focus for the month: {Duration(s.Totals.FocusTime)} across {s.Totals.CompletedWork} completed sessions (completion rate {(s.Totals.CompletionRate ?? 0):0.#}%).");
+            $"{topStr}Total focus for the month: {ReportsFormatting.FormatDuration(s.Totals.FocusTime)} across {s.Totals.CompletedWork} completed sessions (completion rate {ReportsFormatting.FormatRate(s.Totals.CompletionRate ?? 0)}).");
     }
     private UIElement Metric(string label, string value, string sub, int column)
     {

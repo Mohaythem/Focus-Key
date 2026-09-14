@@ -111,10 +111,5 @@ internal static class Presentation
         Child = child
     };
     internal static SolidColorBrush Stroke(HexColor color) => SessionColorBrush.Create(SessionColors.Foreground(color));
-    internal static string Duration(TimeSpan value)
-    {
-        if (value.TotalHours >= 1) return string.Create(CultureInfo.InvariantCulture, $"{(long)value.TotalHours}h {value.Minutes:00}m");
-        if (value.Seconds != 0) return string.Create(CultureInfo.InvariantCulture, $"{(long)value.TotalMinutes}m {value.Seconds:00}s");
-        return string.Create(CultureInfo.InvariantCulture, $"{(long)value.TotalMinutes}m");
-    }
+    internal static string Duration(TimeSpan value) => FocusKey.Foundation.Reports.ReportsFormatting.FormatDuration(value);
 }

@@ -33,6 +33,13 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
     private Appearance _appearance = Appearance.System;
     private Contrast _contrast = Contrast.Standard;
     internal void ApplyColors(SessionColors colors) { _colors = colors; Render(_state); }
+    internal void ApplyShortcut(GlobalShortcut shortcut)
+    {
+        if (OverlayShortcutHint is not null)
+        {
+            OverlayShortcutHint.Text = shortcut.ToString();
+        }
+    }
 
     public QuickOverlayWindow(Action<string>? trace = null)
     {

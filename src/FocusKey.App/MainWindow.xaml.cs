@@ -47,6 +47,14 @@ public sealed partial class MainWindow : Window
     internal event Action? OverlayRequested;
     private void OnOverlayClick(object sender, RoutedEventArgs args) => OverlayRequested?.Invoke();
     internal event Action? ExitRequested;
+    internal event Action<GlobalShortcut>? GlobalShortcutUpdated;
+
+    internal void ApplyShortcut(GlobalShortcut shortcut)
+    {
+        string text = shortcut.ToString();
+        if (HeroOverlayShortcutHint is not null) HeroOverlayShortcutHint.Text = text;
+        if (SidebarOverlayShortcutHint is not null) SidebarOverlayShortcutHint.Text = text;
+    }
 
     private Appearance _appearance = Appearance.System;
     private Contrast _contrast = Contrast.Standard;
@@ -70,6 +78,7 @@ public sealed partial class MainWindow : Window
             Appearance.Light => false,
             _ => MainSurface.ActualTheme == ElementTheme.Dark,
         };
+
         ThemePalette palette = isDark
             ? (_darkPalette ?? ThemePalette.DefaultDark)
             : (_lightPalette ?? ThemePalette.DefaultLight);
@@ -92,14 +101,28 @@ public sealed partial class MainWindow : Window
     internal MainWindow(StartupContext startup,
         Func<SessionType, CancellationToken, Task<SessionRecord>> start,
         Func<SessionId, CancellationToken, Task<SessionOutcome>> stop, Action<Exception> report,
-        Func<Task> refreshSettings)
+        Func<Task> refreshSettings,
+        WindowsShellIntegration shellIntegration)
     {
         InitializeComponent();
         _settingsService = startup.Settings;
         _startupReport = report;
         _reports = new ReportsView(startup.Reports, report);
         ReportsHost.Content = _reports;
-        _settings = new SettingsView(startup.Settings, startup.History, startup.WindowsStartup, refreshSettings, () => _reports.RefreshAsync(), () => WindowNative.GetWindowHandle(this), report);
+        _settings = new SettingsView(
+            startup.Settings,
+            startup.History,
+            startup.WindowsStartup,
+            refreshSettings,
+            () => _reports.RefreshAsync(),
+            () => WindowNative.GetWindowHandle(this),
+            report,
+            (GlobalShortcut sc, out string? err) => shellIntegration.TryUpdateHotkey(sc, out err),
+            sc =>
+            {
+                ApplyShortcut(sc);
+                GlobalShortcutUpdated?.Invoke(sc);
+            });
         SettingsHost.Content = _settings;
         var hwnd = WindowNative.GetWindowHandle(this);
         startup.Logger.Info($"Main window HWND: {hwnd}.");
@@ -255,24 +278,24 @@ public sealed partial class MainWindow : Window
         WorkChoiceCard.Background = SessionColorBrush.CreateAlpha(_colors.Work, workBgAlpha);
         WorkChoiceCard.BorderBrush = SessionColorBrush.CreateAlpha(_colors.Work, workBorderAlpha);
         WorkChoiceDot.Fill = SessionColorBrush.Create(_colors.Work);
-        WorkChoiceMode.Foreground = SessionColorBrush.Create(_colors.Work);
+        WorkChoiceMode.Foreground = Presentation.ThemeBrush("FkSecondary", CurrentCard);
 
-        StartWorkButton.Background = SessionColorBrush.CreateAlpha(_colors.Work, isDark ? 0.22 : 0.16);
-        StartWorkButton.BorderBrush = SessionColorBrush.CreateAlpha(_colors.Work, isDark ? 0.45 : 0.35);
+        StartWorkButton.Background = SessionColorBrush.CreateElevated(_colors.Work, isDark, _isWorkHovered);
+        StartWorkButton.BorderBrush = SessionColorBrush.CreateAlpha(_colors.Work, _isWorkHovered ? (isDark ? 0.85 : 0.75) : (isDark ? 0.55 : 0.45));
         StartWorkButton.BorderThickness = new Thickness(1);
-        StartWorkButton.Foreground = Presentation.ThemeBrush("FkText", CurrentCard);
+        StartWorkButton.Foreground = Presentation.ThemeBrush("FkForeground", CurrentCard);
 
         double breakBgAlpha = _isBreakHovered ? (isDark ? 0.20 : 0.14) : (isDark ? 0.12 : 0.08);
         double breakBorderAlpha = _isBreakHovered ? (isDark ? 0.55 : 0.40) : (isDark ? 0.35 : 0.25);
         BreakChoiceCard.Background = SessionColorBrush.CreateAlpha(_colors.Break, breakBgAlpha);
         BreakChoiceCard.BorderBrush = SessionColorBrush.CreateAlpha(_colors.Break, breakBorderAlpha);
         BreakChoiceDot.Fill = SessionColorBrush.Create(_colors.Break);
-        BreakChoiceMode.Foreground = SessionColorBrush.Create(_colors.Break);
+        BreakChoiceMode.Foreground = Presentation.ThemeBrush("FkSecondary", CurrentCard);
 
-        StartBreakButton.Background = SessionColorBrush.CreateAlpha(_colors.Break, isDark ? 0.22 : 0.16);
-        StartBreakButton.BorderBrush = SessionColorBrush.CreateAlpha(_colors.Break, isDark ? 0.45 : 0.35);
+        StartBreakButton.Background = SessionColorBrush.CreateElevated(_colors.Break, isDark, _isBreakHovered);
+        StartBreakButton.BorderBrush = SessionColorBrush.CreateAlpha(_colors.Break, _isBreakHovered ? (isDark ? 0.85 : 0.75) : (isDark ? 0.55 : 0.45));
         StartBreakButton.BorderThickness = new Thickness(1);
-        StartBreakButton.Foreground = Presentation.ThemeBrush("FkText", CurrentCard);
+        StartBreakButton.Foreground = Presentation.ThemeBrush("FkForeground", CurrentCard);
 
         var durations = _today.Snapshot?.Durations ?? SessionDurations.Default;
         var (workNum, workUnit) = TodayFormatting.FormatLauncherDurationParts(durations.Work);

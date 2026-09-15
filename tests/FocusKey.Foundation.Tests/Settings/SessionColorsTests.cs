@@ -30,7 +30,7 @@ public sealed class SessionColorsTests
         coordinator.ColorsChanged += events.Add;
         await coordinator.InitializeAsync();
         await coordinator.RefreshAsync();
-        Assert.Equal(new SessionColors(HexColor.Parse("#183739"), HexColor.Parse("#434763")), coordinator.Colors);
+        Assert.Equal(new SessionColors(HexColor.Parse("#2F8F83"), HexColor.Parse("#7667B8")), coordinator.Colors);
         Assert.Single(events);
     }
 

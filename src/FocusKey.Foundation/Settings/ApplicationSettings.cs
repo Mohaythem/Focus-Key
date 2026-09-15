@@ -9,12 +9,13 @@ public sealed record ApplicationSettings
         BreakDuration = TimeSpan.FromMinutes(10),
         Appearance = Appearance.System,
         Contrast = Contrast.Standard,
-        WorkColor = HexColor.Parse("#183739"),
-        BreakColor = HexColor.Parse("#434763"),
+        WorkColor = HexColor.Parse("#2F8F83"),
+        BreakColor = HexColor.Parse("#7667B8"),
         LightTheme = ThemeConfiguration.DefaultLight,
         DarkTheme = ThemeConfiguration.DefaultDark,
         SessionSoundsEnabled = true,
         ActivityCollapsed = true,
+        GlobalShortcut = GlobalShortcut.Default,
     };
 
     public required TimeSpan WorkDuration { get; init; }
@@ -27,6 +28,7 @@ public sealed record ApplicationSettings
     public ThemeConfiguration DarkTheme { get; init; } = ThemeConfiguration.DefaultDark;
     public bool SessionSoundsEnabled { get; init; } = true;
     public bool ActivityCollapsed { get; init; } = true;
+    public GlobalShortcut GlobalShortcut { get; init; } = GlobalShortcut.Default;
 
     public void Validate()
     {
@@ -40,6 +42,7 @@ public sealed record ApplicationSettings
         ValidateColor(BreakColor, nameof(BreakColor));
         (LightTheme ?? ThemeConfiguration.DefaultLight).Validate(false);
         (DarkTheme ?? ThemeConfiguration.DefaultDark).Validate(true);
+        (GlobalShortcut ?? GlobalShortcut.Default).Validate();
     }
 
     private static void ValidateDuration(TimeSpan duration, string name)

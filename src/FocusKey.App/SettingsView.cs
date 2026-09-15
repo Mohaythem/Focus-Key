@@ -1,5 +1,6 @@
 using System.Globalization;
 using FocusKey.Foundation.Settings;
+using FocusKey.Shell;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Automation.Peers;
@@ -73,6 +74,15 @@ internal sealed class SettingsView : UserControl
     private readonly Func<Task> _refreshReports;
     private readonly Func<IntPtr> _getWindowHandle;
     private readonly Action<Exception> _report;
+    internal delegate bool TryUpdateShortcutHandler(GlobalShortcut newShortcut, out string? error);
+    private readonly TryUpdateShortcutHandler? _tryUpdateShortcut;
+    private readonly Action<GlobalShortcut>? _onShortcutChanged;
+    private readonly Button _shortcutButton = new();
+    private readonly TextBlock _shortcutText = new();
+    private readonly Button _resetShortcutButton = new();
+    private readonly TextBlock _shortcutError = new() { Visibility = Visibility.Collapsed };
+    private GlobalShortcut _currentShortcut = GlobalShortcut.Default;
+    private bool _isListeningForShortcut;
 
     internal SettingsView(
         SettingsService settings,
@@ -81,13 +91,17 @@ internal sealed class SettingsView : UserControl
         Func<Task> refresh,
         Func<Task> refreshReports,
         Func<IntPtr> getWindowHandle,
-        Action<Exception> report)
+        Action<Exception> report,
+        TryUpdateShortcutHandler? tryUpdateShortcut = null,
+        Action<GlobalShortcut>? onShortcutChanged = null)
     {
         _windowsStartup = windowsStartup ?? throw new ArgumentNullException(nameof(windowsStartup));
         _historyService = history ?? throw new ArgumentNullException(nameof(history));
         _refreshReports = refreshReports ?? throw new ArgumentNullException(nameof(refreshReports));
         _getWindowHandle = getWindowHandle ?? throw new ArgumentNullException(nameof(getWindowHandle));
         _report = report ?? throw new ArgumentNullException(nameof(report));
+        _tryUpdateShortcut = tryUpdateShortcut;
+        _onShortcutChanged = onShortcutChanged;
         _controller = new(settings, refresh, report);
         _colorDebounceTimer = DispatcherQueue.CreateTimer();
         _colorDebounceTimer.Interval = TimeSpan.FromMilliseconds(250);
@@ -156,20 +170,8 @@ internal sealed class SettingsView : UserControl
 
         // 6. SHORTCUT
         var shortcut = new StackPanel { Spacing = 0 };
-        var kbdBadge = new Border
-        {
-            Style = Application.Current?.Resources["FkBadge"] as Style,
-            Padding = new Thickness(10, 4, 10, 4),
-            VerticalAlignment = VerticalAlignment.Center,
-            HorizontalAlignment = HorizontalAlignment.Right,
-            Child = new TextBlock
-            {
-                Text = "Shift + F3",
-                Style = Application.Current?.Resources["FkBadgeText"] as Style,
-                VerticalAlignment = VerticalAlignment.Center
-            }
-        };
-        shortcut.Children.Add(Row("Open overlay", "Global keyboard shortcut", kbdBadge, true));
+        var shortcutControl = BuildShortcutControl();
+        shortcut.Children.Add(Row("Open overlay", "Global keyboard shortcut", shortcutControl, true));
         _fields.Children.Add(Section("SHORTCUT", shortcut));
 
         // 7. SYSTEM
@@ -186,9 +188,6 @@ internal sealed class SettingsView : UserControl
         var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
         actions.Children.Add(_reload);
         var panel = new StackPanel { Spacing = 16, HorizontalAlignment = HorizontalAlignment.Stretch };
-        var help = Presentation.Text("Themes, presets, and colors save and apply automatically.\nDurations save when you leave the row or press Enter, and affect future sessions only.", 11, true);
-        help.TextWrapping = TextWrapping.Wrap;
-        panel.Children.Add(help);
         _editor.Content = _fields;
         _editor.HorizontalContentAlignment = HorizontalAlignment.Stretch;
         panel.Children.Add(_editor);
@@ -495,6 +494,9 @@ internal sealed class SettingsView : UserControl
                 case SettingsField.SessionSounds:
                     _sessionSounds.IsOn = saved.SessionSoundsEnabled;
                     break;
+                case SettingsField.GlobalShortcut:
+                    UpdateShortcutVisuals(saved.GlobalShortcut ?? GlobalShortcut.Default);
+                    break;
             }
         }
         finally { _applying = false; }
@@ -571,20 +573,20 @@ internal sealed class SettingsView : UserControl
 
     private static readonly (string Name, HexColor Color)[] WorkColorPresets =
     [
-        ("Forest Teal", HexColor.Parse("#183739")),
-        ("Pine Emerald", HexColor.Parse("#1B4D3E")),
-        ("Nordic Cyan", HexColor.Parse("#1A3F54")),
-        ("Slate Sage", HexColor.Parse("#2D4F4F")),
-        ("Deep Cobalt", HexColor.Parse("#1E3A5F"))
+        ("Focus Teal", HexColor.Parse("#2F8F83")),
+        ("Deep Teal", HexColor.Parse("#24756D")),
+        ("Fresh Teal", HexColor.Parse("#3A9D8F")),
+        ("Steel Cyan", HexColor.Parse("#3D8391")),
+        ("Focus Blue", HexColor.Parse("#3B78B4"))
     ];
 
     private static readonly (string Name, HexColor Color)[] BreakColorPresets =
     [
-        ("Twilight Slate", HexColor.Parse("#434763")),
-        ("Deep Indigo", HexColor.Parse("#343D5B")),
-        ("Night Amethyst", HexColor.Parse("#3B355A")),
-        ("Muted Plum", HexColor.Parse("#4A354F")),
-        ("Warm Charcoal", HexColor.Parse("#3D3D45"))
+        ("Calm Violet", HexColor.Parse("#7667B8")),
+        ("Indigo", HexColor.Parse("#5967A8")),
+        ("Soft Purple", HexColor.Parse("#8067A8")),
+        ("Plum", HexColor.Parse("#8A5F8F")),
+        ("Slate Violet", HexColor.Parse("#686784"))
     ];
 
     private FrameworkElement BuildColorSelector(Button customButton, ColorPicker picker, (string Name, HexColor Color)[] presets, bool isWork)
@@ -658,6 +660,177 @@ internal sealed class SettingsView : UserControl
         panel.Children.Add(customButton);
         UpdateSwatches(ColorValue(picker));
         return panel;
+    }
+
+    private FrameworkElement BuildShortcutControl()
+    {
+        var root = new StackPanel { Spacing = 6, HorizontalAlignment = HorizontalAlignment.Right };
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, VerticalAlignment = VerticalAlignment.Center };
+
+        _shortcutButton.Style = Application.Current?.Resources["FkColorButton"] as Style;
+        _shortcutButton.MinWidth = 120;
+        _shortcutButton.Padding = new Thickness(12, 6, 12, 6);
+        _shortcutButton.HorizontalContentAlignment = HorizontalAlignment.Center;
+        _shortcutButton.VerticalAlignment = VerticalAlignment.Center;
+
+        _shortcutText.Text = _currentShortcut.ToString();
+        _shortcutText.FontFamily = new FontFamily("Consolas");
+        _shortcutText.FontSize = 12;
+        _shortcutText.Foreground = Presentation.ThemeBrush("FkSecondary", this);
+        _shortcutText.HorizontalAlignment = HorizontalAlignment.Center;
+        _shortcutButton.Content = _shortcutText;
+
+        AutomationProperties.SetName(_shortcutButton, $"Global shortcut, {_currentShortcut}, click to change");
+
+        _resetShortcutButton.Content = "Reset";
+        _resetShortcutButton.FontSize = 12;
+        _resetShortcutButton.Padding = new Thickness(10, 6, 10, 6);
+        _resetShortcutButton.CornerRadius = new CornerRadius(4);
+        _resetShortcutButton.Background = Presentation.ThemeBrush("FkSurface2", this);
+        _resetShortcutButton.BorderBrush = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", this);
+        _resetShortcutButton.BorderThickness = new Thickness(1);
+        _resetShortcutButton.Foreground = Presentation.ThemeBrush("FkSecondary", this);
+        _resetShortcutButton.VerticalAlignment = VerticalAlignment.Center;
+        ToolTipService.SetToolTip(_resetShortcutButton, "Reset to Shift + F3");
+        AutomationProperties.SetName(_resetShortcutButton, "Reset shortcut to Shift + F3");
+
+        row.Children.Add(_shortcutButton);
+        row.Children.Add(_resetShortcutButton);
+        root.Children.Add(row);
+
+        _shortcutError.Style = Application.Current?.Resources["FkMutedText"] as Style;
+        _shortcutError.Foreground = Presentation.ThemeBrush("FkStatusStopped", this);
+        _shortcutError.FontSize = 11;
+        _shortcutError.TextWrapping = TextWrapping.Wrap;
+        _shortcutError.HorizontalAlignment = HorizontalAlignment.Right;
+        AutomationProperties.SetLiveSetting(_shortcutError, AutomationLiveSetting.Polite);
+        root.Children.Add(_shortcutError);
+
+        _shortcutButton.Click += (_, _) =>
+        {
+            if (_isListeningForShortcut)
+            {
+                CancelShortcutListening();
+            }
+            else
+            {
+                StartShortcutListening();
+            }
+        };
+
+        _shortcutButton.PreviewKeyDown += OnShortcutPreviewKeyDown;
+        _shortcutButton.LostFocus += (_, _) =>
+        {
+            if (_isListeningForShortcut) CancelShortcutListening();
+        };
+
+        _resetShortcutButton.Click += async (_, _) =>
+        {
+            if (_applying) return;
+            CancelShortcutListening();
+            await ApplyNewShortcutAsync(GlobalShortcut.Default);
+        };
+
+        return root;
+    }
+
+    private void StartShortcutListening()
+    {
+        _isListeningForShortcut = true;
+        _shortcutError.Visibility = Visibility.Collapsed;
+        _shortcutText.Text = "[ Press combination ]";
+        _shortcutText.Foreground = Presentation.ThemeBrush("FkAccent", this);
+        AutomationProperties.SetName(_shortcutButton, "Listening for shortcut. Press key combination or Escape to cancel.");
+    }
+
+    private void CancelShortcutListening()
+    {
+        _isListeningForShortcut = false;
+        UpdateShortcutVisuals(_currentShortcut);
+    }
+
+    private void UpdateShortcutVisuals(GlobalShortcut shortcut)
+    {
+        _currentShortcut = shortcut;
+        _shortcutText.Text = shortcut.ToString();
+        _shortcutText.Foreground = Presentation.ThemeBrush("FkSecondary", this);
+        AutomationProperties.SetName(_shortcutButton, $"Global shortcut, {shortcut}, click to change");
+    }
+
+    private async void OnShortcutPreviewKeyDown(object sender, KeyRoutedEventArgs args)
+    {
+        if (!_isListeningForShortcut) return;
+        args.Handled = true;
+
+        uint vk = (uint)(args.Key != VirtualKey.None ? args.Key : args.OriginalKey);
+
+        if (vk == 0x1B) // VK_ESCAPE
+        {
+            CancelShortcutListening();
+            return;
+        }
+
+        ShortcutModifiers mods = ShortcutModifiers.None;
+        if ((NativeMethods.GetKeyState(0x10) & 0x8000) != 0) mods |= ShortcutModifiers.Shift;
+        if ((NativeMethods.GetKeyState(0x11) & 0x8000) != 0) mods |= ShortcutModifiers.Control;
+        if ((NativeMethods.GetKeyState(0x12) & 0x8000) != 0) mods |= ShortcutModifiers.Alt;
+        if ((NativeMethods.GetKeyState(0x5B) & 0x8000) != 0 || (NativeMethods.GetKeyState(0x5C) & 0x8000) != 0) mods |= ShortcutModifiers.Windows;
+
+        if (vk is 0x10 or 0xA0 or 0xA1) mods |= ShortcutModifiers.Shift;
+        else if (vk is 0x11 or 0xA2 or 0xA3) mods |= ShortcutModifiers.Control;
+        else if (vk is 0x12 or 0xA4 or 0xA5) mods |= ShortcutModifiers.Alt;
+        else if (vk is 0x5B or 0x5C) mods |= ShortcutModifiers.Windows;
+
+        bool isModifierOnly = vk is 0x10 or 0x11 or 0x12 or 0x5B or 0x5C or 0xA0 or 0xA1 or 0xA2 or 0xA3 or 0xA4 or 0xA5;
+        if (isModifierOnly)
+        {
+            var parts = new List<string>();
+            if (mods.HasFlag(ShortcutModifiers.Windows)) parts.Add("Win");
+            if (mods.HasFlag(ShortcutModifiers.Control)) parts.Add("Ctrl");
+            if (mods.HasFlag(ShortcutModifiers.Alt)) parts.Add("Alt");
+            if (mods.HasFlag(ShortcutModifiers.Shift)) parts.Add("Shift");
+            _shortcutText.Text = parts.Count > 0 ? $"{string.Join(" + ", parts)} + …" : "[ Press combination ]";
+            return;
+        }
+
+        var candidate = new GlobalShortcut(mods, vk);
+        if (!candidate.IsValid(out string? valError))
+        {
+            _shortcutError.Text = valError ?? "Invalid shortcut combination.";
+            _shortcutError.Visibility = Visibility.Visible;
+            return;
+        }
+
+        CancelShortcutListening();
+        await ApplyNewShortcutAsync(candidate);
+    }
+
+    private async Task ApplyNewShortcutAsync(GlobalShortcut candidate)
+    {
+        _applying = true;
+        try
+        {
+            string? regError = null;
+            bool registered = _tryUpdateShortcut == null || _tryUpdateShortcut(candidate, out regError);
+            if (registered)
+            {
+                UpdateShortcutVisuals(candidate);
+                _shortcutError.Text = string.Empty;
+                _shortcutError.Visibility = Visibility.Collapsed;
+                await _controller.UpdateGlobalShortcutAsync(candidate);
+                _onShortcutChanged?.Invoke(candidate);
+            }
+            else
+            {
+                UpdateShortcutVisuals(_currentShortcut);
+                _shortcutError.Text = regError ?? "Could not register shortcut.";
+                _shortcutError.Visibility = Visibility.Visible;
+            }
+        }
+        finally
+        {
+            _applying = false;
+        }
     }
 
     private static ColorPicker Picker(string name)

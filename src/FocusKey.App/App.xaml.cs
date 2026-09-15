@@ -23,6 +23,7 @@ public partial class App : Application
     private bool _allowClose;
     private SingleInstanceLease? _ownership;
     private BackgroundShell? _shell;
+    private WindowsShellIntegration? _shellIntegration;
     private InstanceActivationSignal? _activationSignal;
     private QuickOverlayController? _quickOverlay;
     private QuickOverlayWindow? _quickOverlayWindow;
@@ -71,9 +72,14 @@ public partial class App : Application
             _sessionSoundsEnabled = initialSettings.SessionSoundsEnabled;
             _sounds = new SoundPlayerService(() => _sessionSoundsEnabled);
             _startup.Logger.Info("Single-instance shell ownership acquired.");
+            var integration = new WindowsShellIntegration(initialSettings.GlobalShortcut);
+            _shellIntegration = integration;
             ApplyThemePalettes(_startup.Appearance.LightPalette, _startup.Appearance.DarkPalette);
             _window = new MainWindow(_startup, StartSessionAsync, StopSessionAsync,
-                exception => _startup?.Logger.Error("Main-page operation failed.", exception), RefreshSettingsAsync);
+                exception => _startup?.Logger.Error("Main-page operation failed.", exception), RefreshSettingsAsync,
+                integration);
+            _window.ApplyShortcut(initialSettings.GlobalShortcut);
+            _window.GlobalShortcutUpdated += shortcut => _quickOverlayWindow?.ApplyShortcut(shortcut);
             _window.SetActivityCollapsed(initialSettings.ActivityCollapsed);
             _startup.Appearance.Changed += OnAppearanceChanged;
             _startup.Appearance.ColorsChanged += OnColorsChanged;
@@ -84,7 +90,6 @@ public partial class App : Application
             _window.ExitRequested += OnExplicitExitRequested;
             _window.AppWindow.Closing += OnAppWindowClosing;
             _window.Closed += OnMainWindowClosed;
-            var integration = new WindowsShellIntegration();
             _completion = new CompletionCoordinator(_startup.Sessions, session => NotifyCompletedAsync(integration, session),
                 exception => _startup?.Logger.Error("Completion coordination failed.", exception));
             integration.ClockChangedOrResumed += _completion.RequestEvaluation;
@@ -104,7 +109,7 @@ public partial class App : Application
             _shell.Start();
             await _completion.EvaluateAsync();
             _activationSignal.Listen(_window.DispatcherQueue, () => _shell.RequestActivation(ShellActivationKind.ShowWindow));
-            _startup.Logger.Info("Shell ready: tray added; Shift + F3 registered.");
+            _startup.Logger.Info($"Shell ready: tray added; {integration.CurrentShortcut} registered.");
             if (!isStartupLaunch)
             {
                 _window.Activate();
@@ -195,6 +200,7 @@ public partial class App : Application
         ThemePalette palette = isDark ? _startup.Appearance.DarkPalette : _startup.Appearance.LightPalette;
         window.ApplyAppearance(_startup.Appearance.Current, palette, _startup.Appearance.Contrast);
         window.ApplyColors(_startup.Appearance.Colors);
+        if (_shellIntegration is not null) window.ApplyShortcut(_shellIntegration.CurrentShortcut);
         _quickOverlayWindow = window;
         _startup.Logger.Info($"Quick overlay created with appearance {_startup.Appearance.Current}; Work {_startup.Appearance.Colors.Work}, Break {_startup.Appearance.Colors.Break}.");
         return window;

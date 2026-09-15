@@ -28,7 +28,7 @@
    <StackPanel Grid.Row="2" Spacing="8">
     <Button Content="Quick Overlay" Click="OnOverlayClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="12,7" Background="Transparent" BorderThickness="0" FontSize="12" Foreground="{ThemeResource FkSecondary}"/>
     <Button Content="Exit Focus Key" Click="OnExitClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="12,7" Background="Transparent" BorderThickness="0" FontSize="12" Foreground="{ThemeResource FkSecondary}"/>
-    <Border BorderBrush="{ThemeResource FkBorder}" BorderThickness="0,1,0,0" Padding="12,16,12,0" Margin="0,4,0,0"><StackPanel Spacing="2"><TextBlock Text="Shift + F3" Style="{StaticResource FkText}" FontFamily="Consolas" FontSize="11" Foreground="{ThemeResource FkSecondary}"/><TextBlock Text="One focused session." Style="{StaticResource FkDimText}" FontSize="10"/></StackPanel></Border>
+    <Border BorderBrush="{ThemeResource FkBorder}" BorderThickness="0,1,0,0" Padding="12,16,12,0" Margin="0,4,0,0"><StackPanel Spacing="2"><TextBlock x:Name="SidebarOverlayShortcutHint" Text="Shift + F3" Style="{StaticResource FkText}" FontFamily="Consolas" FontSize="11" Foreground="{ThemeResource FkSecondary}"/><TextBlock Text="One focused session." Style="{StaticResource FkDimText}" FontSize="10"/></StackPanel></Border>
    </StackPanel>
   </Grid>
   <ScrollViewer x:Name="PageScrollViewer" Grid.Column="1" HorizontalScrollBarVisibility="Disabled">
@@ -74,59 +74,59 @@
           <TextBlock Text="·" Style="{StaticResource FkMutedText}" FontSize="12" VerticalAlignment="Center"/>
           <TextBlock Text="Choose a session" Style="{StaticResource FkMutedText}" FontSize="12" VerticalAlignment="Center"/>
          </StackPanel>
-         <Border Grid.Column="1" VerticalAlignment="Center" Background="{ThemeResource FkSurface2}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="8,3">
-          <TextBlock Text="Shift + F3" FontFamily="Consolas" FontSize="11" Foreground="{ThemeResource FkSecondary}"/>
-         </Border>
-        </Grid>
-        <Grid ColumnSpacing="12" HorizontalAlignment="Stretch">
-         <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="*"/>
-          <ColumnDefinition Width="*"/>
-         </Grid.ColumnDefinitions>
+          <Border Grid.Column="1" VerticalAlignment="Center" Background="{ThemeResource FkSurface2}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="8,3">
+           <TextBlock x:Name="HeroOverlayShortcutHint" Text="Shift + F3" FontFamily="Consolas" FontSize="11" Foreground="{ThemeResource FkSecondary}"/>
+          </Border>
+         </Grid>
+         <Grid ColumnSpacing="12" HorizontalAlignment="Stretch">
+          <Grid.ColumnDefinitions>
+           <ColumnDefinition Width="*"/>
+           <ColumnDefinition Width="*"/>
+          </Grid.ColumnDefinitions>
 
-         <!-- Work Hero Surface -->
-         <Border x:Name="WorkChoiceCard" Grid.Column="0" CornerRadius="8" BorderThickness="1" Padding="18,14" MinHeight="84"
-                 PointerEntered="OnWorkCardPointerEntered" PointerExited="OnWorkCardPointerExited">
-          <Grid ColumnSpacing="12">
-           <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="Auto"/>
-           </Grid.ColumnDefinitions>
-           <StackPanel Spacing="2" VerticalAlignment="Center">
-            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-             <Ellipse x:Name="WorkChoiceDot" Width="6" Height="6" VerticalAlignment="Center"/>
-             <TextBlock x:Name="WorkChoiceMode" Text="WORK" FontSize="11" FontWeight="SemiBold" CharacterSpacing="60" Style="{StaticResource FkMutedText}"/>
+          <!-- Work Hero Surface -->
+          <Border x:Name="WorkChoiceCard" Grid.Column="0" CornerRadius="8" BorderThickness="1" Padding="18,14" MinHeight="84"
+                  PointerEntered="OnWorkCardPointerEntered" PointerExited="OnWorkCardPointerExited">
+           <Grid ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+             <ColumnDefinition Width="*"/>
+             <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel Spacing="2" VerticalAlignment="Center">
+             <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+              <Ellipse x:Name="WorkChoiceDot" Width="6" Height="6" VerticalAlignment="Center"/>
+              <TextBlock x:Name="WorkChoiceMode" Text="WORK" FontSize="11" FontWeight="SemiBold" CharacterSpacing="60" Style="{StaticResource FkMutedText}"/>
+             </StackPanel>
+             <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Bottom">
+              <TextBlock x:Name="WorkDurationNumber" Text="30" FontSize="26" FontWeight="SemiBold" Style="{StaticResource FkText}" FontFamily="Segoe UI Variable"/>
+              <TextBlock x:Name="WorkDurationUnit" Text="min" FontSize="12" Style="{StaticResource FkMutedText}" FontFamily="Segoe UI Variable" VerticalAlignment="Bottom" Margin="0,0,0,4"/>
+             </StackPanel>
             </StackPanel>
-            <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Bottom">
-             <TextBlock x:Name="WorkDurationNumber" Text="30" FontSize="26" FontWeight="SemiBold" Style="{StaticResource FkText}" FontFamily="Segoe UI Variable"/>
-             <TextBlock x:Name="WorkDurationUnit" Text="min" FontSize="12" Style="{StaticResource FkMutedText}" FontFamily="Segoe UI Variable" VerticalAlignment="Bottom" Margin="0,0,0,4"/>
-            </StackPanel>
-           </StackPanel>
-           <Button Grid.Column="1" x:Name="StartWorkButton" Content="Start" Click="OnStartWorkClick" VerticalAlignment="Center" Padding="18,7" FontSize="12" FontWeight="SemiBold" CornerRadius="5" AutomationProperties.Name="Start Work"/>
-          </Grid>
-         </Border>
+            <Button Grid.Column="1" x:Name="StartWorkButton" Style="{StaticResource FkLauncherStartButton}" Content="Start" Click="OnStartWorkClick" AutomationProperties.Name="Start Work"/>
+           </Grid>
+          </Border>
 
-         <!-- Break Hero Surface -->
-         <Border x:Name="BreakChoiceCard" Grid.Column="1" CornerRadius="8" BorderThickness="1" Padding="18,14" MinHeight="84"
-                 PointerEntered="OnBreakCardPointerEntered" PointerExited="OnBreakCardPointerExited">
-          <Grid ColumnSpacing="12">
-           <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="Auto"/>
-           </Grid.ColumnDefinitions>
-           <StackPanel Spacing="2" VerticalAlignment="Center">
-            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-             <Ellipse x:Name="BreakChoiceDot" Width="6" Height="6" VerticalAlignment="Center"/>
-             <TextBlock x:Name="BreakChoiceMode" Text="BREAK" FontSize="11" FontWeight="SemiBold" CharacterSpacing="60" Style="{StaticResource FkMutedText}"/>
+          <!-- Break Hero Surface -->
+          <Border x:Name="BreakChoiceCard" Grid.Column="1" CornerRadius="8" BorderThickness="1" Padding="18,14" MinHeight="84"
+                  PointerEntered="OnBreakCardPointerEntered" PointerExited="OnBreakCardPointerExited">
+           <Grid ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+             <ColumnDefinition Width="*"/>
+             <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel Spacing="2" VerticalAlignment="Center">
+             <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+              <Ellipse x:Name="BreakChoiceDot" Width="6" Height="6" VerticalAlignment="Center"/>
+              <TextBlock x:Name="BreakChoiceMode" Text="BREAK" FontSize="11" FontWeight="SemiBold" CharacterSpacing="60" Style="{StaticResource FkMutedText}"/>
+             </StackPanel>
+             <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Bottom">
+              <TextBlock x:Name="BreakDurationNumber" Text="10" FontSize="26" FontWeight="SemiBold" Style="{StaticResource FkText}" FontFamily="Segoe UI Variable"/>
+              <TextBlock x:Name="BreakDurationUnit" Text="min" FontSize="12" Style="{StaticResource FkMutedText}" FontFamily="Segoe UI Variable" VerticalAlignment="Bottom" Margin="0,0,0,4"/>
+             </StackPanel>
             </StackPanel>
-            <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Bottom">
-             <TextBlock x:Name="BreakDurationNumber" Text="10" FontSize="26" FontWeight="SemiBold" Style="{StaticResource FkText}" FontFamily="Segoe UI Variable"/>
-             <TextBlock x:Name="BreakDurationUnit" Text="min" FontSize="12" Style="{StaticResource FkMutedText}" FontFamily="Segoe UI Variable" VerticalAlignment="Bottom" Margin="0,0,0,4"/>
-            </StackPanel>
-           </StackPanel>
-           <Button Grid.Column="1" x:Name="StartBreakButton" Content="Start" Click="OnStartBreakClick" VerticalAlignment="Center" Padding="18,7" FontSize="12" FontWeight="SemiBold" CornerRadius="5" AutomationProperties.Name="Start Break"/>
-          </Grid>
-         </Border>
+            <Button Grid.Column="1" x:Name="StartBreakButton" Style="{StaticResource FkLauncherStartButton}" Content="Start" Click="OnStartBreakClick" AutomationProperties.Name="Start Break"/>
+           </Grid>
+          </Border>
         </Grid>
        </StackPanel>
       </Grid>

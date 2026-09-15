@@ -12,8 +12,9 @@ public sealed class ApplicationSettingsTests
         Assert.Equal(TimeSpan.FromMinutes(30), settings.WorkDuration);
         Assert.Equal(TimeSpan.FromMinutes(10), settings.BreakDuration);
         Assert.Equal(Appearance.System, settings.Appearance);
-        Assert.Equal("#183739", settings.WorkColor.Value);
-        Assert.Equal("#434763", settings.BreakColor.Value);
+        Assert.Equal("#2F8F83", settings.WorkColor.Value);
+        Assert.Equal("#7667B8", settings.BreakColor.Value);
+        Assert.Equal(GlobalShortcut.Default, settings.GlobalShortcut);
     }
 
     [Theory]

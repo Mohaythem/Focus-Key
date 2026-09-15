@@ -338,4 +338,41 @@ All identified release blockers have been successfully resolved. The application
   - Added unit tests in `TodayLauncherTests.cs` validating `FormatLauncherDurationParts`, locale invariance under non-English cultures (`ar-SA`, `fa-IR`, `de-DE`), and SQLite persistence of `ActivityCollapsed`.
   - Updated unit tests in `ReportsRollingWeeklyChartTests.cs` validating 5-hour interval scaling and dynamic ceilings.
   - Updated `SessionSchemaTests.cs` to verify Migration TargetVersion 7.
+  - Built Release configuration with 0 compilation errors and 0 warnings.
+
+## 13. Focused Post-Polish Corrections Before Visual Audit
+
+- **1. Start Button Visibility in Today Launcher**:
+  - Implemented `FkLauncherStartButton` custom `ControlTemplate` in `App.xaml` (Normal, PointerOver, Pressed, Disabled) preventing WinUI default button styling from overriding custom semantic colors.
+  - Implemented `SessionColorBrush.CreateElevated(HexColor, bool isDark, bool isHovered)` blending the semantic color onto the surface base (`#242424` for Dark, `#FFFFFF` for Light) at 24% (36% hovered) in Dark mode and 16% (24% hovered) in Light mode, producing a solid, elevated, high-contrast button plate.
+  - Applied distinct semantic borders (55% Dark / 45% Light unhovered, 85% Dark / 75% Light hovered) and high-contrast `FkForeground` text, ensuring clear visibility and tactile boundaries in both unhovered and hovered states without harsh neon styling.
+- **2. Neutral Typography Hierarchy for `WORK` and `BREAK` Labels**:
+  - Changed `WorkChoiceMode.Foreground` and `BreakChoiceMode.Foreground` from semantic colors to theme-aware neutral foreground `Presentation.ThemeBrush("FkSecondary", CurrentCard)`.
+  - Strengthens the visual hierarchy by keeping duration numbers as the primary anchor while preserving semantic color identity in the background wash, border, indicator dot, and action button.
+- **3. Curated Work & Break Color Presets**:
+  - Replaced former presets in `SettingsView` with 5 curated Work presets:
+    - Focus Teal (`#2F8F83`, new default)
+    - Deep Teal (`#24756D`)
+    - Fresh Teal (`#3A9D8F`)
+    - Steel Cyan (`#3D8391`)
+    - Focus Blue (`#3B78B4`)
+  - And 5 curated Break presets:
+    - Calm Violet (`#7667B8`, new default)
+    - Indigo (`#5967A8`)
+    - Soft Purple (`#8067A8`)
+    - Plum (`#8A5F8F`)
+    - Slate Violet (`#686784`)
+  - Updated fresh install defaults in Migration 3 and `ApplicationSettings.Default` to `#2F8F83` and `#7667B8` while preserving existing user-saved custom colors in SQLite.
+- **4. Customizable Global Open Overlay Shortcut**:
+  - Implemented `GlobalShortcut(ShortcutModifiers Modifiers, uint VirtualKey)` in `FocusKey.Foundation.Settings` with validation rules (supports standalone F1–F12, requires Ctrl/Alt/Win for alphanumeric keys, blocks bare typing characters and reserved keys like Escape and Win+L).
+  - Added SQLite Schema Migration 8 (`global_shortcut_setting`) adding `global_shortcut TEXT NOT NULL DEFAULT 'Shift + F3'` to `application_settings`.
+  - Added transactional hotkey registration in `WindowsShellIntegration.TryUpdateHotkey` with automatic rollback to the previous working shortcut if registration fails (e.g. error 1409).
+  - Built native WinUI shortcut capture control in `SettingsView` featuring interactive listening state (`[ Press combination ]`), live modifier display, Escape cancellation, Reset to default, and inline error feedback.
+  - Dynamically updated shortcut hints across Today header (`HeroOverlayShortcutHint`), sidebar footer (`SidebarOverlayShortcutHint`), and `QuickOverlayWindow` (`OverlayShortcutHint`).
+- **5. Removed Redundant Settings Introductory Copy**:
+  - Removed the 2-line auto-save explanation under the Settings title.
+- **Verification**:
+  - **665 automated tests passing (100% pass rate, 0 failed, 0 skipped)** across the solution.
+  - Added unit test suite `GlobalShortcutTests.cs` (25 tests) verifying formatting, parsing, validation rules, and SQLite persistence.
+  - Updated `ApplicationSettingsTests`, `SessionColorsTests`, and `SessionSchemaTests` (TargetVersion 8).
   - Built Release configuration with 0 compilation errors and 0 warnings.

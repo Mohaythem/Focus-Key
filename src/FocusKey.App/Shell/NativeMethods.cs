@@ -38,12 +38,17 @@ internal static class NativeMethods
     internal const uint TPM_RETURNCMD = 0x0100;
     internal const uint TPM_RIGHTBUTTON = 0x0002;
     internal const uint MF_STRING = 0x00000000;
+    internal const uint MOD_ALT = 0x0001;
+    internal const uint MOD_CONTROL = 0x0002;
     internal const uint MOD_SHIFT = 0x0004;
+    internal const uint MOD_WIN = 0x0008;
     internal const uint MOD_NOREPEAT = 0x4000;
     internal const ushort VK_F3 = 0x72;
     internal const int SW_SHOWNORMAL = 1;
     internal const uint GWLP_USERDATA = unchecked((uint)-21);
     internal const int IDI_APPLICATION = 32512;
+
+    [DllImport("user32.dll")] internal static extern short GetKeyState(int nVirtKey);
 
     [UnmanagedFunctionPointer(CallingConvention.Winapi)]
     internal delegate IntPtr WndProc(IntPtr hWnd, uint message, IntPtr wParam, IntPtr lParam);

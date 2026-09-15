@@ -35,6 +35,7 @@
                     CornerRadius="3"
                     Padding="6,2">
                     <TextBlock
+                        x:Name="OverlayShortcutHint"
                         Text="Shift + F3"
                         FontFamily="Consolas"
                         FontSize="10"

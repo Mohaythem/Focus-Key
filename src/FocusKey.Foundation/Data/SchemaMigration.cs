@@ -89,7 +89,7 @@ public static class SchemaMigrations
                 INSERT INTO application_settings (
                     singleton, work_duration_seconds, break_duration_seconds,
                     appearance, work_color, break_color)
-                VALUES (1, 1800, 600, 'system', '#183739', '#434763');
+                VALUES (1, 1800, 600, 'system', '#2F8F83', '#7667B8');
                 """),
 
         new SchemaMigration(
@@ -168,6 +168,13 @@ public static class SchemaMigrations
             Name: "activity_collapsed_setting",
             Sql: """
                 ALTER TABLE application_settings ADD COLUMN activity_collapsed INTEGER NOT NULL DEFAULT 1;
+                """),
+
+        new SchemaMigration(
+            Version: 8,
+            Name: "global_shortcut_setting",
+            Sql: """
+                ALTER TABLE application_settings ADD COLUMN global_shortcut TEXT NOT NULL DEFAULT 'Shift + F3';
                 """),
     ];
 }

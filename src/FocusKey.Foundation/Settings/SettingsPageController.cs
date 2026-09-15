@@ -7,7 +7,7 @@ public enum SettingsField
     WorkDuration, BreakDuration, Appearance, Contrast, WorkColor, BreakColor,
     LightPreset, LightBackground, LightForeground, LightAccent,
     DarkPreset, DarkBackground, DarkForeground, DarkAccent,
-    SessionSounds
+    SessionSounds, GlobalShortcut
 }
 
 /// <summary>UI-thread auto-save queue. Only committed values are published to runtime.</summary>
@@ -68,6 +68,8 @@ public sealed class SettingsPageController(SettingsService settings, Func<Task> 
         ChangeAsync(SettingsField.BreakColor, () => settings.UpdateBreakColorAsync(value), cancellationToken);
     public Task UpdateSessionSoundsAsync(bool value, CancellationToken cancellationToken = default) =>
         ChangeAsync(SettingsField.SessionSounds, () => settings.UpdateSessionSoundsEnabledAsync(value), cancellationToken);
+    public Task UpdateGlobalShortcutAsync(GlobalShortcut value, CancellationToken cancellationToken = default) =>
+        ChangeAsync(SettingsField.GlobalShortcut, () => settings.UpdateGlobalShortcutAsync(value), cancellationToken);
 
     public Task UpdateLightPresetAsync(string presetId, CancellationToken cancellationToken = default)
     {

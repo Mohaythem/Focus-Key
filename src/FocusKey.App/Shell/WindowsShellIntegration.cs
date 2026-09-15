@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Runtime.InteropServices;
 using FocusKey.Foundation.Shell;
 using FocusKey.Foundation.Sessions;
+using FocusKey.Foundation.Settings;
 
 namespace FocusKey.Shell;
 
@@ -25,7 +26,13 @@ internal sealed class WindowsShellIntegration : IShellIntegration
     private bool _disposed;
     private uint _taskbarCreated;
 
-    public WindowsShellIntegration() => _windowProcedure = WindowProcedure;
+    public GlobalShortcut CurrentShortcut { get; private set; } = GlobalShortcut.Default;
+
+    public WindowsShellIntegration(GlobalShortcut? initialShortcut = null)
+    {
+        _windowProcedure = WindowProcedure;
+        if (initialShortcut is not null) CurrentShortcut = initialShortcut;
+    }
 
     public event Action<ShellActivationKind>? ActivationRequested;
     public event Action? ExitRequested;
@@ -73,7 +80,8 @@ internal sealed class WindowsShellIntegration : IShellIntegration
             if (_window == IntPtr.Zero) throw LastError("Could not create the shell window.");
             _powerRegistration = NativeMethods.RegisterSuspendResumeNotification(_window, 0); // DEVICE_NOTIFY_WINDOW_HANDLE
             if (_powerRegistration == IntPtr.Zero) throw LastError("Could not subscribe to system resume notifications.");
-            if (!NativeMethods.RegisterHotKey(_window, HotkeyId, NativeMethods.MOD_SHIFT | NativeMethods.MOD_NOREPEAT, NativeMethods.VK_F3))
+            uint fsModifiers = NativeMethods.MOD_NOREPEAT | MapModifiers(CurrentShortcut.Modifiers);
+            if (!NativeMethods.RegisterHotKey(_window, HotkeyId, fsModifiers, CurrentShortcut.VirtualKey))
             {
                 // Hotkey is a convenience; do not crash the application if it is taken.
                 _hotkeyRegistered = false;
@@ -183,6 +191,67 @@ internal sealed class WindowsShellIntegration : IShellIntegration
     private void RaiseExit() { try { ExitRequested?.Invoke(); } catch (Exception e) { Report(e); } }
     private void Report(Exception e) { try { ErrorOccurred?.Invoke(e); } catch { } }
     private static Win32Exception LastError(string message) => new(Marshal.GetLastWin32Error(), message);
+    public bool TryUpdateHotkey(GlobalShortcut newShortcut, out string? error)
+    {
+        error = null;
+        if (!newShortcut.IsValid(out string? validationError))
+        {
+            error = validationError;
+            return false;
+        }
+
+        if (_disposed)
+        {
+            error = "The shell integration has been disposed.";
+            return false;
+        }
+
+        if (!_started || _window == IntPtr.Zero)
+        {
+            CurrentShortcut = newShortcut;
+            return true;
+        }
+
+        // Unregister existing hotkey if currently registered
+        if (_hotkeyRegistered)
+        {
+            NativeMethods.UnregisterHotKey(_window, HotkeyId);
+            _hotkeyRegistered = false;
+        }
+
+        uint fsModifiers = NativeMethods.MOD_NOREPEAT | MapModifiers(newShortcut.Modifiers);
+        if (NativeMethods.RegisterHotKey(_window, HotkeyId, fsModifiers, newShortcut.VirtualKey))
+        {
+            _hotkeyRegistered = true;
+            CurrentShortcut = newShortcut;
+            return true;
+        }
+
+        int err = Marshal.GetLastWin32Error();
+        error = err == 1409
+            ? $"The shortcut '{newShortcut}' is already in use by another application."
+            : $"Failed to register shortcut '{newShortcut}' (Error {err}).";
+
+        // Rollback to previous working shortcut
+        uint prevModifiers = NativeMethods.MOD_NOREPEAT | MapModifiers(CurrentShortcut.Modifiers);
+        if (NativeMethods.RegisterHotKey(_window, HotkeyId, prevModifiers, CurrentShortcut.VirtualKey))
+        {
+            _hotkeyRegistered = true;
+        }
+
+        return false;
+    }
+
+    private static uint MapModifiers(ShortcutModifiers modifiers)
+    {
+        uint result = 0;
+        if ((modifiers & ShortcutModifiers.Alt) != 0) result |= NativeMethods.MOD_ALT;
+        if ((modifiers & ShortcutModifiers.Control) != 0) result |= NativeMethods.MOD_CONTROL;
+        if ((modifiers & ShortcutModifiers.Shift) != 0) result |= NativeMethods.MOD_SHIFT;
+        if ((modifiers & ShortcutModifiers.Windows) != 0) result |= NativeMethods.MOD_WIN;
+        return result;
+    }
+
     private void Rollback()
     {
         if (_powerRegistration != IntPtr.Zero) NativeMethods.UnregisterSuspendResumeNotification(_powerRegistration);

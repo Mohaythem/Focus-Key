@@ -22,7 +22,7 @@ public sealed class SessionSchemaTests
         Assert.True(store.Initialization.DatabaseFileCreated);
         Assert.Equal(0, store.Initialization.SchemaVersionBefore);
         Assert.Equal(SchemaMigrations.TargetVersion, store.Initialization.SchemaVersionAfter);
-        Assert.Equal(7, SchemaMigrations.TargetVersion);
+        Assert.Equal(8, SchemaMigrations.TargetVersion);
         Assert.Equal(Enumerable.Range(1, SchemaMigrations.TargetVersion), store.Initialization.AppliedMigrations);
         Assert.Equal(1, store.ScalarRaw<long>(
             "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'sessions';"));

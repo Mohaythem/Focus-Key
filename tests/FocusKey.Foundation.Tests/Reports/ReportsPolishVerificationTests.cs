@@ -41,15 +41,15 @@ public sealed class ReportsPolishVerificationTests
         var weekly = await service.ReadAsync(ReportPeriod.Weekly, DateOnly.FromDateTime(thursday.DateTime));
         Assert.Equal(7, weekly.Trend.Count); // 7 rolling days
         Assert.Equal(11, weekly.Totals.Started); // 2 on Mon + 2 on Tue + 7 on Thu
-        Assert.Equal(TimeSpan.FromMinutes(45 + 50 + 80), weekly.Totals.FocusTime); // 175m
+        Assert.Equal(TimeSpan.FromMinutes(45 + 50 + 90), weekly.Totals.FocusTime); // 185m (including 10m stopped work session)
         Assert.Equal(TimeSpan.FromMinutes(15 + 10 + 20), weekly.Totals.BreakTime); // 45m
-        Assert.Equal(TimeSpan.FromMinutes(175), weekly.WeekFocus);
+        Assert.Equal(TimeSpan.FromMinutes(185), weekly.WeekFocus);
         Assert.Equal(TimeSpan.FromMinutes(150), weekly.PreviousWeekFocus);
-        Assert.Equal(TimeSpan.FromMinutes(25), weekly.WeekDifference);
+        Assert.Equal(TimeSpan.FromMinutes(35), weekly.WeekDifference);
 
-        // Rightmost day (index 6, Thursday Sept 10) has 80m work, 20m break
+        // Rightmost day (index 6, Thursday Sept 10) has 90m work (80m completed + 10m stopped), 20m break
         Assert.Equal("2026-09-10", weekly.Trend[6].Label);
-        Assert.Equal(TimeSpan.FromMinutes(80), weekly.Trend[6].Totals.FocusTime);
+        Assert.Equal(TimeSpan.FromMinutes(90), weekly.Trend[6].Totals.FocusTime);
         Assert.Equal(TimeSpan.FromMinutes(20), weekly.Trend[6].Totals.BreakTime);
 
         // Monday Sept 7 (index 3) and Tuesday Sept 8 (index 4)
@@ -61,7 +61,7 @@ public sealed class ReportsPolishVerificationTests
         // 2. Monthly Verification
         var monthly = await service.ReadAsync(ReportPeriod.Monthly, DateOnly.FromDateTime(thursday.DateTime));
         Assert.True(monthly.Trend.Count >= 4);
-        Assert.Equal(TimeSpan.FromMinutes(235), monthly.Totals.FocusTime); // 175m this week + 60m on Sept 3
+        Assert.Equal(TimeSpan.FromMinutes(245), monthly.Totals.FocusTime); // 185m this week + 60m on Sept 3
 
         // 3. Streak Statistics Verification (User-level, invariant across periods)
         Assert.Equal(1, weekly.Streaks.CurrentStreak);

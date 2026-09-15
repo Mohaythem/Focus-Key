@@ -376,7 +376,7 @@ internal sealed class ReportsView : UserControl, IDisposable
         if (s.Totals.Started == 0)
             return "No sessions recorded in this period. Completed time and focus patterns will appear here once a session is recorded.";
 
-        if (s.Totals.Completed == 0)
+        if (s.Totals.Completed == 0 && s.Totals.FocusTime == TimeSpan.Zero)
             return string.Create(CultureInfo.InvariantCulture,
                 $"{s.Totals.Started} {(s.Totals.Started == 1 ? "session was" : "sessions were")} started in this period, but none completed yet. Completed sessions will show patterns and comparisons here.");
 

@@ -7,14 +7,14 @@ public sealed record TodaySnapshot(DateOnly Date, TimeZoneInfo TimeZone, DateTim
 {
     public int CompletedWorkCount => Sessions.Count(s => s.Type == SessionType.Work && s.Status == SessionStatus.Completed);
     public int CompletedBreakCount => Sessions.Count(s => s.Type == SessionType.Break && s.Status == SessionStatus.Completed);
-    public TimeSpan WorkTime => CompletedTime(SessionType.Work);
-    public TimeSpan BreakTime => CompletedTime(SessionType.Break);
+    public TimeSpan WorkTime => CreditedTime(SessionType.Work);
+    public TimeSpan BreakTime => CreditedTime(SessionType.Break);
     public double? CompletionRate => Sessions.Count == 0 ? null :
         100.0 * Sessions.Count(s => s.Status == SessionStatus.Completed) / Sessions.Count;
 
-    private TimeSpan CompletedTime(SessionType type) => TimeSpan.FromTicks(Sessions
-        .Where(s => s.Type == type && s.Status == SessionStatus.Completed)
-        .Aggregate(0L, (total, session) => checked(total + session.ActualDuration!.Value.Ticks)));
+    private TimeSpan CreditedTime(SessionType type) => TimeSpan.FromTicks(Sessions
+        .Where(s => s.Type == type && s.Status != SessionStatus.Running)
+        .Aggregate(0L, (total, session) => checked(total + session.EffectiveDuration.Ticks)));
 }
 
 /// <summary>Read-only daily projection. Session membership uses its local start date.</summary>

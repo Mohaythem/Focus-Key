@@ -29,7 +29,7 @@ public sealed class TodayServiceTests
     }
 
     [Fact]
-    public async Task CountsOnlyCompletedTypesAndSumsActualCompletedDurations()
+    public async Task CountsOnlyCompletedTypesAndSumsCreditedDurations()
     {
         using var store = new SessionStore();
         var rows = new[]
@@ -38,14 +38,14 @@ public sealed class TodayServiceTests
             Completed(TestSessions.Anchor.AddHours(1), SessionType.Work, 15),
             Completed(TestSessions.Anchor.AddHours(2), SessionType.Break, 10),
             TestSessions.Finished(SessionStatus.Stopped, startedAt: TestSessions.Anchor.AddHours(3), actualDuration: TimeSpan.FromMinutes(5)),
-            TestSessions.Finished(SessionStatus.Interrupted, startedAt: TestSessions.Anchor.AddHours(4)),
+            TestSessions.Finished(SessionStatus.Interrupted, startedAt: TestSessions.Anchor.AddHours(4), actualDuration: TimeSpan.FromMinutes(10)),
             TestSessions.Running(startedAt: TestSessions.Anchor.AddHours(5))
         };
         foreach (var row in rows) await store.Repository.AddAsync(row);
         var today = await new TodayService(store.Repository, new ManualTimeProvider(TestSessions.Anchor.AddHours(6)), () => TimeZoneInfo.Utc).ReadAsync();
         Assert.Equal(2, today.CompletedWorkCount);
         Assert.Equal(1, today.CompletedBreakCount);
-        Assert.Equal(TimeSpan.FromMinutes(45), today.WorkTime);
+        Assert.Equal(TimeSpan.FromMinutes(60), today.WorkTime);
         Assert.Equal(TimeSpan.FromMinutes(10), today.BreakTime);
         Assert.Equal(50.0, today.CompletionRate);
         Assert.Equal(rows[^1], today.Running);
@@ -140,7 +140,7 @@ public sealed class TodayServiceTests
         clock.Advance(TimeSpan.FromMinutes(3)); await sessions.StopAsync(started.Id);
         var stopped = await service.ReadAsync();
         Assert.Null(stopped.Running); Assert.Equal(SessionStatus.Stopped, Assert.Single(stopped.Sessions).Status);
-        Assert.Equal(TimeSpan.Zero, stopped.WorkTime);
+        Assert.Equal(TimeSpan.FromMinutes(3), stopped.WorkTime);
         var second = await sessions.StartAsync(SessionType.Break);
         clock.Set(second.PlannedEndAt); await sessions.CompleteIfDueAsync();
         var completed = await service.ReadAsync();

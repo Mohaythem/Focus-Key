@@ -36,6 +36,39 @@ public sealed class SessionRecordTests
     }
 
     [Fact]
+    public void EffectiveDuration_RunningOrNullEnded_ReturnsZero()
+    {
+        SessionRecord session = TestSessions.Running(plannedDuration: TimeSpan.FromMinutes(30));
+        Assert.Equal(TimeSpan.Zero, session.EffectiveDuration);
+    }
+
+    [Fact]
+    public void EffectiveDuration_StoppedSession_ReturnsElapsedClampedToPlanned()
+    {
+        SessionRecord normal = TestSessions.Finished(
+            SessionStatus.Stopped,
+            plannedDuration: TimeSpan.FromMinutes(40),
+            actualDuration: TimeSpan.FromMinutes(20));
+        Assert.Equal(TimeSpan.FromMinutes(20), normal.EffectiveDuration);
+
+        SessionRecord exceeded = TestSessions.Finished(
+            SessionStatus.Stopped,
+            plannedDuration: TimeSpan.FromMinutes(40),
+            actualDuration: TimeSpan.FromMinutes(50));
+        Assert.Equal(TimeSpan.FromMinutes(40), exceeded.EffectiveDuration);
+    }
+
+    [Fact]
+    public void EffectiveDuration_CrashRecovery_ReturnsZero()
+    {
+        SessionRecord crash = TestSessions.Finished(
+            SessionStatus.Interrupted,
+            plannedDuration: TimeSpan.FromMinutes(30),
+            actualDuration: TimeSpan.Zero);
+        Assert.Equal(TimeSpan.Zero, crash.EffectiveDuration);
+    }
+
+    [Fact]
     public void Timestamps_AreNormalizedToUtc()
     {
         var localStart = new DateTimeOffset(2026, 9, 2, 12, 0, 0, TimeSpan.FromHours(3));

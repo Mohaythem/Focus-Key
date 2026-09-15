@@ -37,8 +37,8 @@ public sealed record ReportTotals(int Started, int WorkStarted, int BreakStarted
     {
         var rows = sessions.ToArray();
         TimeSpan Duration(SessionType type) => TimeSpan.FromTicks(rows
-            .Where(s => s.Status == SessionStatus.Completed && s.Type == type)
-            .Aggregate(0L, (sum, s) => checked(sum + s.ActualDuration!.Value.Ticks)));
+            .Where(s => s.Status != SessionStatus.Running && s.Type == type)
+            .Aggregate(0L, (sum, s) => checked(sum + s.EffectiveDuration.Ticks)));
         return new(rows.Length, rows.Count(s => s.Type == SessionType.Work), rows.Count(s => s.Type == SessionType.Break),
             rows.Count(s => s.Type == SessionType.Work && s.Status == SessionStatus.Completed),
             rows.Count(s => s.Type == SessionType.Break && s.Status == SessionStatus.Completed),

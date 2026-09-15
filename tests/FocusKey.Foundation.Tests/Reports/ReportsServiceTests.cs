@@ -7,7 +7,7 @@ namespace FocusKey.Foundation.Tests.Reports;
 public sealed class ReportsServiceTests
 {
     [Fact]
-    public async Task WeeklyTotalsCountStatusesAndOnlyCompletedDurations()
+    public async Task WeeklyTotalsCountStatusesAndElapsedDurationsForEndedSessions()
     {
         using var store = new SessionStore();
         var day = new DateTimeOffset(2026, 9, 2, 0, 0, 0, TimeSpan.Zero);
@@ -31,14 +31,14 @@ public sealed class ReportsServiceTests
         Assert.Equal(1, snapshot.Totals.Stopped);
         Assert.Equal(1, snapshot.Totals.Interrupted);
         Assert.Equal(1, snapshot.Totals.Running);
-        Assert.Equal(TimeSpan.FromMinutes(40), snapshot.Totals.FocusTime);
-        Assert.Equal(TimeSpan.FromMinutes(10), snapshot.Totals.BreakTime);
+        Assert.Equal(TimeSpan.FromMinutes(45), snapshot.Totals.FocusTime);
+        Assert.Equal(TimeSpan.FromMinutes(14), snapshot.Totals.BreakTime);
         Assert.Equal(7, snapshot.Trend.Count);
         Assert.Equal(6, snapshot.Trend[6].Totals.Started);
         Assert.Equal(0, snapshot.LeadingFocusPeriods.Single().StartHour);
         Assert.Equal(2, snapshot.LeadingFocusPeriods.Single().CompletedWork);
         Assert.Equal(50.0, snapshot.Totals.CompletionRate);
-        Assert.Equal(80.0, snapshot.Totals.WorkShare);
+        Assert.Equal(100.0 * 45 / 59, snapshot.Totals.WorkShare!.Value, 5);
     }
 
     [Theory]
@@ -153,7 +153,7 @@ public sealed class ReportsServiceTests
         clock.Advance(TimeSpan.FromMinutes(3)); await engine.StopAsync(running.Id);
         var stopped = await service.ReadAsync(ReportPeriod.Weekly, new DateOnly(2026, 9, 2));
         Assert.Equal(1, stopped.Totals.Stopped);
-        Assert.Equal(TimeSpan.Zero, stopped.Totals.FocusTime);
+        Assert.Equal(TimeSpan.FromMinutes(3), stopped.Totals.FocusTime);
         var next = await engine.StartAsync(SessionType.Work);
         clock.Set(next.PlannedEndAt.AddHours(1));
         var overdue = await service.ReadAsync(ReportPeriod.Weekly, new DateOnly(2026, 9, 2));
@@ -161,7 +161,7 @@ public sealed class ReportsServiceTests
         Assert.Equal(next, await store.Repository.GetAsync(next.Id));
         await engine.CompleteIfDueAsync();
         var completed = await service.ReadAsync(ReportPeriod.Weekly, new DateOnly(2026, 9, 2));
-        Assert.Equal(TimeSpan.FromMinutes(30), completed.Totals.FocusTime);
+        Assert.Equal(TimeSpan.FromMinutes(33), completed.Totals.FocusTime);
         Assert.Equal(50.0, completed.Totals.CompletionRate);
         var brk = await engine.StartAsync(SessionType.Break);
         clock.Set(brk.PlannedEndAt); await engine.CompleteIfDueAsync();
@@ -173,15 +173,17 @@ public sealed class ReportsServiceTests
     [InlineData(SessionType.Work, SessionStatus.Interrupted)]
     [InlineData(SessionType.Break, SessionStatus.Stopped)]
     [InlineData(SessionType.Break, SessionStatus.Interrupted)]
-    public async Task NonCompletedActualTimeNeverCountsAsCompletedTime(SessionType type, SessionStatus status)
+    public async Task NonCompletedActualTimeContributesToDurationWithoutCountingAsCompletedSession(SessionType type, SessionStatus status)
     {
         using var store = new SessionStore();
         await store.Repository.AddAsync(TestSessions.Finished(status, type: type, actualDuration: TimeSpan.FromMinutes(12)));
         var report = await Service(store, TimeZoneInfo.Utc).ReadAsync(ReportPeriod.Weekly, new(2026, 9, 2));
-        Assert.Equal(TimeSpan.Zero, report.Totals.FocusTime);
-        Assert.Equal(TimeSpan.Zero, report.Totals.BreakTime);
+        Assert.Equal(type == SessionType.Work ? TimeSpan.FromMinutes(12) : TimeSpan.Zero, report.Totals.FocusTime);
+        Assert.Equal(type == SessionType.Break ? TimeSpan.FromMinutes(12) : TimeSpan.Zero, report.Totals.BreakTime);
+        Assert.Equal(0, report.Totals.CompletedWork);
+        Assert.Equal(0, report.Totals.CompletedBreak);
         Assert.Equal(0.0, report.Totals.CompletionRate);
-        Assert.Null(report.Totals.WorkShare);
+        Assert.Equal(type == SessionType.Work ? 100.0 : 0.0, report.Totals.WorkShare);
         Assert.Equal(1, report.Totals.Started);
         Assert.Empty(report.LeadingFocusPeriods);
     }

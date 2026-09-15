@@ -57,13 +57,13 @@ public sealed class HistoricalFocusService(
             DateTimeOffset.MaxValue,
             cancellationToken).ConfigureAwait(false);
 
-        // Group native completed work sessions by local calendar date
+        // Group native focus by local calendar date (credited work time)
         var nativeFocusByDate = sessions
-            .Where(s => s.Type == SessionType.Work && s.Status == SessionStatus.Completed)
+            .Where(s => s.Type == SessionType.Work && s.Status != SessionStatus.Running)
             .GroupBy(s => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(s.StartedAt, zone).DateTime))
             .ToDictionary(
                 g => g.Key,
-                g => g.Aggregate(TimeSpan.Zero, (acc, s) => acc + (s.ActualDuration ?? TimeSpan.Zero)));
+                g => g.Aggregate(TimeSpan.Zero, (acc, s) => acc + s.EffectiveDuration));
 
         // 2. Fetch all historical focus records
         var historical = await _history.GetAllAsync(cancellationToken).ConfigureAwait(false);

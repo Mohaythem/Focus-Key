@@ -253,4 +253,30 @@ All identified release blockers have been successfully resolved. The application
 - **Verification**:
   - 595 automated tests passing (100% pass rate), including culture-isolation unit tests in `ReportsFormattingTests.cs` verifying `ar-EG`, `ar-SA`, `fa-IR`, `en-US`, and invariant culture.
   - Runtime visual verification confirmed across Dark and Light modes (`visual_reports_6h.png`, `visual_reports_12h.png`, `visual_reports_light_12h.png`).
+
+## 10. Partial Session Elapsed-Time Accounting (Stopped & Interrupted Sessions)
+
+- **Problem & Root Cause**:
+  - Previously, `ReportTotals.From`, `TodaySnapshot.WorkTime`/`BreakTime`, and `HistoricalFocusService.ExportWebsiteCsvAsync` filtered exclusively by `s.Status == SessionStatus.Completed`.
+  - When a user stopped a session before the planned duration finished (e.g., stopping a 40-minute Work session after 20 minutes) or had a clean shutdown interruption, the real time spent was completely excluded from `Focus Time`, `Break Time`, Today view, weekly/monthly report totals, and chart bars.
+- **Architectural Solution — `EffectiveDuration` on `SessionRecord`**:
+  - Introduced a centralized, robust property `EffectiveDuration` with defensive clamping `[TimeSpan.Zero, PlannedDuration]`:
+    - Returns `TimeSpan.Zero` while running (`Status == Running`) or if `EndedAt` is null.
+    - Returns `TimeSpan.Zero` if `EndedAt <= StartedAt` (e.g. crash recovery restart where no reliable elapsed time exists, preventing false inflation).
+    - Returns exact `PlannedDuration` for `Completed` sessions (preventing sub-second drift).
+    - Returns exact elapsed duration (`EndedAt - StartedAt`) for `Stopped` and orderly shutdown `Interrupted` sessions, clamped to not exceed `PlannedDuration`.
+- **Strict Separation of Completion Metrics vs. Time Accounting**:
+  - **Completion Metrics**: `CompletedWorkCount`, `CompletedBreakCount`, and `CompletionRate` remain strictly based on `SessionStatus.Completed`. Stopping a session does NOT count as a finished session or increment completion percentage.
+  - **Time Accounting**: `FocusTime` and `BreakTime` credit all non-running sessions' `EffectiveDuration`, ensuring genuine user focus and rest time is accurately credited across all surfaces.
+- **Surface Coverage**:
+  - **Today View**: Real-time `WorkTime` and `BreakTime` reflect credited elapsed time immediately upon stopping a session.
+  - **Weekly & Monthly Reports**: Both aggregate totals (`Totals.FocusTime`, `Totals.BreakTime`) and rolling daily/weekly trend buckets (`Trend[i].Totals`) incorporate credited durations.
+  - **Focus Activity Chart**: Bars, ceiling scaling (`ComputeCeilingHours`), and native hover tooltips visualize partial session focus time seamlessly.
+  - **Report Insights**: Updated condition so that when partial focus time exists (even with 0 completed sessions), insights summarize actual focus output and daily averages instead of incorrectly stating that no completed sessions exist to show patterns.
+  - **Historical Focus CSV Export**: Native focus aggregation in `ExportWebsiteCsvAsync` includes credited work time from stopped sessions alongside completed sessions and imported website records.
+- **Verification**:
+  - **610 automated tests passing (100% pass rate, 0 failed, 0 skipped)** across the solution.
+  - Added dedicated test suite `ReportsPartialSessionAccountingTests.cs` verifying running isolation, clamping, crash recovery zero-crediting, orderly shutdown crediting, Today metric separation, weekly trend buckets, monthly slices, CSV coexistence, and CSV export.
+  - Updated existing tests in `ReportsServiceTests.cs`, `TodayServiceTests.cs`, `ReportsPolishVerificationTests.cs`, and `SessionRecordTests.cs` to validate credited elapsed accounting.
+
 

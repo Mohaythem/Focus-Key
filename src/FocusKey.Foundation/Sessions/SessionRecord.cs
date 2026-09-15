@@ -53,6 +53,23 @@ public sealed record SessionRecord
     /// <summary>How long the session actually lasted, or null while it is still Running.</summary>
     public TimeSpan? ActualDuration => EndedAt - StartedAt;
 
+    /// <summary>
+    /// The credited focus or break duration for reports and daily accounting.
+    /// Returns zero while running or if the session has no valid elapsed time.
+    /// Clamped to [0, PlannedDuration] so an interrupted or stopped session cannot credit negative time
+    /// or time beyond the planned duration, and completed sessions credit exactly PlannedDuration.
+    /// </summary>
+    public TimeSpan EffectiveDuration
+    {
+        get
+        {
+            if (Status == SessionStatus.Running || EndedAt is null) return TimeSpan.Zero;
+            var elapsed = EndedAt.Value - StartedAt;
+            if (elapsed <= TimeSpan.Zero) return TimeSpan.Zero;
+            return elapsed > PlannedDuration ? PlannedDuration : elapsed;
+        }
+    }
+
     /// <summary>True while this record represents the one active session.</summary>
     public bool IsActive => Status == SessionStatus.Running;
 

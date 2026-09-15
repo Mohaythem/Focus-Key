@@ -1,5 +1,7 @@
 using System.Globalization;
+using FocusKey.Foundation.Data;
 using FocusKey.Foundation.Sessions;
+using FocusKey.Foundation.Settings;
 using FocusKey.Foundation.Tests.Sessions;
 using FocusKey.Foundation.Today;
 
@@ -82,6 +84,92 @@ public sealed class TodayLauncherTests
             CultureInfo.CurrentCulture = originalCulture;
             CultureInfo.CurrentUICulture = originalUICulture;
         }
+    }
+
+    [Theory]
+    [InlineData(30, 0, "30", "min")]
+    [InlineData(10, 0, "10", "min")]
+    [InlineData(60, 0, "1", "hr")]
+    [InlineData(120, 0, "2", "hrs")]
+    [InlineData(25, 30, "25:30", "min")]
+    [InlineData(0, 45, "45", "sec")]
+    [InlineData(0, 0, "0", "min")]
+    [InlineData(90, 0, "1h 30", "m")]
+    public void FormatLauncherDurationPartsFormatsCorrectly(int minutes, int seconds, string expectedNumber, string expectedUnit)
+    {
+        var duration = TimeSpan.FromMinutes(minutes) + TimeSpan.FromSeconds(seconds);
+        var (number, unit) = TodayFormatting.FormatLauncherDurationParts(duration);
+        Assert.Equal(expectedNumber, number);
+        Assert.Equal(expectedUnit, unit);
+    }
+
+    [Fact]
+    public void FormatLauncherDurationPartsPreservesWesternDigitsUnderNonEnglishLocales()
+    {
+        var originalCulture = CultureInfo.CurrentCulture;
+        var originalUICulture = CultureInfo.CurrentUICulture;
+        try
+        {
+            var arabicCulture = new CultureInfo("ar-SA");
+            CultureInfo.CurrentCulture = arabicCulture;
+            CultureInfo.CurrentUICulture = arabicCulture;
+
+            var (workNumber, workUnit) = TodayFormatting.FormatLauncherDurationParts(TimeSpan.FromMinutes(30));
+            var (brkNumber, brkUnit) = TodayFormatting.FormatLauncherDurationParts(TimeSpan.FromMinutes(10));
+            var (secNumber, secUnit) = TodayFormatting.FormatLauncherDurationParts(TimeSpan.FromSeconds(45));
+            var (minSecNumber, minSecUnit) = TodayFormatting.FormatLauncherDurationParts(TimeSpan.FromMinutes(25) + TimeSpan.FromSeconds(30));
+
+            Assert.Equal("30", workNumber);
+            Assert.Equal("min", workUnit);
+            Assert.Equal("10", brkNumber);
+            Assert.Equal("min", brkUnit);
+            Assert.Equal("45", secNumber);
+            Assert.Equal("sec", secUnit);
+            Assert.Equal("25:30", minSecNumber);
+            Assert.Equal("min", minSecUnit);
+
+            Assert.DoesNotContain("٣", workNumber, StringComparison.Ordinal);
+            Assert.DoesNotContain("٠", workNumber, StringComparison.Ordinal);
+            Assert.All(workNumber, c => Assert.True(c <= 127));
+            Assert.All(brkNumber, c => Assert.True(c <= 127));
+            Assert.All(secNumber, c => Assert.True(c <= 127));
+            Assert.All(minSecNumber, c => Assert.True(c <= 127));
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = originalCulture;
+            CultureInfo.CurrentUICulture = originalUICulture;
+        }
+    }
+
+    [Fact]
+    public async Task ApplicationSettings_ActivityCollapsed_DefaultsToTrueAndPersists()
+    {
+        using var temp = new TempDirectory();
+        string file = Path.Combine(temp.Path, "focus_key.db");
+        var connections = new SqliteConnectionFactory(file);
+        new DatabaseBootstrapper(connections).Initialize();
+
+        var repo = new SqliteSettingsRepository(connections);
+        var service = new SettingsService(repo);
+
+        // Verify default value is true
+        var initial = await repo.LoadAsync();
+        Assert.True(initial.ActivityCollapsed);
+
+        // Update via service to false
+        var updated = await service.UpdateActivityCollapsedAsync(false);
+        Assert.False(updated.ActivityCollapsed);
+
+        var reloaded = await repo.LoadAsync();
+        Assert.False(reloaded.ActivityCollapsed);
+
+        // Update via service back to true
+        var restored = await service.UpdateActivityCollapsedAsync(true);
+        Assert.True(restored.ActivityCollapsed);
+
+        var reloadedRestored = await repo.LoadAsync();
+        Assert.True(reloadedRestored.ActivityCollapsed);
     }
 
     [Fact]

@@ -36,6 +36,8 @@ public sealed class SettingsService(ISettingsRepository repository)
         UpdateAsync(current => current with { DarkTheme = value }, cancellationToken);
     public Task<ApplicationSettings> UpdateSessionSoundsEnabledAsync(bool value, CancellationToken cancellationToken = default) =>
         UpdateAsync(current => current with { SessionSoundsEnabled = value }, cancellationToken);
+    public Task<ApplicationSettings> UpdateActivityCollapsedAsync(bool value, CancellationToken cancellationToken = default) =>
+        UpdateAsync(current => current with { ActivityCollapsed = value }, cancellationToken);
 
     private async Task<ApplicationSettings> UpdateAsync(
         Func<ApplicationSettings, ApplicationSettings> change, CancellationToken cancellationToken)

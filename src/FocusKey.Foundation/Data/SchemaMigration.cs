@@ -162,5 +162,12 @@ public static class SchemaMigrations
             Sql: """
                 ALTER TABLE application_settings ADD COLUMN session_sounds_enabled INTEGER NOT NULL DEFAULT 1;
                 """),
+
+        new SchemaMigration(
+            Version: 7,
+            Name: "activity_collapsed_setting",
+            Sql: """
+                ALTER TABLE application_settings ADD COLUMN activity_collapsed INTEGER NOT NULL DEFAULT 1;
+                """),
     ];
 }

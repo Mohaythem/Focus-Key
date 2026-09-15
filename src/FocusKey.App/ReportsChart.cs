@@ -12,7 +12,7 @@ namespace FocusKey;
 
 /// <summary>
 /// Reports Focus Activity chart matching the approved rectangular grid visual reference.
-/// Features 2-hour horizontal grid intervals, vertical day/week separators, dynamic Y-axis scaling,
+/// Features 5-hour horizontal grid intervals, vertical day/week separators, dynamic Y-axis scaling,
 /// substantial centered focus bars, and exact duration labels above non-zero bars.
 /// </summary>
 internal sealed class ReportsChart : Grid
@@ -35,7 +35,7 @@ internal sealed class ReportsChart : Grid
         double effectiveMax = trend.Count == 0 ? 0 : trend.Max(b => b.Totals.FocusTime.TotalSeconds);
         int ceilingHours = ReportsService.ComputeCeilingHours(effectiveMax);
 
-        // 1. Y-Axis column (Column 0): ticks from 0h up to ceilingHours in 2h steps
+        // 1. Y-Axis column (Column 0): ticks from 0h up to ceilingHours in 5h steps
         var axisCanvas = new Canvas
         {
             Width = 46,
@@ -43,7 +43,7 @@ internal sealed class ReportsChart : Grid
             Language = "en-US",
             FlowDirection = FlowDirection.LeftToRight
         };
-        for (int h = 0; h <= ceilingHours; h += 2)
+        for (int h = 0; h <= ceilingHours; h += 5)
         {
             double fraction = (double)h / ceilingHours;
             double y = TopHeadroom + PlotAreaHeight * (1.0 - fraction);
@@ -79,8 +79,8 @@ internal sealed class ReportsChart : Grid
         var gridStroke = Presentation.ThemeBrush("FkSecondary", this);
         const double gridOpacity = 0.38;
 
-        // Horizontal lines at each 2h tick
-        for (int h = 0; h <= ceilingHours; h += 2)
+        // Horizontal lines at each 5h tick
+        for (int h = 0; h <= ceilingHours; h += 5)
         {
             double fraction = (double)h / ceilingHours;
             double y = TopHeadroom + PlotAreaHeight * (1.0 - fraction);

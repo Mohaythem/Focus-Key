@@ -308,5 +308,34 @@ All identified release blockers have been successfully resolved. The application
   - **628 automated tests passing (100% pass rate, 0 failed, 0 skipped)** across the solution.
   - Added dedicated unit test suite `TodayLauncherTests.cs` (18 tests) covering duration resolution, formatting rules, locale invariance, `StartAsync` execution, single-active-session protection, and exception resilience.
 
+## 12. Today Hero Launcher Polish, Collapsible Activity Section, and 5-Hour Reports Scale
 
-
+- **Zero Layout Jump & Unified Card Height (180 DIP)**:
+  - Resolved the geometry mismatch between the idle and active `CURRENT SESSION` cards.
+  - Unified `CurrentCard` container with exact `Padding="28,24,28,24"` and `MinHeight="180"` across both states.
+  - Whether idle or running, the card footprint remains stable at 180 DIP, completely eliminating layout shifting or jumping of surrounding elements (Metrics Grid and Activity section).
+- **Windows 11 Native Hero Surface Composition**:
+  - Recomposed the idle Current Session launcher into a first-party Windows 11 hero surface:
+    - **Visual Hierarchy & Duration Anchors**: Displays prominent duration numbers (`30`, `10`) in 26 pt SemiBold with clean baseline units (`min`, `hr`) in 12 pt muted text, formatted via `TodayFormatting.FormatLauncherDurationParts`.
+    - **Calm Semantic Washes**: Card backgrounds use subtle semi-transparent tints derived directly from the user's active theme colors (`_colors.Work` and `_colors.Break`) using `SessionColorBrush.CreateAlpha` (12% opacity in Dark theme, 8% in Light theme; 35% border stroke). Avoids saturated solid blocks while maintaining clear identity.
+    - **Tactile Interaction & Hover States**: Pointers entering `WorkChoiceCard` or `BreakChoiceCard` trigger smooth visual elevation (20% Dark / 14% Light surface wash, 55% border stroke) and highlight the integrated Start buttons.
+    - **Integrated Action Buttons**: Native `Start Work` and `Start Break` buttons feature subtle tinted fills, crisp borders, and full keyboard accessibility.
+    - **Header & Keyboard Hint**: Header features title `CURRENT SESSION · Choose a session` alongside a secondary keyboard capsule hint `Shift + F3`.
+- **Collapsible Activity Section with Persistent SQLite Setting**:
+  - Replaced the static `ACTIVITY` header with an interactive header button (`ActivityHeaderButton`) featuring native Segoe Fluent Icons chevrons (`\uE70D` when collapsed, `\uE70E` when expanded).
+  - Defaults to collapsed (`ActivityCollapsed = true`) for a clean, focused initial view.
+  - Added SQLite Schema Migration 7 (`activity_collapsed_setting`) to `application_settings` (`activity_collapsed INTEGER NOT NULL DEFAULT 1`).
+  - Implemented `UpdateActivityCollapsedAsync` in `SettingsService` and wired it into `App.xaml.cs` and `MainWindow.xaml.cs`.
+  - **In-Memory Live Updates Preserved**: The data binding and session update cycle for `ActivityRows.ItemsSource` remains fully event-driven (updating on session start, stop, complete, midnight rollover, and navigation). The rows continue updating in memory even while collapsed, guaranteeing immediate, fresh data upon expansion without any UI lag or polling overhead.
+- **Reports Focus Activity Chart Scaling to 5-Hour Intervals**:
+  - Updated `ReportsService.ComputeCeilingHours(double maxSeconds)` to round up in 5-hour increments with a minimum ceiling of 5 hours:
+    $$\text{ComputeCeilingHours}(\text{maxSeconds}) = \max(5, \lceil \text{maxHours} / 5.0 \rceil \times 5)$$
+  - Examples: $0\text{s} \to 5\text{h}$, $3\text{h} \to 5\text{h}$, $8\text{h} \to 10\text{h}$, $11\text{h} \to 15\text{h}$, $19\text{h} \to 20\text{h}$.
+  - In `ReportsChart.cs`, updated Y-axis tick intervals and horizontal gridlines from 2-hour increments to 5-hour increments (`h += 5`), rendering clean ticks (`0h`, `5h`, `10h`, `15h`...) and matching horizontal dashed gridlines.
+  - Retained exact 252 DIP plotting height, 28 DIP headroom, bar widths, and zero-distortion layout.
+- **Verification**:
+  - **640 automated tests passing (100% pass rate, 0 failed, 0 skipped)** across the test suite.
+  - Added unit tests in `TodayLauncherTests.cs` validating `FormatLauncherDurationParts`, locale invariance under non-English cultures (`ar-SA`, `fa-IR`, `de-DE`), and SQLite persistence of `ActivityCollapsed`.
+  - Updated unit tests in `ReportsRollingWeeklyChartTests.cs` validating 5-hour interval scaling and dynamic ceilings.
+  - Updated `SessionSchemaTests.cs` to verify Migration TargetVersion 7.
+  - Built Release configuration with 0 compilation errors and 0 warnings.

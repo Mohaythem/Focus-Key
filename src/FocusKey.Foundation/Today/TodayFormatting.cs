@@ -37,4 +37,34 @@ public static class TodayFormatting
             ? string.Create(Culture, $"{hours}h {mins}m")
             : string.Create(Culture, $"{hours} hr");
     }
+
+    /// <summary>
+    /// Formats a session duration into distinct number and unit parts (e.g. ("30", "min"), ("10", "min"), ("1", "hr")).
+    /// </summary>
+    public static (string Number, string Unit) FormatLauncherDurationParts(TimeSpan duration)
+    {
+        if (duration <= TimeSpan.Zero) return ("0", "min");
+        long totalSeconds = (long)Math.Round(duration.TotalSeconds);
+        if (totalSeconds < 60)
+        {
+            return (string.Create(Culture, $"{totalSeconds}"), "sec");
+        }
+        long totalMinutes = totalSeconds / 60;
+        long remainingSec = totalSeconds % 60;
+        if (remainingSec > 0)
+        {
+            return (string.Create(Culture, $"{totalMinutes}:{remainingSec:D2}"), "min");
+        }
+        if (totalMinutes < 60)
+        {
+            return (string.Create(Culture, $"{totalMinutes}"), "min");
+        }
+        long hours = totalMinutes / 60;
+        long mins = totalMinutes % 60;
+        if (mins > 0)
+        {
+            return (string.Create(Culture, $"{hours}h {mins}"), "m");
+        }
+        return (string.Create(Culture, $"{hours}"), hours == 1 ? "hr" : "hrs");
+    }
 }

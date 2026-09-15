@@ -74,6 +74,7 @@ public partial class App : Application
             ApplyThemePalettes(_startup.Appearance.LightPalette, _startup.Appearance.DarkPalette);
             _window = new MainWindow(_startup, StartSessionAsync, StopSessionAsync,
                 exception => _startup?.Logger.Error("Main-page operation failed.", exception), RefreshSettingsAsync);
+            _window.SetActivityCollapsed(initialSettings.ActivityCollapsed);
             _startup.Appearance.Changed += OnAppearanceChanged;
             _startup.Appearance.ColorsChanged += OnColorsChanged;
             _startup.Appearance.PalettesChanged += OnPalettesChanged;

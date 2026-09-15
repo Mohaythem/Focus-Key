@@ -26,6 +26,18 @@ public sealed partial class MainWindow : Window
     private bool _hasRenderedRunning;
     private bool _lastHasRunning;
     private SessionColors _colors = SessionColors.From(ApplicationSettings.Default);
+    private readonly SettingsService? _settingsService;
+    private readonly Action<Exception>? _startupReport;
+    private bool _activityCollapsed = true;
+    private bool _isWorkHovered;
+    private bool _isBreakHovered;
+
+    internal void SetActivityCollapsed(bool collapsed)
+    {
+        _activityCollapsed = collapsed;
+        UpdateActivityVisuals();
+    }
+
     internal void ApplyColors(SessionColors colors)
     {
         _colors = colors;
@@ -83,6 +95,8 @@ public sealed partial class MainWindow : Window
         Func<Task> refreshSettings)
     {
         InitializeComponent();
+        _settingsService = startup.Settings;
+        _startupReport = report;
         _reports = new ReportsView(startup.Reports, report);
         ReportsHost.Content = _reports;
         _settings = new SettingsView(startup.Settings, startup.History, startup.WindowsStartup, refreshSettings, () => _reports.RefreshAsync(), () => WindowNative.GetWindowHandle(this), report);
@@ -107,6 +121,7 @@ public sealed partial class MainWindow : Window
         _displayTimer.IsRepeating = false;
         _displayTimer.Tick += OnDisplayTick;
         Closed += (_, _) => { _visible = false; _displayTimer.Stop(); _today.Dispose(); _reports.Dispose(); };
+        UpdateActivityVisuals();
         Render();
         startup.Logger.Info("Today main window created.");
     }
@@ -174,6 +189,104 @@ public sealed partial class MainWindow : Window
     private async void OnStartBreakClick(object sender, RoutedEventArgs args) => await _today.StartAsync(SessionType.Break);
     private async void OnStopClick(object sender, RoutedEventArgs args) => await _today.StopAsync();
     private void OnExitClick(object sender, RoutedEventArgs args) => ExitRequested?.Invoke();
+
+    private void UpdateActivityVisuals()
+    {
+        if (ActivityChevron is not null)
+            ActivityChevron.Glyph = _activityCollapsed ? "\uE70D" : "\uE70E";
+        if (ActivityContentPanel is not null)
+            ActivityContentPanel.Visibility = _activityCollapsed ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private async void OnToggleActivityClick(object sender, RoutedEventArgs args)
+    {
+        _activityCollapsed = !_activityCollapsed;
+        UpdateActivityVisuals();
+        if (_settingsService is not null)
+        {
+            try
+            {
+                await _settingsService.UpdateActivityCollapsedAsync(_activityCollapsed);
+            }
+            catch (Exception ex)
+            {
+                _startupReport?.Invoke(ex);
+            }
+        }
+    }
+
+    private bool IsCurrentThemeDark() => _appearance switch
+    {
+        Appearance.Dark => true,
+        Appearance.Light => false,
+        _ => MainSurface.ActualTheme == ElementTheme.Dark,
+    };
+
+    private void OnWorkCardPointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        _isWorkHovered = true;
+        PaintLauncherCards(IsCurrentThemeDark());
+    }
+
+    private void OnWorkCardPointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        _isWorkHovered = false;
+        PaintLauncherCards(IsCurrentThemeDark());
+    }
+
+    private void OnBreakCardPointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        _isBreakHovered = true;
+        PaintLauncherCards(IsCurrentThemeDark());
+    }
+
+    private void OnBreakCardPointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        _isBreakHovered = false;
+        PaintLauncherCards(IsCurrentThemeDark());
+    }
+
+    private void PaintLauncherCards(bool isDark)
+    {
+        if (WorkChoiceCard is null || BreakChoiceCard is null) return;
+
+        double workBgAlpha = _isWorkHovered ? (isDark ? 0.20 : 0.14) : (isDark ? 0.12 : 0.08);
+        double workBorderAlpha = _isWorkHovered ? (isDark ? 0.55 : 0.40) : (isDark ? 0.35 : 0.25);
+        WorkChoiceCard.Background = SessionColorBrush.CreateAlpha(_colors.Work, workBgAlpha);
+        WorkChoiceCard.BorderBrush = SessionColorBrush.CreateAlpha(_colors.Work, workBorderAlpha);
+        WorkChoiceDot.Fill = SessionColorBrush.Create(_colors.Work);
+        WorkChoiceMode.Foreground = SessionColorBrush.Create(_colors.Work);
+
+        StartWorkButton.Background = SessionColorBrush.CreateAlpha(_colors.Work, isDark ? 0.22 : 0.16);
+        StartWorkButton.BorderBrush = SessionColorBrush.CreateAlpha(_colors.Work, isDark ? 0.45 : 0.35);
+        StartWorkButton.BorderThickness = new Thickness(1);
+        StartWorkButton.Foreground = Presentation.ThemeBrush("FkText", CurrentCard);
+
+        double breakBgAlpha = _isBreakHovered ? (isDark ? 0.20 : 0.14) : (isDark ? 0.12 : 0.08);
+        double breakBorderAlpha = _isBreakHovered ? (isDark ? 0.55 : 0.40) : (isDark ? 0.35 : 0.25);
+        BreakChoiceCard.Background = SessionColorBrush.CreateAlpha(_colors.Break, breakBgAlpha);
+        BreakChoiceCard.BorderBrush = SessionColorBrush.CreateAlpha(_colors.Break, breakBorderAlpha);
+        BreakChoiceDot.Fill = SessionColorBrush.Create(_colors.Break);
+        BreakChoiceMode.Foreground = SessionColorBrush.Create(_colors.Break);
+
+        StartBreakButton.Background = SessionColorBrush.CreateAlpha(_colors.Break, isDark ? 0.22 : 0.16);
+        StartBreakButton.BorderBrush = SessionColorBrush.CreateAlpha(_colors.Break, isDark ? 0.45 : 0.35);
+        StartBreakButton.BorderThickness = new Thickness(1);
+        StartBreakButton.Foreground = Presentation.ThemeBrush("FkText", CurrentCard);
+
+        var durations = _today.Snapshot?.Durations ?? SessionDurations.Default;
+        var (workNum, workUnit) = TodayFormatting.FormatLauncherDurationParts(durations.Work);
+        var (brkNum, brkUnit) = TodayFormatting.FormatLauncherDurationParts(durations.Break);
+
+        WorkDurationNumber.Text = workNum;
+        WorkDurationUnit.Text = workUnit;
+        BreakDurationNumber.Text = brkNum;
+        BreakDurationUnit.Text = brkUnit;
+
+        bool canStart = !_today.IsStarting && !_today.IsStopping && !_today.IsRefreshing && _today.Error is null;
+        StartWorkButton.IsEnabled = canStart;
+        StartBreakButton.IsEnabled = canStart;
+    }
 
     private void Render()
     {
@@ -252,18 +365,10 @@ public sealed partial class MainWindow : Window
             ActiveContent.Visibility = Visibility.Collapsed;
             IdleContent.Visibility = Visibility.Visible;
             CurrentCard.ClearValue(Border.BackgroundProperty);
-            CurrentCard.Padding = new Thickness(24, 20, 24, 20);
+            CurrentCard.Padding = new Thickness(28, 24, 28, 24);
+            CurrentCard.MinHeight = 180;
 
-            WorkChoiceDot.Fill = SessionColorBrush.Create(_colors.Work);
-            BreakChoiceDot.Fill = SessionColorBrush.Create(_colors.Break);
-
-            var durations = _today.Snapshot?.Durations ?? SessionDurations.Default;
-            WorkChoiceDuration.Text = Presentation.FormatLauncherDuration(durations.Work);
-            BreakChoiceDuration.Text = Presentation.FormatLauncherDuration(durations.Break);
-
-            bool canStart = !_today.IsStarting && !_today.IsStopping && !_today.IsRefreshing && _today.Error is null;
-            StartWorkButton.IsEnabled = canStart;
-            StartBreakButton.IsEnabled = canStart;
+            PaintLauncherCards(IsCurrentThemeDark());
 
             if (stateChanged)
             {
@@ -281,6 +386,7 @@ public sealed partial class MainWindow : Window
         var foreground = Presentation.Stroke(color);
         CurrentCard.Background = SessionColorBrush.Create(color);
         CurrentCard.Padding = new Thickness(28, 24, 28, 24);
+        CurrentCard.MinHeight = 180;
         CurrentHeading.Foreground = RunningType.Foreground = RunningText.Foreground = RunningHint.Foreground = foreground;
         RunningType.Text = running.Type.ToString();
         RunningType.Visibility = Visibility.Visible;

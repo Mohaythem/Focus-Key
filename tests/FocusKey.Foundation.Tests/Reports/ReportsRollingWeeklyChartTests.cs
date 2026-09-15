@@ -74,22 +74,24 @@ public sealed class ReportsRollingWeeklyChartTests
     }
 
     [Theory]
-    [InlineData(0, 2)]                         // 0 focus -> 2h minimum ceiling
-    [InlineData(45 * 60, 2)]                    // 45m focus -> 2h ceiling
-    [InlineData(75 * 60, 2)]                    // 1h 15m focus -> 2h ceiling
-    [InlineData(120 * 60, 2)]                   // 2h 00m focus -> 2h ceiling
-    [InlineData(125 * 60, 4)]                   // 2h 05m focus -> 4h ceiling
-    [InlineData(240 * 60, 4)]                   // 4h 00m focus -> 4h ceiling
-    [InlineData(241 * 60, 6)]                   // 4h 01m focus -> 6h ceiling
-    [InlineData((11 * 3600) + (24 * 60), 12)]   // 11h 24m focus -> 12h ceiling
-    [InlineData(12 * 3600, 12)]                 // 12h 00m focus -> 12h ceiling
-    [InlineData((12 * 3600) + 60, 14)]          // 12h 01m focus -> 14h ceiling
-    public void ComputeCeilingHours_ScalesIn2HourIncrementsWithMinimum2Hours(double maxSeconds, int expectedCeilingHours)
+    [InlineData(0, 5)]
+    [InlineData(30 * 60, 5)]
+    [InlineData(60 * 60, 5)]
+    [InlineData(120 * 60, 5)]
+    [InlineData(180 * 60, 5)] // 3h -> 5
+    [InlineData(300 * 60, 5)] // 5h -> 5
+    [InlineData(301 * 60, 10)] // 5h 1s -> 10
+    [InlineData(480 * 60, 10)] // 8h -> 10
+    [InlineData(600 * 60, 10)] // 10h -> 10
+    [InlineData(660 * 60, 15)] // 11h -> 15
+    [InlineData(1140 * 60, 20)] // 19h -> 20
+    [InlineData(1200 * 60, 20)] // 20h -> 20
+    public void ComputeCeilingHours_ScalesIn5HourIncrementsWithMinimum5Hours(double maxSeconds, int expectedCeilingHours)
     {
         int ceiling = ReportsService.ComputeCeilingHours(maxSeconds);
         Assert.Equal(expectedCeilingHours, ceiling);
-        Assert.True(ceiling % 2 == 0); // Always even (2-hour increments)
-        Assert.True(ceiling >= 2);     // Minimum 2 hours
+        Assert.True(ceiling % 5 == 0);
+        Assert.True(ceiling >= 5);
     }
 
     [Fact]
@@ -143,7 +145,7 @@ public sealed class ReportsRollingWeeklyChartTests
 
         // Verify ceiling calculation for 8h maximum
         int ceiling = ReportsService.ComputeCeilingHours(snapshot.Trend.Max(b => b.Totals.FocusTime.TotalSeconds));
-        Assert.Equal(8, ceiling);
+        Assert.Equal(10, ceiling);
     }
 
     [Fact]

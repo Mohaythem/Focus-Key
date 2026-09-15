@@ -14,6 +14,7 @@ public sealed record ApplicationSettings
         LightTheme = ThemeConfiguration.DefaultLight,
         DarkTheme = ThemeConfiguration.DefaultDark,
         SessionSoundsEnabled = true,
+        ActivityCollapsed = true,
     };
 
     public required TimeSpan WorkDuration { get; init; }
@@ -25,6 +26,7 @@ public sealed record ApplicationSettings
     public ThemeConfiguration LightTheme { get; init; } = ThemeConfiguration.DefaultLight;
     public ThemeConfiguration DarkTheme { get; init; } = ThemeConfiguration.DefaultDark;
     public bool SessionSoundsEnabled { get; init; } = true;
+    public bool ActivityCollapsed { get; init; } = true;
 
     public void Validate()
     {

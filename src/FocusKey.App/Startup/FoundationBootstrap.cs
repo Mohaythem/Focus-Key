@@ -41,8 +41,8 @@ internal static class FoundationBootstrap
             var historicalRepo = new FocusKey.Foundation.History.SqliteHistoricalFocusRepository(connections);
             var historyService = new FocusKey.Foundation.History.HistoricalFocusService(historicalRepo, repository);
             var settings = new SettingsService(new SqliteSettingsRepository(connections));
-            var sessions = new SessionCoordinator(repository,
-                durationProvider: new SettingsSessionDurationProvider(settings));
+            var durationProvider = new SettingsSessionDurationProvider(settings);
+            var sessions = new SessionCoordinator(repository, durationProvider: durationProvider);
             SessionRecoveryResult recovery = await sessions.InitializeAsync(cancellationToken).ConfigureAwait(false);
             logger.Info($"Session startup recovery: {recovery.Kind}.");
             var appearance = new AppearanceCoordinator(settings);
@@ -57,7 +57,7 @@ internal static class FoundationBootstrap
                 Logger = logger,
                 Database = database,
                 Sessions = sessions,
-                Today = new TodayService(repository),
+                Today = new TodayService(repository, durationProvider: durationProvider),
                 Reports = new ReportsService(repository, historicalRepo),
                 Settings = settings,
                 Appearance = appearance,

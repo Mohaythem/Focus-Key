@@ -279,4 +279,34 @@ All identified release blockers have been successfully resolved. The application
   - Added dedicated test suite `ReportsPartialSessionAccountingTests.cs` verifying running isolation, clamping, crash recovery zero-crediting, orderly shutdown crediting, Today metric separation, weekly trend buckets, monthly slices, CSV coexistence, and CSV export.
   - Updated existing tests in `ReportsServiceTests.cs`, `TodayServiceTests.cs`, `ReportsPolishVerificationTests.cs`, and `SessionRecordTests.cs` to validate credited elapsed accounting.
 
+## 11. Today Idle Current Session Card Redesign (Work/Break Launcher)
+
+- **Problem & Objective**:
+  - Previously, the idle state of the Today page's `CURRENT SESSION` card was an empty placeholder ("Ready when you are - Press Shift + F3 to start Work or Break"), underutilizing visual space and requiring users to open Quick Overlay or press a shortcut to start sessions.
+  - Redesigned the idle state into a native, compact Work/Break session launcher integrated directly into the `CURRENT SESSION` card while preserving the active countdown design and single-engine authority.
+- **Single Authoritative Session Engine Pipeline**:
+  - Starts sessions exclusively through `TodayController.StartAsync(SessionType)` &rarr; `StartSessionAsync` in `App.xaml.cs` &rarr; `CompletionCoordinator.StartAsync` &rarr; `SessionCoordinator.StartAsync` &rarr; `SessionEngine.StartAsync`.
+  - Zero duplicate timers or secondary state; both Today and Quick Overlay observe the single immutable `TodaySnapshot` projection.
+  - Session start tick sound (`_sounds?.PlayStartTick()`) triggers strictly once when enabled.
+- **Dynamic Configured Durations**:
+  - Wired `SettingsSessionDurationProvider` into `TodayService`, populating `TodaySnapshot.Durations`.
+  - Durations update dynamically when modified in Settings without any hardcoded values.
+- **Deterministic Western Latin Formatting**:
+  - Implemented `TodayFormatting.FormatLauncherDuration(TimeSpan)` enforcing invariant Latin digits (`0-9`) and English abbreviations (`"30 min"`, `"10 min"`, `"45 min"`, `"1h 30m"`), immune to OS regional numeral shaping.
+- **Dual-Mode WinUI 3 Presentation & Layout**:
+  - Restructured `CurrentCard` in `MainWindow.xaml` with `ActiveContent` and `IdleContent`.
+  - **Active Session View**: 100% preserved existing design (40pt Consolas countdown, "remaining" status, 3 DIP progress bar, capsule Stop button, semantic theme background).
+  - **Idle Launcher View**: Header with `CURRENT SESSION` and `Shift + F3` shortcut badge, followed by two balanced choice cards for Work and Break, each featuring semantic colored indicator dots, duration labels, and native Start buttons.
+- **Restrained Transitions & Reduced Motion**:
+  - Applied 200ms `CubicEase` opacity fade animation between idle and active states.
+  - Checked `new UISettings().AnimationsEnabled` to respect Windows Accessibility Reduced Motion preferences.
+  - Spatial dimensions remain stable across states, preventing surrounding summary cards and activity rows from shifting.
+- **Concurrency & Collision Safety**:
+  - Gated by `IsStarting`, `IsStopping`, and `IsRefreshing` flags to disable inputs during state changes.
+  - Gracefully handles `ActiveSessionAlreadyExistsException` (e.g. concurrent start from hotkey/overlay) by immediately refreshing into the running state without presenting false error banners.
+- **Verification**:
+  - **628 automated tests passing (100% pass rate, 0 failed, 0 skipped)** across the solution.
+  - Added dedicated unit test suite `TodayLauncherTests.cs` (18 tests) covering duration resolution, formatting rules, locale invariance, `StartAsync` execution, single-active-session protection, and exception resilience.
+
+
 

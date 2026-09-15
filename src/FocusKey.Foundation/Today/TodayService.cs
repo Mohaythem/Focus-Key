@@ -3,8 +3,10 @@ using FocusKey.Foundation.Sessions;
 namespace FocusKey.Foundation.Today;
 
 public sealed record TodaySnapshot(DateOnly Date, TimeZoneInfo TimeZone, DateTimeOffset ObservedAt,
-    DateTimeOffset NextDayAt, IReadOnlyList<SessionRecord> Sessions, SessionRecord? Running)
+    DateTimeOffset NextDayAt, IReadOnlyList<SessionRecord> Sessions, SessionRecord? Running,
+    SessionDurations? Durations = null)
 {
+    public SessionDurations Durations { get; init; } = Durations ?? SessionDurations.Default;
     public int CompletedWorkCount => Sessions.Count(s => s.Type == SessionType.Work && s.Status == SessionStatus.Completed);
     public int CompletedBreakCount => Sessions.Count(s => s.Type == SessionType.Break && s.Status == SessionStatus.Completed);
     public TimeSpan WorkTime => CreditedTime(SessionType.Work);
@@ -18,12 +20,32 @@ public sealed record TodaySnapshot(DateOnly Date, TimeZoneInfo TimeZone, DateTim
 }
 
 /// <summary>Read-only daily projection. Session membership uses its local start date.</summary>
-public sealed class TodayService(ISessionRepository repository, TimeProvider? timeProvider = null,
-    Func<TimeZoneInfo>? localTimeZone = null)
+public sealed class TodayService
 {
-    private readonly ISessionRepository _repository = repository ?? throw new ArgumentNullException(nameof(repository));
-    private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
-    private readonly Func<TimeZoneInfo> _zone = localTimeZone ?? (() => TimeZoneInfo.Local);
+    private readonly ISessionRepository _repository;
+    private readonly ISessionDurationProvider? _durationProvider;
+    private readonly TimeProvider _time;
+    private readonly Func<TimeZoneInfo> _zone;
+
+    public TodayService(
+        ISessionRepository repository,
+        ISessionDurationProvider? durationProvider = null,
+        TimeProvider? timeProvider = null,
+        Func<TimeZoneInfo>? localTimeZone = null)
+    {
+        _repository = repository ?? throw new ArgumentNullException(nameof(repository));
+        _durationProvider = durationProvider;
+        _time = timeProvider ?? TimeProvider.System;
+        _zone = localTimeZone ?? (() => TimeZoneInfo.Local);
+    }
+
+    public TodayService(
+        ISessionRepository repository,
+        TimeProvider? timeProvider,
+        Func<TimeZoneInfo>? localTimeZone = null)
+        : this(repository, null, timeProvider, localTimeZone)
+    {
+    }
 
     public async Task<TodaySnapshot> ReadAsync(CancellationToken cancellationToken = default)
     {
@@ -39,7 +61,10 @@ public sealed class TodayService(ISessionRepository repository, TimeProvider? ti
         var rows = candidates.Where(s => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(s.StartedAt, zone).DateTime) == date)
             .OrderBy(s => s.StartedAt).ThenBy(s => s.Id.ToText()).ToArray();
         SessionRecord? running = await _repository.GetRunningAsync(cancellationToken).ConfigureAwait(false);
-        return new(date, zone, now, NextDay(date, zone), Array.AsReadOnly(rows), running);
+        SessionDurations durations = _durationProvider is not null
+            ? await _durationProvider.GetDurationsAsync(cancellationToken).ConfigureAwait(false)
+            : SessionDurations.Default;
+        return new(date, zone, now, NextDay(date, zone), Array.AsReadOnly(rows), running, durations);
     }
 
     public static DateTimeOffset NextDay(DateOnly date, TimeZoneInfo zone)

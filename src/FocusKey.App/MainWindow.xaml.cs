@@ -8,8 +8,10 @@ using FocusKey.Startup;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Windows.Graphics;
+using Windows.UI.ViewManagement;
 using FocusKey.Shell;
 using WinRT.Interop;
+using Microsoft.UI.Xaml.Media.Animation;
 
 namespace FocusKey;
 
@@ -21,6 +23,8 @@ public sealed partial class MainWindow : Window
     private readonly SettingsView _settings;
     private readonly DispatcherQueueTimer _displayTimer;
     private bool _visible;
+    private bool _hasRenderedRunning;
+    private bool _lastHasRunning;
     private SessionColors _colors = SessionColors.From(ApplicationSettings.Default);
     internal void ApplyColors(SessionColors colors)
     {
@@ -74,6 +78,7 @@ public sealed partial class MainWindow : Window
     }
 
     internal MainWindow(StartupContext startup,
+        Func<SessionType, CancellationToken, Task<SessionRecord>> start,
         Func<SessionId, CancellationToken, Task<SessionOutcome>> stop, Action<Exception> report,
         Func<Task> refreshSettings)
     {
@@ -96,7 +101,7 @@ public sealed partial class MainWindow : Window
             NavColumn.Width = new GridLength(narrow ? 180 : 216);
             PageContent.Padding = new Thickness(narrow ? 24 : 40, 28, narrow ? 24 : 40, 36);
         };
-        _today = new TodayController(startup.Today.ReadAsync, stop, report);
+        _today = new TodayController(startup.Today.ReadAsync, start, stop, report);
         _today.Changed += Render;
         _displayTimer = DispatcherQueue.CreateTimer();
         _displayTimer.IsRepeating = false;
@@ -165,6 +170,8 @@ public sealed partial class MainWindow : Window
         await _settings.OpenAsync();
     }
     private async void OnRefreshClick(object sender, RoutedEventArgs args) => await _today.RefreshAsync();
+    private async void OnStartWorkClick(object sender, RoutedEventArgs args) => await _today.StartAsync(SessionType.Work);
+    private async void OnStartBreakClick(object sender, RoutedEventArgs args) => await _today.StartAsync(SessionType.Break);
     private async void OnStopClick(object sender, RoutedEventArgs args) => await _today.StopAsync();
     private void OnExitClick(object sender, RoutedEventArgs args) => ExitRequested?.Invoke();
 
@@ -179,8 +186,8 @@ public sealed partial class MainWindow : Window
         TodayPanel.Visibility = isToday ? Visibility.Visible : Visibility.Collapsed;
         SettingsHost.Visibility = _today.Page == MainPage.Settings ? Visibility.Visible : Visibility.Collapsed;
         ReportsHost.Visibility = _today.Page == MainPage.Reports ? Visibility.Visible : Visibility.Collapsed;
-        LoadStatus.Text = _today.IsRefreshing ? "Loading…" : _today.IsStopping ? "Stopping…" : string.Empty;
-        RefreshButton.IsEnabled = !_today.IsRefreshing && !_today.IsStopping;
+        LoadStatus.Text = _today.IsRefreshing ? "Loading…" : _today.IsStarting ? "Starting…" : _today.IsStopping ? "Stopping…" : string.Empty;
+        RefreshButton.IsEnabled = !_today.IsRefreshing && !_today.IsStopping && !_today.IsStarting;
         ErrorText.Text = _today.Error ?? string.Empty;
         ErrorText.Visibility = _today.Error is null ? Visibility.Collapsed : Visibility.Visible;
         if (_today.Snapshot is { } snapshot)
@@ -236,21 +243,38 @@ public sealed partial class MainWindow : Window
             ActiveDot.Fill = SessionColorBrush.Create(indicatorColor);
         }
 
+        bool stateChanged = _hasRenderedRunning && (_lastHasRunning != hasRunning);
+        _lastHasRunning = hasRunning;
+        _hasRenderedRunning = true;
+
         if (_today.Snapshot?.Running is not { } running)
         {
+            ActiveContent.Visibility = Visibility.Collapsed;
+            IdleContent.Visibility = Visibility.Visible;
             CurrentCard.ClearValue(Border.BackgroundProperty);
-            CurrentHeading.ClearValue(TextBlock.ForegroundProperty);
-            RunningText.ClearValue(TextBlock.ForegroundProperty);
-            RunningHint.ClearValue(TextBlock.ForegroundProperty);
-            RunningType.Visibility = Visibility.Collapsed;
-            RunningText.Text = "Ready when you are";
-            RunningText.FontSize = 22;
-            RunningText.FontFamily = new FontFamily("Segoe UI Variable");
-            RunningHint.Text = "Press Shift + F3 to start Work or Break.";
             CurrentCard.Padding = new Thickness(24, 20, 24, 20);
-            SessionProgress.Visibility = StopButton.Visibility = Visibility.Collapsed;
+
+            WorkChoiceDot.Fill = SessionColorBrush.Create(_colors.Work);
+            BreakChoiceDot.Fill = SessionColorBrush.Create(_colors.Break);
+
+            var durations = _today.Snapshot?.Durations ?? SessionDurations.Default;
+            WorkChoiceDuration.Text = Presentation.FormatLauncherDuration(durations.Work);
+            BreakChoiceDuration.Text = Presentation.FormatLauncherDuration(durations.Break);
+
+            bool canStart = !_today.IsStarting && !_today.IsStopping && !_today.IsRefreshing && _today.Error is null;
+            StartWorkButton.IsEnabled = canStart;
+            StartBreakButton.IsEnabled = canStart;
+
+            if (stateChanged)
+            {
+                AnimateTransition(IdleContent);
+            }
             return;
         }
+
+        IdleContent.Visibility = Visibility.Collapsed;
+        ActiveContent.Visibility = Visibility.Visible;
+
         var snapshot = SessionSnapshot.For(running, DateTimeOffset.UtcNow);
         var remaining = TimeSpan.FromSeconds(Math.Ceiling(snapshot.Remaining.TotalSeconds));
         var color = running.Type == SessionType.Work ? _colors.Work : _colors.Break;
@@ -267,7 +291,39 @@ public sealed partial class MainWindow : Window
         SessionProgress.Value = 100 * snapshot.Elapsed.TotalSeconds / snapshot.PlannedDuration.TotalSeconds;
         SessionProgress.Foreground = foreground;
         SessionProgress.Visibility = StopButton.Visibility = Visibility.Visible;
-        StopButton.IsEnabled = !_today.IsRefreshing && !_today.IsStopping && _today.Error is null;
+        StopButton.IsEnabled = !_today.IsRefreshing && !_today.IsStopping && !_today.IsStarting && _today.Error is null;
+
+        if (stateChanged)
+        {
+            AnimateTransition(ActiveContent);
+        }
+    }
+
+    private static void AnimateTransition(UIElement target)
+    {
+        try
+        {
+            if (new UISettings().AnimationsEnabled)
+            {
+                var animation = new DoubleAnimation
+                {
+                    From = 0.0,
+                    To = 1.0,
+                    Duration = new Duration(TimeSpan.FromMilliseconds(200)),
+                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                };
+                var storyboard = new Storyboard();
+                storyboard.Children.Add(animation);
+                Storyboard.SetTarget(animation, target);
+                Storyboard.SetTargetProperty(animation, "Opacity");
+                storyboard.Begin();
+                return;
+            }
+        }
+        catch
+        {
+        }
+        target.Opacity = 1.0;
     }
     private async void OnDisplayTick(DispatcherQueueTimer sender, object args)
     {

@@ -72,7 +72,7 @@ public partial class App : Application
             _sounds = new SoundPlayerService(() => _sessionSoundsEnabled);
             _startup.Logger.Info("Single-instance shell ownership acquired.");
             ApplyThemePalettes(_startup.Appearance.LightPalette, _startup.Appearance.DarkPalette);
-            _window = new MainWindow(_startup, StopSessionAsync,
+            _window = new MainWindow(_startup, StartSessionAsync, StopSessionAsync,
                 exception => _startup?.Logger.Error("Main-page operation failed.", exception), RefreshSettingsAsync);
             _startup.Appearance.Changed += OnAppearanceChanged;
             _startup.Appearance.ColorsChanged += OnColorsChanged;

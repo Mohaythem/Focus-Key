@@ -5,18 +5,43 @@ namespace FocusKey.Foundation.Today;
 public enum MainPage { Today, Reports, Settings }
 
 /// <summary>UI-thread presentation and refresh ordering; no timer or session authority.</summary>
-public sealed class TodayController(Func<CancellationToken, Task<TodaySnapshot>> read,
-    Func<SessionId, CancellationToken, Task<SessionOutcome>> stop, Action<Exception> report) : IDisposable
+public sealed class TodayController : IDisposable
 {
+    private readonly Func<CancellationToken, Task<TodaySnapshot>> _read;
+    private readonly Func<SessionType, CancellationToken, Task<SessionRecord>>? _start;
+    private readonly Func<SessionId, CancellationToken, Task<SessionOutcome>> _stop;
+    private readonly Action<Exception> _report;
     private int _generation;
     private bool _visible;
     private bool _disposed;
+
     public MainPage Page { get; private set; } = MainPage.Today;
     public TodaySnapshot? Snapshot { get; private set; }
     public bool IsRefreshing { get; private set; }
     public bool IsStopping { get; private set; }
+    public bool IsStarting { get; private set; }
     public string? Error { get; private set; }
     public event Action? Changed;
+
+    public TodayController(
+        Func<CancellationToken, Task<TodaySnapshot>> read,
+        Func<SessionType, CancellationToken, Task<SessionRecord>>? start,
+        Func<SessionId, CancellationToken, Task<SessionOutcome>> stop,
+        Action<Exception> report)
+    {
+        _read = read ?? throw new ArgumentNullException(nameof(read));
+        _start = start;
+        _stop = stop ?? throw new ArgumentNullException(nameof(stop));
+        _report = report ?? throw new ArgumentNullException(nameof(report));
+    }
+
+    public TodayController(
+        Func<CancellationToken, Task<TodaySnapshot>> read,
+        Func<SessionId, CancellationToken, Task<SessionOutcome>> stop,
+        Action<Exception> report)
+        : this(read, null, stop, report)
+    {
+    }
 
     public async Task OpenAsync()
     {
@@ -51,7 +76,7 @@ public sealed class TodayController(Func<CancellationToken, Task<TodaySnapshot>>
         Changed?.Invoke();
         try
         {
-            TodaySnapshot snapshot = await read(CancellationToken.None);
+            TodaySnapshot snapshot = await _read(CancellationToken.None);
             if (generation != _generation || _disposed) return;
             Snapshot = snapshot;
             Error = null;
@@ -59,7 +84,7 @@ public sealed class TodayController(Func<CancellationToken, Task<TodaySnapshot>>
         catch (Exception exception)
         {
             if (generation == _generation && !_disposed) Error = "Could not load Today. Try Refresh again.";
-            report(exception);
+            _report(exception);
         }
         finally
         {
@@ -71,20 +96,46 @@ public sealed class TodayController(Func<CancellationToken, Task<TodaySnapshot>>
         }
     }
 
+    public async Task StartAsync(SessionType type)
+    {
+        if (_disposed || !_visible || Page != MainPage.Today || IsStarting || IsStopping || IsRefreshing || Error is not null || Snapshot?.Running is not null || _start is null) return;
+        IsStarting = true;
+        Changed?.Invoke();
+        try
+        {
+            await _start(type, CancellationToken.None);
+            await RefreshAsync();
+        }
+        catch (ActiveSessionAlreadyExistsException)
+        {
+            await RefreshAsync();
+        }
+        catch (Exception exception)
+        {
+            if (!_disposed) Error = "Could not start the session. Refresh and try again.";
+            _report(exception);
+        }
+        finally
+        {
+            IsStarting = false;
+            if (!_disposed) Changed?.Invoke();
+        }
+    }
+
     public async Task StopAsync()
     {
-        if (_disposed || !_visible || Page != MainPage.Today || IsStopping || IsRefreshing || Error is not null || Snapshot?.Running is not { } running) return;
+        if (_disposed || !_visible || Page != MainPage.Today || IsStopping || IsStarting || IsRefreshing || Error is not null || Snapshot?.Running is not { } running) return;
         IsStopping = true;
         Changed?.Invoke();
         try
         {
-            await stop(running.Id, CancellationToken.None);
+            await _stop(running.Id, CancellationToken.None);
             await RefreshAsync();
         }
         catch (Exception exception)
         {
             if (!_disposed) Error = "Could not stop the session. Refresh and try again.";
-            report(exception);
+            _report(exception);
         }
         finally
         {

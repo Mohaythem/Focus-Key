@@ -112,4 +112,5 @@ internal static class Presentation
     };
     internal static SolidColorBrush Stroke(HexColor color) => SessionColorBrush.Create(SessionColors.Foreground(color));
     internal static string Duration(TimeSpan value) => FocusKey.Foundation.Reports.ReportsFormatting.FormatDuration(value);
+    internal static string FormatLauncherDuration(TimeSpan duration) => FocusKey.Foundation.Today.TodayFormatting.FormatLauncherDuration(duration);
 }

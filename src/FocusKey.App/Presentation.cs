@@ -12,19 +12,9 @@ namespace FocusKey;
 /// <summary>Presentation primitives shared by native pages; no session or persistence state.</summary>
 internal static class Presentation
 {
-    internal static Brush ThemeBrush(string key, FrameworkElement? context = null)
+    internal static Brush ThemeBrush(string key, bool isDark)
     {
-        ElementTheme theme = context?.ActualTheme is ElementTheme.Light or ElementTheme.Dark
-            ? context.ActualTheme
-            : EffectiveSystemTheme();
-
-        string themeKey = theme switch
-        {
-            ElementTheme.Light => "Light",
-            ElementTheme.Dark => "Dark",
-            _ => "Dark",
-        };
-
+        string themeKey = isDark ? "Dark" : "Light";
         if (Application.Current?.Resources.ThemeDictionaries is { } dicts &&
             dicts.TryGetValue(themeKey, out object? dictObj) &&
             dictObj is ResourceDictionary dict &&
@@ -35,6 +25,17 @@ internal static class Presentation
         }
 
         return Application.Current?.Resources[key] as Brush ?? new SolidColorBrush(Microsoft.UI.Colors.Transparent);
+    }
+
+    internal static Brush ThemeBrush(string key, FrameworkElement? context = null)
+    {
+        ElementTheme theme = context?.ActualTheme is ElementTheme.Light or ElementTheme.Dark
+            ? context.ActualTheme
+            : (context?.RequestedTheme is ElementTheme.Light or ElementTheme.Dark
+                ? context.RequestedTheme
+                : EffectiveSystemTheme());
+
+        return ThemeBrush(key, theme == ElementTheme.Dark);
     }
 
     private static ElementTheme EffectiveSystemTheme()
@@ -110,7 +111,153 @@ internal static class Presentation
         Padding = new Thickness(padding),
         Child = child
     };
+    internal static Border CardHero(UIElement child, Thickness? padding = null) => new()
+    {
+        Style = Application.Current?.Resources["FkCardHero"] as Style,
+        Padding = padding ?? Paddings.HeroCard,
+        Child = child
+    };
+
+    internal static TextBlock PageTitle(string value) => new()
+    {
+        Text = value,
+        Style = Application.Current?.Resources["FkPageTitleText"] as Style,
+        IsTextSelectionEnabled = true,
+        Language = "en-US",
+        FlowDirection = FlowDirection.LeftToRight,
+        TextReadingOrder = TextReadingOrder.UseFlowDirection
+    };
+
+    internal static TextBlock SectionHeader(string value) => new()
+    {
+        Text = value,
+        Style = Application.Current?.Resources["FkSectionHeaderText"] as Style,
+        IsTextSelectionEnabled = true,
+        Language = "en-US",
+        FlowDirection = FlowDirection.LeftToRight,
+        TextReadingOrder = TextReadingOrder.UseFlowDirection
+    };
+
+    internal static TextBlock BodyStrong(string value, double size = 13) => new()
+    {
+        Text = value,
+        FontSize = size,
+        Style = Application.Current?.Resources["FkBodyStrongText"] as Style,
+        IsTextSelectionEnabled = true,
+        Language = "en-US",
+        FlowDirection = FlowDirection.LeftToRight,
+        TextReadingOrder = TextReadingOrder.UseFlowDirection
+    };
+
+    internal static TextBlock Supporting(string value, double size = 12) => new()
+    {
+        Text = value,
+        FontSize = size,
+        Style = Application.Current?.Resources["FkSupportingText"] as Style,
+        IsTextSelectionEnabled = true,
+        Language = "en-US",
+        FlowDirection = FlowDirection.LeftToRight,
+        TextReadingOrder = TextReadingOrder.UseFlowDirection
+    };
+
+    internal static TextBlock CaptionHint(string value, double size = 11) => new()
+    {
+        Text = value,
+        FontSize = size,
+        Style = Application.Current?.Resources["FkCaptionHintText"] as Style,
+        IsTextSelectionEnabled = true,
+        Language = "en-US",
+        FlowDirection = FlowDirection.LeftToRight,
+        TextReadingOrder = TextReadingOrder.UseFlowDirection
+    };
+
+    internal static TextBlock MetricValue(string value, double size = 28) => new()
+    {
+        Text = value,
+        FontSize = size,
+        Style = Application.Current?.Resources["FkMetricValueText"] as Style,
+        IsTextSelectionEnabled = true,
+        Language = "en-US",
+        FlowDirection = FlowDirection.LeftToRight,
+        TextReadingOrder = TextReadingOrder.UseFlowDirection
+    };
+
+    internal static TextBlock DisplayTimer(string value, double size = 40) => new()
+    {
+        Text = value,
+        FontSize = size,
+        Style = Application.Current?.Resources["FkDisplayTimerText"] as Style,
+        IsTextSelectionEnabled = true,
+        Language = "en-US",
+        FlowDirection = FlowDirection.LeftToRight,
+        TextReadingOrder = TextReadingOrder.UseFlowDirection
+    };
+
+    internal static TextBlock DurationChoice(string value, double size = 26) => new()
+    {
+        Text = value,
+        FontSize = size,
+        Style = Application.Current?.Resources["FkDurationChoiceText"] as Style,
+        IsTextSelectionEnabled = true,
+        Language = "en-US",
+        FlowDirection = FlowDirection.LeftToRight,
+        TextReadingOrder = TextReadingOrder.UseFlowDirection
+    };
+
     internal static SolidColorBrush Stroke(HexColor color) => SessionColorBrush.Create(SessionColors.Foreground(color));
     internal static string Duration(TimeSpan value) => FocusKey.Foundation.Reports.ReportsFormatting.FormatDuration(value);
     internal static string FormatLauncherDuration(TimeSpan duration) => FocusKey.Foundation.Today.TodayFormatting.FormatLauncherDuration(duration);
+
+    internal static class Radii
+    {
+        internal static readonly CornerRadius Control = new(4);
+        internal static readonly CornerRadius Card = new(6);
+        internal static readonly CornerRadius Hero = new(8);
+    }
+
+    internal static class Spacing
+    {
+        internal const double S2 = 2;
+        internal const double S4 = 4;
+        internal const double S8 = 8;
+        internal const double S12 = 12;
+        internal const double S16 = 16;
+        internal const double S20 = 20;
+        internal const double S24 = 24;
+        internal const double S28 = 28;
+        internal const double S40 = 40;
+    }
+
+    internal static class Paddings
+    {
+        internal static readonly Thickness PageStandard = new(40, 28, 40, 36);
+        internal static readonly Thickness PageCompact = new(24, 20, 24, 28);
+        internal static readonly Thickness Card = new(20);
+        internal static readonly Thickness HeroCard = new(28, 24, 28, 24);
+    }
+
+    internal static class LayoutConstraints
+    {
+        internal const double UtilityPageMaxWidth = 880;
+        internal const double ReportsPageMaxWidth = 1040;
+        internal const double OverlayWidth = 420;
+        internal const double BreakpointCompact = 740;
+        internal const double BreakpointMaximized = 1200;
+    }
+
+    internal static class Motion
+    {
+        internal static readonly TimeSpan QuickDuration = TimeSpan.FromMilliseconds(150);
+        internal static readonly TimeSpan StandardDuration = TimeSpan.FromMilliseconds(200);
+        internal static readonly TimeSpan SmoothDuration = TimeSpan.FromMilliseconds(250);
+
+        internal static bool AreAnimationsEnabled
+        {
+            get
+            {
+                try { return new UISettings().AnimationsEnabled; }
+                catch { return true; }
+            }
+        }
+    }
 }

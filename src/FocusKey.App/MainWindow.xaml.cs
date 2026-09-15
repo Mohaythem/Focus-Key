@@ -278,24 +278,24 @@ public sealed partial class MainWindow : Window
         WorkChoiceCard.Background = SessionColorBrush.CreateAlpha(_colors.Work, workBgAlpha);
         WorkChoiceCard.BorderBrush = SessionColorBrush.CreateAlpha(_colors.Work, workBorderAlpha);
         WorkChoiceDot.Fill = SessionColorBrush.Create(_colors.Work);
-        WorkChoiceMode.Foreground = Presentation.ThemeBrush("FkSecondary", CurrentCard);
+        WorkChoiceMode.Foreground = Presentation.ThemeBrush("FkSecondary", isDark);
 
         StartWorkButton.Background = SessionColorBrush.CreateElevated(_colors.Work, isDark, _isWorkHovered);
         StartWorkButton.BorderBrush = SessionColorBrush.CreateAlpha(_colors.Work, _isWorkHovered ? (isDark ? 0.85 : 0.75) : (isDark ? 0.55 : 0.45));
         StartWorkButton.BorderThickness = new Thickness(1);
-        StartWorkButton.Foreground = Presentation.ThemeBrush("FkForeground", CurrentCard);
+        StartWorkButton.Foreground = Presentation.ThemeBrush("FkForeground", isDark);
 
         double breakBgAlpha = _isBreakHovered ? (isDark ? 0.20 : 0.14) : (isDark ? 0.12 : 0.08);
         double breakBorderAlpha = _isBreakHovered ? (isDark ? 0.55 : 0.40) : (isDark ? 0.35 : 0.25);
         BreakChoiceCard.Background = SessionColorBrush.CreateAlpha(_colors.Break, breakBgAlpha);
         BreakChoiceCard.BorderBrush = SessionColorBrush.CreateAlpha(_colors.Break, breakBorderAlpha);
         BreakChoiceDot.Fill = SessionColorBrush.Create(_colors.Break);
-        BreakChoiceMode.Foreground = Presentation.ThemeBrush("FkSecondary", CurrentCard);
+        BreakChoiceMode.Foreground = Presentation.ThemeBrush("FkSecondary", isDark);
 
         StartBreakButton.Background = SessionColorBrush.CreateElevated(_colors.Break, isDark, _isBreakHovered);
         StartBreakButton.BorderBrush = SessionColorBrush.CreateAlpha(_colors.Break, _isBreakHovered ? (isDark ? 0.85 : 0.75) : (isDark ? 0.55 : 0.45));
         StartBreakButton.BorderThickness = new Thickness(1);
-        StartBreakButton.Foreground = Presentation.ThemeBrush("FkForeground", CurrentCard);
+        StartBreakButton.Foreground = Presentation.ThemeBrush("FkForeground", isDark);
 
         var durations = _today.Snapshot?.Durations ?? SessionDurations.Default;
         var (workNum, workUnit) = TodayFormatting.FormatLauncherDurationParts(durations.Work);

@@ -21,7 +21,7 @@
     <SolidColorBrush x:Key="FkOverlay" Color="#FFFFFF"/>
     <SolidColorBrush x:Key="FkBorder" Color="#D4DCDC"/><SolidColorBrush x:Key="FkForeground" Color="#0F1414"/>
     <SolidColorBrush x:Key="CardStrokeColorDefaultBrush" Color="#D4DCDC"/>
-    <SolidColorBrush x:Key="FkSecondary" Color="#5A6A6A"/><SolidColorBrush x:Key="FkDim" Color="#8A9898"/>
+    <SolidColorBrush x:Key="FkSecondary" Color="#5A6A6A"/><SolidColorBrush x:Key="FkDim" Color="#5C6E6E"/>
     <SolidColorBrush x:Key="FkAccent" Color="#183739"/>
     <SolidColorBrush x:Key="FkStatusRunning" Color="#0F1414"/>
     <SolidColorBrush x:Key="FkStatusCompleted" Color="#5A6A6A"/>
@@ -41,6 +41,99 @@
     <SolidColorBrush x:Key="FkStatusInterrupted" Color="{ThemeResource SystemColorHighlightColor}"/>
    </ResourceDictionary>
   </ResourceDictionary.ThemeDictionaries>
+
+  <!-- Spacing Scale Tokens (Visual System) -->
+  <x:Double x:Key="FkSpacing2">2</x:Double>
+  <x:Double x:Key="FkSpacing4">4</x:Double>
+  <x:Double x:Key="FkSpacing8">8</x:Double>
+  <x:Double x:Key="FkSpacing12">12</x:Double>
+  <x:Double x:Key="FkSpacing16">16</x:Double>
+  <x:Double x:Key="FkSpacing20">20</x:Double>
+  <x:Double x:Key="FkSpacing24">24</x:Double>
+  <x:Double x:Key="FkSpacing28">28</x:Double>
+  <x:Double x:Key="FkSpacing40">40</x:Double>
+
+  <Thickness x:Key="FkPagePaddingStandard">40,28,40,36</Thickness>
+  <Thickness x:Key="FkPagePaddingCompact">24,20,24,28</Thickness>
+  <Thickness x:Key="FkCardPadding">20</Thickness>
+  <Thickness x:Key="FkHeroCardPadding">28,24,28,24</Thickness>
+
+  <!-- Geometry & Corner Radius Tokens (3-Tier Family) -->
+  <CornerRadius x:Key="FkControlRadius">4</CornerRadius>
+  <CornerRadius x:Key="FkCardRadius">6</CornerRadius>
+  <CornerRadius x:Key="FkHeroRadius">8</CornerRadius>
+
+  <!-- Responsive Layout Constraint Tokens -->
+  <x:Double x:Key="FkUtilityPageMaxWidth">880</x:Double>
+  <x:Double x:Key="FkReportsPageMaxWidth">1040</x:Double>
+  <x:Double x:Key="FkOverlayWidth">420</x:Double>
+  <x:Double x:Key="FkBreakpointCompact">740</x:Double>
+  <x:Double x:Key="FkBreakpointMaximized">1200</x:Double>
+
+  <!-- Semantic Session Default Brushes -->
+  <SolidColorBrush x:Key="FkWorkDefaultBrush" Color="#2F8F83"/>
+  <SolidColorBrush x:Key="FkBreakDefaultBrush" Color="#7667B8"/>
+
+  <!-- Typography Ramp Styles (8-Step Foundation) -->
+  <Style x:Key="FkDisplayTimerText" TargetType="TextBlock" BasedOn="{StaticResource FkText}">
+    <Setter Property="FontSize" Value="40"/>
+    <Setter Property="FontWeight" Value="Normal"/>
+    <Setter Property="FontFamily" Value="Consolas"/>
+    <Setter Property="Language" Value="en-US"/>
+    <Setter Property="FlowDirection" Value="LeftToRight"/>
+    <Setter Property="TextReadingOrder" Value="UseFlowDirection"/>
+  </Style>
+  <Style x:Key="FkMetricValueText" TargetType="TextBlock" BasedOn="{StaticResource FkText}">
+    <Setter Property="FontSize" Value="28"/>
+    <Setter Property="FontWeight" Value="Normal"/>
+    <Setter Property="FontFamily" Value="Consolas"/>
+    <Setter Property="Language" Value="en-US"/>
+    <Setter Property="FlowDirection" Value="LeftToRight"/>
+    <Setter Property="TextReadingOrder" Value="UseFlowDirection"/>
+  </Style>
+  <Style x:Key="FkDurationChoiceText" TargetType="TextBlock" BasedOn="{StaticResource FkText}">
+    <Setter Property="FontSize" Value="26"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="FontFamily" Value="Segoe UI Variable, Segoe UI"/>
+    <Setter Property="Language" Value="en-US"/>
+    <Setter Property="FlowDirection" Value="LeftToRight"/>
+    <Setter Property="TextReadingOrder" Value="UseFlowDirection"/>
+  </Style>
+  <Style x:Key="FkPageTitleText" TargetType="TextBlock" BasedOn="{StaticResource FkText}">
+    <Setter Property="FontSize" Value="16"/>
+    <Setter Property="FontWeight" Value="Medium"/>
+    <Setter Property="FontFamily" Value="Segoe UI Variable, Segoe UI"/>
+  </Style>
+  <Style x:Key="FkBodyStrongText" TargetType="TextBlock" BasedOn="{StaticResource FkText}">
+    <Setter Property="FontSize" Value="13"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="FontFamily" Value="Segoe UI Variable, Segoe UI"/>
+  </Style>
+  <Style x:Key="FkSupportingText" TargetType="TextBlock" BasedOn="{StaticResource FkMutedText}">
+    <Setter Property="FontSize" Value="12"/>
+    <Setter Property="FontFamily" Value="Segoe UI Variable, Segoe UI"/>
+  </Style>
+  <Style x:Key="FkSectionHeaderText" TargetType="TextBlock" BasedOn="{StaticResource FkMutedText}">
+    <Setter Property="FontSize" Value="11"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="FontFamily" Value="Segoe UI Variable, Segoe UI"/>
+    <Setter Property="CharacterSpacing" Value="60"/>
+  </Style>
+  <Style x:Key="FkCaptionHintText" TargetType="TextBlock" BasedOn="{StaticResource FkText}">
+    <Setter Property="Foreground" Value="{ThemeResource FkDim}"/>
+    <Setter Property="FontSize" Value="11"/>
+    <Setter Property="FontFamily" Value="Segoe UI Variable, Segoe UI"/>
+  </Style>
+
+  <!-- Surface Elevation Styles -->
+  <Style x:Key="FkCardHero" TargetType="Border">
+    <Setter Property="Background" Value="{ThemeResource FkSurface}"/>
+    <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="{StaticResource FkHeroRadius}"/>
+    <Setter Property="Padding" Value="{StaticResource FkHeroCardPadding}"/>
+  </Style>
+
   <Style x:Key="FkText" TargetType="TextBlock"><Setter Property="Foreground" Value="{ThemeResource FkForeground}"/><Setter Property="FontSize" Value="13"/><Setter Property="TextWrapping" Value="Wrap"/></Style>
   <Style x:Key="FkMutedText" TargetType="TextBlock" BasedOn="{StaticResource FkText}"><Setter Property="Foreground" Value="{ThemeResource FkSecondary}"/><Setter Property="FontSize" Value="12"/></Style>
   <Style x:Key="FkDimText" TargetType="TextBlock" BasedOn="{StaticResource FkText}"><Setter Property="Foreground" Value="{ThemeResource FkDim}"/><Setter Property="FontSize" Value="11"/></Style>
@@ -50,23 +143,23 @@
   <Style x:Key="FkStatusCompletedText" TargetType="TextBlock" BasedOn="{StaticResource FkText}"><Setter Property="Foreground" Value="{ThemeResource FkStatusCompleted}"/><Setter Property="FontSize" Value="11"/><Setter Property="FontWeight" Value="Medium"/><Setter Property="CharacterSpacing" Value="40"/></Style>
   <Style x:Key="FkStatusStoppedText" TargetType="TextBlock" BasedOn="{StaticResource FkText}"><Setter Property="Foreground" Value="{ThemeResource FkStatusStopped}"/><Setter Property="FontSize" Value="11"/><Setter Property="FontWeight" Value="Medium"/><Setter Property="CharacterSpacing" Value="40"/></Style>
   <Style x:Key="FkStatusInterruptedText" TargetType="TextBlock" BasedOn="{StaticResource FkText}"><Setter Property="Foreground" Value="{ThemeResource FkStatusInterrupted}"/><Setter Property="FontSize" Value="11"/><Setter Property="FontWeight" Value="Medium"/><Setter Property="CharacterSpacing" Value="40"/></Style>
-  <Style x:Key="FkCard" TargetType="Border"><Setter Property="Background" Value="{ThemeResource FkSurface}"/><Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="6"/><Setter Property="Padding" Value="20"/></Style>
-  <Style x:Key="FkCardSubtle" TargetType="Border"><Setter Property="Background" Value="{ThemeResource FkSurface2}"/><Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="6"/><Setter Property="Padding" Value="20"/></Style>
-  <Style x:Key="FkNav" TargetType="ToggleButton"><Setter Property="HorizontalAlignment" Value="Stretch"/><Setter Property="HorizontalContentAlignment" Value="Left"/><Setter Property="Padding" Value="12,7"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="CornerRadius" Value="4"/><Setter Property="Foreground" Value="{ThemeResource FkForeground}"/></Style>
-  <Style x:Key="FkSidebarButton" TargetType="Button"><Setter Property="HorizontalAlignment" Value="Stretch"/><Setter Property="HorizontalContentAlignment" Value="Left"/><Setter Property="Padding" Value="12,7"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="CornerRadius" Value="4"/><Setter Property="FontSize" Value="12"/><Setter Property="Foreground" Value="{ThemeResource FkSecondary}"/></Style>
-  <Style x:Key="FkBadge" TargetType="Border"><Setter Property="Background" Value="{ThemeResource FkSurface2}"/><Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="4"/></Style>
+  <Style x:Key="FkCard" TargetType="Border"><Setter Property="Background" Value="{ThemeResource FkSurface}"/><Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="{StaticResource FkCardRadius}"/><Setter Property="Padding" Value="{StaticResource FkCardPadding}"/></Style>
+  <Style x:Key="FkCardSubtle" TargetType="Border"><Setter Property="Background" Value="{ThemeResource FkSurface2}"/><Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="{StaticResource FkCardRadius}"/><Setter Property="Padding" Value="{StaticResource FkCardPadding}"/></Style>
+  <Style x:Key="FkNav" TargetType="ToggleButton"><Setter Property="HorizontalAlignment" Value="Stretch"/><Setter Property="HorizontalContentAlignment" Value="Left"/><Setter Property="Padding" Value="12,7"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="CornerRadius" Value="{StaticResource FkControlRadius}"/><Setter Property="Foreground" Value="{ThemeResource FkForeground}"/></Style>
+  <Style x:Key="FkSidebarButton" TargetType="Button"><Setter Property="HorizontalAlignment" Value="Stretch"/><Setter Property="HorizontalContentAlignment" Value="Left"/><Setter Property="Padding" Value="12,7"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="CornerRadius" Value="{StaticResource FkControlRadius}"/><Setter Property="FontSize" Value="12"/><Setter Property="Foreground" Value="{ThemeResource FkSecondary}"/></Style>
+  <Style x:Key="FkBadge" TargetType="Border"><Setter Property="Background" Value="{ThemeResource FkSurface2}"/><Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="{StaticResource FkControlRadius}"/></Style>
   <Style x:Key="FkBadgeText" TargetType="TextBlock" BasedOn="{StaticResource FkText}"><Setter Property="Foreground" Value="{ThemeResource FkSecondary}"/><Setter Property="FontFamily" Value="Consolas"/><Setter Property="FontSize" Value="11"/></Style>
-  <Style x:Key="FkColorButton" TargetType="Button"><Setter Property="Background" Value="{ThemeResource FkSurface2}"/><Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="4"/><Setter Property="MinWidth" Value="120"/><Setter Property="Padding" Value="10,6,12,6"/></Style>
+  <Style x:Key="FkColorButton" TargetType="Button"><Setter Property="Background" Value="{ThemeResource FkSurface2}"/><Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="{StaticResource FkControlRadius}"/><Setter Property="MinWidth" Value="120"/><Setter Property="Padding" Value="10,6,12,6"/></Style>
   <Style x:Key="FkColorHexText" TargetType="TextBlock" BasedOn="{StaticResource FkText}"><Setter Property="Foreground" Value="{ThemeResource FkSecondary}"/><Setter Property="FontFamily" Value="Consolas"/><Setter Property="FontSize" Value="12"/></Style>
-  <Style x:Key="FkSwatchBorder" TargetType="Border"><Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="3"/><Setter Property="Width" Value="16"/><Setter Property="Height" Value="16"/></Style>
+  <Style x:Key="FkSwatchBorder" TargetType="Border"><Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="{StaticResource FkControlRadius}"/><Setter Property="Width" Value="16"/><Setter Property="Height" Value="16"/></Style>
   <Style x:Key="FkSettingRow" TargetType="Grid"><Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/></Style>
-  <Style x:Key="FkSegmentContainer" TargetType="Border"><Setter Property="Background" Value="{ThemeResource FkSurface2}"/><Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="5"/><Setter Property="Padding" Value="2"/></Style>
-  <Style x:Key="FkSegmentActive" TargetType="Button"><Setter Property="Background" Value="{ThemeResource FkSurface}"/><Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="4"/><Setter Property="Foreground" Value="{ThemeResource FkForeground}"/><Setter Property="FontWeight" Value="Medium"/><Setter Property="FontSize" Value="11"/><Setter Property="Padding" Value="14,4"/></Style>
-  <Style x:Key="FkSegmentInactive" TargetType="Button"><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="CornerRadius" Value="4"/><Setter Property="Foreground" Value="{ThemeResource FkSecondary}"/><Setter Property="FontWeight" Value="Normal"/><Setter Property="FontSize" Value="11"/><Setter Property="Padding" Value="14,4"/></Style>
+  <Style x:Key="FkSegmentContainer" TargetType="Border"><Setter Property="Background" Value="{ThemeResource FkSurface2}"/><Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="{StaticResource FkCardRadius}"/><Setter Property="Padding" Value="2"/></Style>
+  <Style x:Key="FkSegmentActive" TargetType="Button"><Setter Property="Background" Value="{ThemeResource FkSurface}"/><Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="{StaticResource FkControlRadius}"/><Setter Property="Foreground" Value="{ThemeResource FkForeground}"/><Setter Property="FontWeight" Value="Medium"/><Setter Property="FontSize" Value="11"/><Setter Property="Padding" Value="14,4"/></Style>
+  <Style x:Key="FkSegmentInactive" TargetType="Button"><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="CornerRadius" Value="{StaticResource FkControlRadius}"/><Setter Property="Foreground" Value="{ThemeResource FkSecondary}"/><Setter Property="FontWeight" Value="Normal"/><Setter Property="FontSize" Value="11"/><Setter Property="Padding" Value="14,4"/></Style>
   <Style x:Key="FkChartGridLine" TargetType="Border"><Setter Property="Height" Value="1"/><Setter Property="Background" Value="{ThemeResource CardStrokeColorDefaultBrush}"/><Setter Property="Opacity" Value="0.5"/><Setter Property="HorizontalAlignment" Value="Stretch"/></Style>
   <Style x:Key="FkOverlayCard" TargetType="Button">
     <Setter Property="Padding" Value="20,18"/>
-    <Setter Property="CornerRadius" Value="4"/>
+    <Setter Property="CornerRadius" Value="{StaticResource FkControlRadius}"/>
     <Setter Property="HorizontalContentAlignment" Value="Left"/>
     <Setter Property="VerticalContentAlignment" Value="Center"/>
     <Setter Property="HorizontalAlignment" Value="Stretch"/>
@@ -114,7 +207,7 @@
   <Style x:Key="FkLauncherStartButton" TargetType="Button">
     <Setter Property="Height" Value="32"/>
     <Setter Property="Padding" Value="18,0"/>
-    <Setter Property="CornerRadius" Value="5"/>
+    <Setter Property="CornerRadius" Value="{StaticResource FkControlRadius}"/>
     <Setter Property="FontSize" Value="12"/>
     <Setter Property="FontWeight" Value="SemiBold"/>
     <Setter Property="HorizontalAlignment" Value="Right"/>
@@ -122,6 +215,7 @@
     <Setter Property="HorizontalContentAlignment" Value="Center"/>
     <Setter Property="VerticalContentAlignment" Value="Center"/>
     <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="Foreground" Value="{ThemeResource FkForeground}"/>
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="Button">
@@ -154,6 +248,7 @@
             <ContentPresenter
               Content="{TemplateBinding Content}"
               ContentTemplate="{TemplateBinding ContentTemplate}"
+              Foreground="{TemplateBinding Foreground}"
               HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
               VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
           </Border>
@@ -164,12 +259,13 @@
   <Style x:Key="FkOverlayStartButton" TargetType="Button">
     <Setter Property="Height" Value="38"/>
     <Setter Property="Padding" Value="16,0"/>
-    <Setter Property="CornerRadius" Value="4"/>
+    <Setter Property="CornerRadius" Value="{StaticResource FkControlRadius}"/>
     <Setter Property="FontSize" Value="13"/>
     <Setter Property="FontWeight" Value="Medium"/>
     <Setter Property="HorizontalAlignment" Value="Stretch"/>
     <Setter Property="HorizontalContentAlignment" Value="Center"/>
     <Setter Property="VerticalContentAlignment" Value="Center"/>
+    <Setter Property="Foreground" Value="{ThemeResource FkForeground}"/>
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="Button">
@@ -202,6 +298,7 @@
             <ContentPresenter
               Content="{TemplateBinding Content}"
               ContentTemplate="{TemplateBinding ContentTemplate}"
+              Foreground="{TemplateBinding Foreground}"
               HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
               VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
           </Border>
@@ -213,7 +310,7 @@
     <Setter Property="MinHeight" Value="0"/>
     <Setter Property="Height" Value="30"/>
     <Setter Property="Padding" Value="14,0"/>
-    <Setter Property="CornerRadius" Value="4"/>
+    <Setter Property="CornerRadius" Value="{StaticResource FkControlRadius}"/>
     <Setter Property="FontSize" Value="12"/>
     <Setter Property="FontWeight" Value="Normal"/>
     <Setter Property="HorizontalAlignment" Value="Right"/>
@@ -255,6 +352,7 @@
             <ContentPresenter
               Content="{TemplateBinding Content}"
               ContentTemplate="{TemplateBinding ContentTemplate}"
+              Foreground="{TemplateBinding Foreground}"
               HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
               VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
           </Border>

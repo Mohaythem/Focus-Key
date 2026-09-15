@@ -50,4 +50,29 @@ internal static class SessionColorBrush
             return new SolidColorBrush(Windows.UI.Color.FromArgb(255, r, g, b));
         }
     }
+
+    /// <summary>Curated default session colors defined by the Visual System.</summary>
+    internal static class Defaults
+    {
+        internal static readonly HexColor Work = HexColor.Parse("#2F8F83");
+        internal static readonly HexColor Break = HexColor.Parse("#7667B8");
+    }
+
+    /// <summary>Creates a subtle surface tint (e.g. 5% opacity) over the base theme surface.</summary>
+    internal static SolidColorBrush CreateTint(HexColor color, bool isDark, double opacity = 0.05)
+    {
+        byte cr = Convert.ToByte(color.Value.Substring(1, 2), 16);
+        byte cg = Convert.ToByte(color.Value.Substring(3, 2), 16);
+        byte cb = Convert.ToByte(color.Value.Substring(5, 2), 16);
+
+        byte bg = isDark ? (byte)30 : (byte)255;
+        byte r = (byte)Math.Clamp((int)Math.Round(cr * opacity + bg * (1 - opacity)), 0, 255);
+        byte g = (byte)Math.Clamp((int)Math.Round(cg * opacity + bg * (1 - opacity)), 0, 255);
+        byte b = (byte)Math.Clamp((int)Math.Round(cb * opacity + bg * (1 - opacity)), 0, 255);
+        return new SolidColorBrush(Windows.UI.Color.FromArgb(255, r, g, b));
+    }
+
+    /// <summary>Creates a subtle semantic border brush (e.g. 30% alpha for idle choice card, 80% for hover).</summary>
+    internal static SolidColorBrush CreateSemanticBorder(HexColor color, double alpha = 0.30) =>
+        CreateAlpha(color, alpha);
 }

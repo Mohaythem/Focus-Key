@@ -87,15 +87,17 @@ public sealed class ReportsService
     }
 
     /// <summary>
-    /// Computes the dynamic Y-axis ceiling in 5-hour increments based on the maximum focus duration.
-    /// axisCeiling = ceil(maxHours / 5) * 5, with a minimum useful ceiling of 5 hours.
+    /// Computes the dynamic Y-axis ceiling in step-hour increments based on the maximum focus duration.
+    /// axisCeiling = ceil(maxHours / stepHours) * stepHours, with a minimum useful ceiling of stepHours.
+    /// Defaults to 5-hour increments for weekly reports, and 10-hour increments for monthly reports.
     /// </summary>
-    public static int ComputeCeilingHours(double maxSeconds)
+    public static int ComputeCeilingHours(double maxSeconds, int stepHours = 5)
     {
-        if (maxSeconds <= 0) return 5;
+        if (stepHours <= 0) stepHours = 5;
+        if (maxSeconds <= 0) return stepHours;
         double maxHours = maxSeconds / 3600.0;
-        int ceiling = (int)Math.Ceiling(maxHours / 5.0) * 5;
-        return Math.Max(5, ceiling);
+        int ceiling = (int)Math.Ceiling(maxHours / (double)stepHours) * stepHours;
+        return Math.Max(stepHours, ceiling);
     }
 
     public DateOnly CurrentDate() => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(_time.GetUtcNow(), _zone()).DateTime);

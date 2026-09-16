@@ -94,6 +94,26 @@ public sealed class ReportsRollingWeeklyChartTests
         Assert.True(ceiling >= 5);
     }
 
+    [Theory]
+    [InlineData(0, 10)]
+    [InlineData(30 * 60, 10)] // 30m -> 10
+    [InlineData(5 * 3600, 10)] // 5h -> 10
+    [InlineData(10 * 3600, 10)] // 10h -> 10
+    [InlineData(10 * 3600 + 1, 20)] // 10h 1s -> 20
+    [InlineData(18 * 3600, 20)] // 18h -> 20
+    [InlineData(20 * 3600, 20)] // 20h -> 20
+    [InlineData(21 * 3600, 30)] // 21h -> 30
+    [InlineData(30 * 3600, 30)] // 30h -> 30
+    [InlineData(35 * 3600, 40)] // 35h -> 40
+    [InlineData(50 * 3600, 50)] // 50h -> 50
+    public void ComputeCeilingHours_ScalesIn10HourIncrementsWithMinimum10HoursForMonthly(double maxSeconds, int expectedCeilingHours)
+    {
+        int ceiling = ReportsService.ComputeCeilingHours(maxSeconds, 10);
+        Assert.Equal(expectedCeilingHours, ceiling);
+        Assert.True(ceiling % 10 == 0);
+        Assert.True(ceiling >= 10);
+    }
+
     [Fact]
     public async Task ReadAsync_ZeroValueDays_RemainVisibleWithCleanBaseline()
     {

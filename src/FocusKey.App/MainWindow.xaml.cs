@@ -237,7 +237,7 @@ public sealed partial class MainWindow : Window
                 if (TodayPanel is not null)
                     TodayPanel.Width = Math.Min(880, available);
                 if (ReportsHost is not null)
-                    ReportsHost.Width = Math.Min(1040, available);
+                    ReportsHost.Width = Math.Min(1220, available);
             }
         }
     }

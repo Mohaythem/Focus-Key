@@ -51,7 +51,7 @@ internal sealed class ReportsView : UserControl, IDisposable
         // Build segmented period selector per reference
         BuildPeriodSelector();
 
-        var panel = new StackPanel { Spacing = 14, HorizontalAlignment = HorizontalAlignment.Stretch };
+        var panel = new StackPanel { Spacing = 16, HorizontalAlignment = HorizontalAlignment.Stretch };
 
         // 1. Top header row: "Reports" title on left, segmented period selector on right (exact Figma layout)
         var topHeader = new Grid { HorizontalAlignment = HorizontalAlignment.Stretch, Margin = new Thickness(0, 0, 0, 4) };
@@ -210,8 +210,8 @@ internal sealed class ReportsView : UserControl, IDisposable
             {
                 if (metrics.ActualWidth <= 0) return;
                 bool compact = metrics.ActualWidth < 540;
-                double fontSize = compact ? 21 : 28;
-                var pad = new Thickness(compact ? 12 : 20, 18, compact ? 12 : 20, 18);
+                double fontSize = compact ? 21 : 30;
+                var pad = new Thickness(compact ? 12 : 22, compact ? 16 : 20, compact ? 12 : 22, compact ? 16 : 20);
                 card1.Padding = pad; val1.FontSize = fontSize;
                 card2.Padding = pad; val2.FontSize = fontSize;
                 card3.Padding = pad; val3.FontSize = fontSize;
@@ -301,8 +301,8 @@ internal sealed class ReportsView : UserControl, IDisposable
         Grid.SetColumn(right, 2);
         grid.Children.Add(right);
 
-        var card = Card(grid, 18);
-        card.Padding = new Thickness(20, 18, 20, 18);
+        var card = Card(grid, 20);
+        card.Padding = new Thickness(22, 18, 22, 18);
         return card;
     }
 
@@ -339,7 +339,9 @@ internal sealed class ReportsView : UserControl, IDisposable
         AutomationProperties.SetName(chart, "Focus activity trend chart");
         body.Children.Add(chart);
 
-        return Card(body, 20);
+        var card2 = Card(body, 22);
+        card2.Padding = new Thickness(24, 22, 24, 22);
+        return card2;
     }
 
     private FrameworkElement InsightCard(ReportsSnapshot s)
@@ -357,7 +359,9 @@ internal sealed class ReportsView : UserControl, IDisposable
         content.LineHeight = 20;
         body.Children.Add(content);
 
-        return Card(body, 16);
+        var card = Card(body, 20);
+        card.Padding = new Thickness(24, 18, 24, 18);
+        return card;
     }
 
     private static string GenerateInsightText(ReportsSnapshot s)
@@ -416,7 +420,7 @@ internal sealed class ReportsView : UserControl, IDisposable
         if (Application.Current?.Resources["FkMetricValueText"] is Style metricStyle)
         {
             valueText.Style = metricStyle;
-            valueText.FontSize = 28;
+            valueText.FontSize = 30;
             valueText.Margin = new Thickness(0, 0, 0, 4);
         }
         p.Children.Add(valueText);
@@ -424,8 +428,8 @@ internal sealed class ReportsView : UserControl, IDisposable
         labelText.FontWeight = Microsoft.UI.Text.FontWeights.Medium;
         p.Children.Add(labelText);
         p.Children.Add(Presentation.DimText(sub, 11));
-        var b = Card(p, 18);
-        b.Padding = new Thickness(20, 18, 20, 18);
+        var b = Card(p, 20);
+        b.Padding = new Thickness(22, 20, 22, 20);
         Grid.SetColumn(b, column);
         return (b, valueText);
     }

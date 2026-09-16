@@ -17,9 +17,9 @@ namespace FocusKey;
 /// </summary>
 internal sealed class ReportsChart : Grid
 {
-    private const double TopHeadroom = 28;
-    private const double PlotAreaHeight = 260;
-    private const double TotalPlotHeight = TopHeadroom + PlotAreaHeight; // 288 DIP
+    private const double TopHeadroom = 30;
+    private const double PlotAreaHeight = 300;
+    private const double TotalPlotHeight = TopHeadroom + PlotAreaHeight; // 330 DIP
 
     internal ReportsChart(IReadOnlyList<ReportBucket> trend, ReportPeriod period, ReportsPalette palette)
     {
@@ -32,10 +32,11 @@ internal sealed class ReportsChart : Grid
         RowDefinitions.Add(new RowDefinition { Height = new GridLength(TotalPlotHeight) });
         RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
+        int stepHours = period == ReportPeriod.Monthly ? 10 : 5;
         double effectiveMax = trend.Count == 0 ? 0 : trend.Max(b => b.Totals.FocusTime.TotalSeconds);
-        int ceilingHours = ReportsService.ComputeCeilingHours(effectiveMax);
+        int ceilingHours = ReportsService.ComputeCeilingHours(effectiveMax, stepHours);
 
-        // 1. Y-Axis column (Column 0): ticks from 0h up to ceilingHours in 5h steps
+        // 1. Y-Axis column (Column 0): ticks from 0h up to ceilingHours in stepHours steps
         var axisCanvas = new Canvas
         {
             Width = 46,
@@ -43,7 +44,7 @@ internal sealed class ReportsChart : Grid
             Language = "en-US",
             FlowDirection = FlowDirection.LeftToRight
         };
-        for (int h = 0; h <= ceilingHours; h += 5)
+        for (int h = 0; h <= ceilingHours; h += stepHours)
         {
             double fraction = (double)h / ceilingHours;
             double y = TopHeadroom + PlotAreaHeight * (1.0 - fraction);
@@ -79,8 +80,8 @@ internal sealed class ReportsChart : Grid
         var gridStroke = Presentation.ThemeBrush("FkSecondary", this);
         const double gridOpacity = 0.38;
 
-        // Horizontal lines at each 5h tick
-        for (int h = 0; h <= ceilingHours; h += 5)
+        // Horizontal lines at each stepHours tick
+        for (int h = 0; h <= ceilingHours; h += stepHours)
         {
             double fraction = (double)h / ceilingHours;
             double y = TopHeadroom + PlotAreaHeight * (1.0 - fraction);
@@ -225,8 +226,10 @@ internal sealed class ReportsChart : Grid
                     vLines[c].X2 = x;
                 }
 
-                // Update bar widths: ~72% of column width, clamped comfortably
-                double dynamicBarWidth = Math.Clamp(Math.Floor(colW * 0.72), 24, 108);
+                // Update bar widths: ~72% for Weekly, ~58% for Monthly, clamped comfortably
+                double fillRatio = period == ReportPeriod.Monthly ? 0.58 : 0.72;
+                double maxBarWidth = period == ReportPeriod.Monthly ? 128 : 116;
+                double dynamicBarWidth = Math.Clamp(Math.Floor(colW * fillRatio), 24, maxBarWidth);
                 foreach (var bar in barBorders)
                 {
                     bar.Width = dynamicBarWidth;

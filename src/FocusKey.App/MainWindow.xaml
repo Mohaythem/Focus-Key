@@ -33,114 +33,136 @@
   </Grid>
   <ScrollViewer x:Name="PageScrollViewer" Grid.Column="1" HorizontalScrollBarVisibility="Disabled">
    <StackPanel x:Name="PageContent" Spacing="20" Padding="40,28,40,36" HorizontalAlignment="Stretch">
-    <TextBlock x:Name="PageTitle" Text="Today" Style="{StaticResource FkText}" FontSize="16" FontWeight="Medium" AutomationProperties.HeadingLevel="Level1" CharacterSpacing="-10"/>
+    <TextBlock x:Name="PageTitle" Text="Today" Style="{StaticResource FkText}" FontSize="16" FontWeight="Medium" AutomationProperties.HeadingLevel="Level1" CharacterSpacing="-10" Visibility="Collapsed"/>
     <ContentControl x:Name="SettingsHost" Visibility="Collapsed" HorizontalContentAlignment="Stretch"/>
     <ContentControl x:Name="ReportsHost" Visibility="Collapsed" HorizontalContentAlignment="Stretch"/>
-    <StackPanel x:Name="TodayPanel" Spacing="20" HorizontalAlignment="Stretch">
-     <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-      <StackPanel Spacing="2"><TextBlock x:Name="DayLabel" Style="{StaticResource FkMutedText}" FontSize="11"/><TextBlock x:Name="LoadStatus" Style="{StaticResource FkDimText}" AutomationProperties.LiveSetting="Polite"/></StackPanel>
-      <Button Grid.Column="1" x:Name="RefreshButton" Click="OnRefreshClick" AutomationProperties.Name="Refresh Today" ToolTipService.ToolTip="Refresh Today"><FontIcon Glyph="&#xE72C;" FontSize="14"/></Button>
+    <StackPanel x:Name="TodayPanel" Spacing="20" HorizontalAlignment="Center" MaxWidth="{StaticResource FkUtilityPageMaxWidth}">
+     <!-- Today Header: Title, Localized Date, and Refresh Action -->
+     <Grid ColumnSpacing="8">
+      <Grid.ColumnDefinitions>
+       <ColumnDefinition Width="*"/>
+       <ColumnDefinition Width="Auto"/>
+      </Grid.ColumnDefinitions>
+      <StackPanel Spacing="4">
+       <TextBlock Text="Today" Style="{StaticResource FkPageTitleText}" AutomationProperties.HeadingLevel="Level1"/>
+       <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+        <TextBlock x:Name="DayLabel" Style="{StaticResource FkMutedText}" FontSize="12"/>
+        <TextBlock x:Name="LoadStatus" Style="{StaticResource FkDimText}" FontSize="11" AutomationProperties.LiveSetting="Polite"/>
+       </StackPanel>
+      </StackPanel>
+      <Button Grid.Column="1" x:Name="RefreshButton" Click="OnRefreshClick" AutomationProperties.Name="Refresh Today" ToolTipService.ToolTip="Refresh" VerticalAlignment="Top" Padding="8,6" CornerRadius="{StaticResource FkControlRadius}">
+       <FontIcon Glyph="&#xE72C;" FontSize="13"/>
+      </Button>
      </Grid>
      <TextBlock x:Name="ErrorText" Style="{StaticResource FkText}" Visibility="Collapsed" AutomationProperties.LiveSetting="Polite"/>
      <Border x:Name="CurrentCard" Style="{StaticResource FkCard}" HorizontalAlignment="Stretch" Padding="28,24,28,24" MinHeight="180">
       <Grid>
        <!-- Active Session View (Hidden when Idle) -->
-       <StackPanel x:Name="ActiveContent" Spacing="12" Visibility="Collapsed">
-        <TextBlock x:Name="CurrentHeading" Text="CURRENT SESSION" Style="{StaticResource FkSectionText}"/>
-        <Grid ColumnSpacing="16">
+       <StackPanel x:Name="ActiveContent" Spacing="14" Visibility="Collapsed">
+        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+         <Ellipse x:Name="ActiveTypeDot" Width="6" Height="6" VerticalAlignment="Center"/>
+         <TextBlock x:Name="CurrentHeading" Text="WORK SESSION" Style="{StaticResource FkSectionText}" VerticalAlignment="Center"/>
+        </StackPanel>
+        <Grid ColumnSpacing="16" Margin="0,2,0,0">
          <Grid.ColumnDefinitions>
           <ColumnDefinition Width="*"/>
           <ColumnDefinition Width="Auto"/>
          </Grid.ColumnDefinitions>
-         <StackPanel Spacing="4">
-          <TextBlock x:Name="RunningType" Style="{StaticResource FkMutedText}" FontSize="12"/>
-          <TextBlock x:Name="RunningText" Style="{StaticResource FkText}" FontSize="40" FontFamily="Consolas"/>
-          <TextBlock x:Name="RunningHint" Style="{StaticResource FkMutedText}" FontSize="11"/>
+         <StackPanel Spacing="2" VerticalAlignment="Center">
+          <TextBlock x:Name="RunningText" Style="{StaticResource FkDisplayTimerText}"/>
+          <TextBlock x:Name="RunningHint" Text="Remaining" Style="{StaticResource FkMutedText}" FontSize="12"/>
          </StackPanel>
-         <Button Grid.Column="1" x:Name="StopButton" Content="Stop" Click="OnStopClick" Visibility="Collapsed" VerticalAlignment="Bottom" Padding="16,7" FontSize="12"/>
+         <Button Grid.Column="1" x:Name="StopButton" Content="Stop" Click="OnStopClick" Visibility="Collapsed" VerticalAlignment="Bottom" Padding="18,7" FontSize="12" CornerRadius="{StaticResource FkControlRadius}" AutomationProperties.Name="Stop Session"/>
         </Grid>
-        <ProgressBar x:Name="SessionProgress" Minimum="0" Maximum="100" Visibility="Collapsed" Height="3" AutomationProperties.Name="Session progress"/>
+        <ProgressBar x:Name="SessionProgress" Minimum="0" Maximum="100" Visibility="Collapsed" Height="3" CornerRadius="1.5" AutomationProperties.Name="Session progress" Margin="0,4,0,0"/>
        </StackPanel>
 
        <!-- Idle Hero Launcher View (Visible when Idle) -->
        <StackPanel x:Name="IdleContent" Spacing="14" Visibility="Visible">
-        <Grid>
+        <TextBlock Text="START A SESSION" Style="{StaticResource FkSectionText}" VerticalAlignment="Center"/>
+        <Grid ColumnSpacing="12" HorizontalAlignment="Stretch">
          <Grid.ColumnDefinitions>
           <ColumnDefinition Width="*"/>
-          <ColumnDefinition Width="Auto"/>
+          <ColumnDefinition Width="*"/>
          </Grid.ColumnDefinitions>
-         <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-          <TextBlock Text="CURRENT SESSION" Style="{StaticResource FkSectionText}" VerticalAlignment="Center"/>
-          <TextBlock Text="·" Style="{StaticResource FkMutedText}" FontSize="12" VerticalAlignment="Center"/>
-          <TextBlock Text="Choose a session" Style="{StaticResource FkMutedText}" FontSize="12" VerticalAlignment="Center"/>
-         </StackPanel>
-          <Border Grid.Column="1" VerticalAlignment="Center" Background="{ThemeResource FkSurface2}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="8,3">
-           <TextBlock x:Name="HeroOverlayShortcutHint" Text="Shift + F3" FontFamily="Consolas" FontSize="11" Foreground="{ThemeResource FkSecondary}"/>
-          </Border>
-         </Grid>
-         <Grid ColumnSpacing="12" HorizontalAlignment="Stretch">
-          <Grid.ColumnDefinitions>
-           <ColumnDefinition Width="*"/>
-           <ColumnDefinition Width="*"/>
-          </Grid.ColumnDefinitions>
 
-          <!-- Work Hero Surface -->
-          <Border x:Name="WorkChoiceCard" Grid.Column="0" CornerRadius="8" BorderThickness="1" Padding="18,14" MinHeight="84"
-                  PointerEntered="OnWorkCardPointerEntered" PointerExited="OnWorkCardPointerExited">
-           <Grid ColumnSpacing="12">
-            <Grid.ColumnDefinitions>
-             <ColumnDefinition Width="*"/>
-             <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-            <StackPanel Spacing="2" VerticalAlignment="Center">
-             <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-              <Ellipse x:Name="WorkChoiceDot" Width="6" Height="6" VerticalAlignment="Center"/>
-              <TextBlock x:Name="WorkChoiceMode" Text="WORK" FontSize="11" FontWeight="SemiBold" CharacterSpacing="60" Style="{StaticResource FkMutedText}"/>
-             </StackPanel>
-             <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Bottom">
-              <TextBlock x:Name="WorkDurationNumber" Text="30" FontSize="26" FontWeight="SemiBold" Style="{StaticResource FkText}" FontFamily="Segoe UI Variable"/>
-              <TextBlock x:Name="WorkDurationUnit" Text="min" FontSize="12" Style="{StaticResource FkMutedText}" FontFamily="Segoe UI Variable" VerticalAlignment="Bottom" Margin="0,0,0,4"/>
-             </StackPanel>
+         <!-- Work Hero Surface -->
+         <Border x:Name="WorkChoiceCard" Grid.Column="0" CornerRadius="{StaticResource FkHeroRadius}" BorderThickness="1" Padding="18,14" MinHeight="84"
+                 PointerEntered="OnWorkCardPointerEntered" PointerExited="OnWorkCardPointerExited" Tapped="OnStartWorkClick">
+          <Grid ColumnSpacing="12">
+           <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+           </Grid.ColumnDefinitions>
+           <StackPanel Spacing="2" VerticalAlignment="Center">
+            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+             <Ellipse x:Name="WorkChoiceDot" Width="6" Height="6" VerticalAlignment="Center"/>
+             <TextBlock x:Name="WorkChoiceMode" Text="WORK" FontSize="11" FontWeight="SemiBold" CharacterSpacing="60" Style="{StaticResource FkMutedText}"/>
             </StackPanel>
-            <Button Grid.Column="1" x:Name="StartWorkButton" Style="{StaticResource FkLauncherStartButton}" Content="Start" Click="OnStartWorkClick" AutomationProperties.Name="Start Work"/>
-           </Grid>
-          </Border>
+            <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Bottom">
+             <TextBlock x:Name="WorkDurationNumber" Text="30" FontSize="26" FontWeight="SemiBold" Style="{StaticResource FkText}" FontFamily="Segoe UI Variable"/>
+             <TextBlock x:Name="WorkDurationUnit" Text="min" FontSize="12" Style="{StaticResource FkMutedText}" FontFamily="Segoe UI Variable" VerticalAlignment="Bottom" Margin="0,0,0,4"/>
+            </StackPanel>
+           </StackPanel>
+           <Button Grid.Column="1" x:Name="StartWorkButton" Style="{StaticResource FkLauncherStartButton}" Content="Start" Click="OnStartWorkClick" AutomationProperties.Name="Start Work"/>
+          </Grid>
+         </Border>
 
-          <!-- Break Hero Surface -->
-          <Border x:Name="BreakChoiceCard" Grid.Column="1" CornerRadius="8" BorderThickness="1" Padding="18,14" MinHeight="84"
-                  PointerEntered="OnBreakCardPointerEntered" PointerExited="OnBreakCardPointerExited">
-           <Grid ColumnSpacing="12">
-            <Grid.ColumnDefinitions>
-             <ColumnDefinition Width="*"/>
-             <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-            <StackPanel Spacing="2" VerticalAlignment="Center">
-             <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-              <Ellipse x:Name="BreakChoiceDot" Width="6" Height="6" VerticalAlignment="Center"/>
-              <TextBlock x:Name="BreakChoiceMode" Text="BREAK" FontSize="11" FontWeight="SemiBold" CharacterSpacing="60" Style="{StaticResource FkMutedText}"/>
-             </StackPanel>
-             <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Bottom">
-              <TextBlock x:Name="BreakDurationNumber" Text="10" FontSize="26" FontWeight="SemiBold" Style="{StaticResource FkText}" FontFamily="Segoe UI Variable"/>
-              <TextBlock x:Name="BreakDurationUnit" Text="min" FontSize="12" Style="{StaticResource FkMutedText}" FontFamily="Segoe UI Variable" VerticalAlignment="Bottom" Margin="0,0,0,4"/>
-             </StackPanel>
+         <!-- Break Hero Surface -->
+         <Border x:Name="BreakChoiceCard" Grid.Column="1" CornerRadius="{StaticResource FkHeroRadius}" BorderThickness="1" Padding="18,14" MinHeight="84"
+                 PointerEntered="OnBreakCardPointerEntered" PointerExited="OnBreakCardPointerExited" Tapped="OnStartBreakClick">
+          <Grid ColumnSpacing="12">
+           <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+           </Grid.ColumnDefinitions>
+           <StackPanel Spacing="2" VerticalAlignment="Center">
+            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+             <Ellipse x:Name="BreakChoiceDot" Width="6" Height="6" VerticalAlignment="Center"/>
+             <TextBlock x:Name="BreakChoiceMode" Text="BREAK" FontSize="11" FontWeight="SemiBold" CharacterSpacing="60" Style="{StaticResource FkMutedText}"/>
             </StackPanel>
-            <Button Grid.Column="1" x:Name="StartBreakButton" Style="{StaticResource FkLauncherStartButton}" Content="Start" Click="OnStartBreakClick" AutomationProperties.Name="Start Break"/>
-           </Grid>
-          </Border>
+            <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Bottom">
+             <TextBlock x:Name="BreakDurationNumber" Text="10" FontSize="26" FontWeight="SemiBold" Style="{StaticResource FkText}" FontFamily="Segoe UI Variable"/>
+             <TextBlock x:Name="BreakDurationUnit" Text="min" FontSize="12" Style="{StaticResource FkMutedText}" FontFamily="Segoe UI Variable" VerticalAlignment="Bottom" Margin="0,0,0,4"/>
+            </StackPanel>
+           </StackPanel>
+           <Button Grid.Column="1" x:Name="StartBreakButton" Style="{StaticResource FkLauncherStartButton}" Content="Start" Click="OnStartBreakClick" AutomationProperties.Name="Start Break"/>
+          </Grid>
+         </Border>
         </Grid>
        </StackPanel>
       </Grid>
      </Border>
      <Grid x:Name="SummaryGrid" RowSpacing="12" ColumnSpacing="12" HorizontalAlignment="Stretch">
       <Grid.RowDefinitions><RowDefinition/><RowDefinition/></Grid.RowDefinitions><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-      <Border Style="{StaticResource FkCard}" Padding="22,24"><StackPanel Spacing="6"><TextBlock x:Name="FocusValue" Text="—" Style="{StaticResource FkMetricText}"/><TextBlock Text="Focus Time" Style="{StaticResource FkText}" FontSize="12" FontWeight="Medium"/><TextBlock Text="today" Style="{StaticResource FkMutedText}" FontSize="11"/></StackPanel></Border>
-      <Border Grid.Column="1" Style="{StaticResource FkCard}" Padding="22,24"><StackPanel Spacing="6"><TextBlock x:Name="WorkValue" Text="—" Style="{StaticResource FkMetricText}"/><TextBlock Text="Work Sessions" Style="{StaticResource FkText}" FontSize="12" FontWeight="Medium"/><TextBlock Text="completed" Style="{StaticResource FkMutedText}" FontSize="11"/></StackPanel></Border>
-      <Border Grid.Row="1" Style="{StaticResource FkCard}" Padding="22,24"><StackPanel Spacing="6"><TextBlock x:Name="BreakValue" Text="—" Style="{StaticResource FkMetricText}"/><TextBlock Text="Break Time" Style="{StaticResource FkText}" FontSize="12" FontWeight="Medium"/><TextBlock x:Name="BreakDetail" Text="today" Style="{StaticResource FkMutedText}" FontSize="11"/></StackPanel></Border>
-      <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource FkCard}" Padding="22,24"><StackPanel Spacing="6"><TextBlock x:Name="CompletionValue" Text="—" Style="{StaticResource FkMetricText}"/><TextBlock Text="Completion" Style="{StaticResource FkText}" FontSize="12" FontWeight="Medium"/><TextBlock Text="rate" Style="{StaticResource FkMutedText}" FontSize="11"/></StackPanel></Border>
+      <Border Style="{StaticResource FkCard}" Padding="20,18">
+       <StackPanel Spacing="6">
+        <TextBlock x:Name="FocusValue" Text="—" Style="{StaticResource FkMetricValueText}"/>
+        <TextBlock Text="Focus Time" Style="{StaticResource FkText}" FontSize="12" FontWeight="Medium"/>
+       </StackPanel>
+      </Border>
+      <Border Grid.Column="1" Style="{StaticResource FkCard}" Padding="20,18">
+       <StackPanel Spacing="6">
+        <TextBlock x:Name="WorkValue" Text="—" Style="{StaticResource FkMetricValueText}"/>
+        <TextBlock Text="Completed Work" Style="{StaticResource FkText}" FontSize="12" FontWeight="Medium"/>
+       </StackPanel>
+      </Border>
+      <Border Grid.Row="1" Style="{StaticResource FkCard}" Padding="20,18">
+       <StackPanel Spacing="6">
+        <TextBlock x:Name="BreakValue" Text="—" Style="{StaticResource FkMetricValueText}"/>
+        <TextBlock Text="Break Time" Style="{StaticResource FkText}" FontSize="12" FontWeight="Medium"/>
+       </StackPanel>
+      </Border>
+      <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource FkCard}" Padding="20,18">
+       <StackPanel Spacing="6">
+        <TextBlock x:Name="CompletionValue" Text="—" Style="{StaticResource FkMetricValueText}"/>
+        <TextBlock Text="Completion Rate" Style="{StaticResource FkText}" FontSize="12" FontWeight="Medium"/>
+       </StackPanel>
+      </Border>
      </Grid>
      <Border Style="{StaticResource FkCard}" Padding="0" HorizontalAlignment="Stretch">
       <StackPanel Spacing="0">
-       <Button x:Name="ActivityHeaderButton" Click="OnToggleActivityClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="20,12" Background="Transparent" BorderThickness="0" CornerRadius="4,4,0,0" AutomationProperties.Name="Activity, toggle collapse">
+       <Button x:Name="ActivityHeaderButton" Click="OnToggleActivityClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="20,14" Background="Transparent" BorderThickness="0" CornerRadius="{StaticResource FkControlRadius}" AutomationProperties.Name="Activity, toggle collapse">
         <Grid>
          <Grid.ColumnDefinitions>
           <ColumnDefinition Width="*"/>
@@ -151,8 +173,8 @@
         </Grid>
        </Button>
        <Border x:Name="ActivityContentPanel" BorderBrush="{ThemeResource FkBorder}" BorderThickness="0,1,0,0" Visibility="Collapsed">
-        <StackPanel Padding="20,0">
-         <TextBlock x:Name="EmptyActivity" Text="No sessions yet. Your sessions will appear here." Style="{StaticResource FkMutedText}" Padding="0,12"/>
+        <StackPanel Padding="20,4,20,14">
+         <TextBlock x:Name="EmptyActivity" Text="No sessions yet today." Style="{StaticResource FkMutedText}" FontSize="12" Padding="0,14" HorizontalAlignment="Center"/>
          <ItemsControl x:Name="ActivityRows" HorizontalContentAlignment="Stretch"/>
         </StackPanel>
        </Border>

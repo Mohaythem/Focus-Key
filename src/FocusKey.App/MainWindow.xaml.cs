@@ -52,7 +52,6 @@ public sealed partial class MainWindow : Window
     internal void ApplyShortcut(GlobalShortcut shortcut)
     {
         string text = shortcut.ToString();
-        if (HeroOverlayShortcutHint is not null) HeroOverlayShortcutHint.Text = text;
         if (SidebarOverlayShortcutHint is not null) SidebarOverlayShortcutHint.Text = text;
     }
 
@@ -137,7 +136,9 @@ public sealed partial class MainWindow : Window
             bool narrow = MainSurface.ActualWidth < 740;
             NavColumn.Width = new GridLength(narrow ? 180 : 216);
             PageContent.Padding = new Thickness(narrow ? 24 : 40, 28, narrow ? 24 : 40, 36);
+            UpdateTodayPanelWidth();
         };
+        PageScrollViewer.SizeChanged += (_, _) => UpdateTodayPanelWidth();
         _today = new TodayController(startup.Today.ReadAsync, start, stop, report);
         _today.Changed += Render;
         _displayTimer = DispatcherQueue.CreateTimer();
@@ -146,6 +147,7 @@ public sealed partial class MainWindow : Window
         Closed += (_, _) => { _visible = false; _displayTimer.Stop(); _today.Dispose(); _reports.Dispose(); };
         UpdateActivityVisuals();
         Render();
+        UpdateTodayPanelWidth();
         startup.Logger.Info("Today main window created.");
     }
 
@@ -154,6 +156,7 @@ public sealed partial class MainWindow : Window
         _settings.CommitPendingDurations();
         _visible = true;
         _reports.Hide();
+        UpdateTodayPanelWidth();
         await _today.OpenAsync();
     }
 
@@ -198,7 +201,7 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private async void OnTodayClick(object sender, RoutedEventArgs args) { _settings.CommitPendingDurations(); _reports.Hide(); await _today.NavigateAsync(MainPage.Today); }
+    private async void OnTodayClick(object sender, RoutedEventArgs args) { _settings.CommitPendingDurations(); _reports.Hide(); UpdateTodayPanelWidth(); await _today.NavigateAsync(MainPage.Today); }
     private async void OnReportsClick(object sender, RoutedEventArgs args) => await OpenReportsAsync();
     private async void OnSettingsClick(object sender, RoutedEventArgs args)
     {
@@ -219,6 +222,20 @@ public sealed partial class MainWindow : Window
             ActivityChevron.Glyph = _activityCollapsed ? "\uE70D" : "\uE70E";
         if (ActivityContentPanel is not null)
             ActivityContentPanel.Visibility = _activityCollapsed ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private void UpdateTodayPanelWidth()
+    {
+        if (TodayPanel is null || PageScrollViewer is null || PageContent is null) return;
+        if (PageScrollViewer.ActualWidth > 0)
+        {
+            PageContent.Width = PageScrollViewer.ActualWidth;
+            double available = PageScrollViewer.ActualWidth - PageContent.Padding.Left - PageContent.Padding.Right;
+            if (available > 0)
+            {
+                TodayPanel.Width = Math.Min(880, available);
+            }
+        }
     }
 
     private async void OnToggleActivityClick(object sender, RoutedEventArgs args)
@@ -318,7 +335,7 @@ public sealed partial class MainWindow : Window
         ReportsNav.IsChecked = _today.Page == MainPage.Reports;
         SettingsNav.IsChecked = _today.Page == MainPage.Settings;
         PageTitle.Text = _today.Page.ToString();
-        PageTitle.Visibility = _today.Page == MainPage.Reports ? Visibility.Collapsed : Visibility.Visible;
+        PageTitle.Visibility = _today.Page == MainPage.Settings ? Visibility.Visible : Visibility.Collapsed;
         TodayPanel.Visibility = isToday ? Visibility.Visible : Visibility.Collapsed;
         SettingsHost.Visibility = _today.Page == MainPage.Settings ? Visibility.Visible : Visibility.Collapsed;
         ReportsHost.Visibility = _today.Page == MainPage.Reports ? Visibility.Visible : Visibility.Collapsed;
@@ -329,18 +346,17 @@ public sealed partial class MainWindow : Window
         if (_today.Snapshot is { } snapshot)
         {
             DayLabel.Text = snapshot.Date.ToString("dddd, d MMMM yyyy", CultureInfo.InvariantCulture);
-            ToolTipService.SetToolTip(DayLabel, $"{snapshot.TimeZone.DisplayName}. Sessions grouped by local start date.");
+            ToolTipService.SetToolTip(DayLabel, snapshot.TimeZone.DisplayName);
             FocusValue.Text = Presentation.Duration(snapshot.WorkTime);
             WorkValue.Text = snapshot.CompletedWorkCount.ToString(CultureInfo.InvariantCulture);
             BreakValue.Text = Presentation.Duration(snapshot.BreakTime);
-            BreakDetail.Text = "today";
             CompletionValue.Text = snapshot.CompletionRate is { } rate ? rate.ToString("0", CultureInfo.InvariantCulture) + "%" : "—";
             ActivityRows.ItemsSource = snapshot.Sessions.Select(session =>
             {
                 string started = TimeZoneInfo.ConvertTime(session.StartedAt, snapshot.TimeZone).ToString("HH:mm", CultureInfo.InvariantCulture);
                 string duration = session.ActualDuration is { } actual ? Presentation.Duration(actual) : $"{Presentation.Duration(session.PlannedDuration)} planned";
-                var row = new Grid { ColumnSpacing = 16, Padding = new Thickness(0, 12, 0, 12) };
-                foreach (var width in new[] { new GridLength(40), new GridLength(4), new GridLength(1, GridUnitType.Star), GridLength.Auto, new GridLength(72) })
+                var row = new Grid { ColumnSpacing = 16, Padding = new Thickness(0, 10, 0, 10) };
+                foreach (var width in new[] { new GridLength(44), new GridLength(6), new GridLength(1, GridUnitType.Star), GridLength.Auto, new GridLength(72) })
                     row.ColumnDefinitions.Add(new ColumnDefinition { Width = width });
                 var color = session.Type == SessionType.Work ? _colors.Work : _colors.Break;
                 var timeText = Presentation.Text(started, 11, true);
@@ -388,6 +404,7 @@ public sealed partial class MainWindow : Window
             ActiveContent.Visibility = Visibility.Collapsed;
             IdleContent.Visibility = Visibility.Visible;
             CurrentCard.ClearValue(Border.BackgroundProperty);
+            CurrentCard.ClearValue(Border.BorderBrushProperty);
             CurrentCard.Padding = new Thickness(28, 24, 28, 24);
             CurrentCard.MinHeight = 180;
 
@@ -406,20 +423,32 @@ public sealed partial class MainWindow : Window
         var snapshot = SessionSnapshot.For(running, DateTimeOffset.UtcNow);
         var remaining = TimeSpan.FromSeconds(Math.Ceiling(snapshot.Remaining.TotalSeconds));
         var color = running.Type == SessionType.Work ? _colors.Work : _colors.Break;
-        var foreground = Presentation.Stroke(color);
-        CurrentCard.Background = SessionColorBrush.Create(color);
+        bool isDark = IsCurrentThemeDark();
+
+        CurrentCard.Background = SessionColorBrush.CreateTint(color, isDark, 0.06);
+        CurrentCard.BorderBrush = SessionColorBrush.CreateSemanticBorder(color, 0.40);
         CurrentCard.Padding = new Thickness(28, 24, 28, 24);
         CurrentCard.MinHeight = 180;
-        CurrentHeading.Foreground = RunningType.Foreground = RunningText.Foreground = RunningHint.Foreground = foreground;
-        RunningType.Text = running.Type.ToString();
-        RunningType.Visibility = Visibility.Visible;
-        RunningText.FontSize = 40;
-        RunningText.FontFamily = new FontFamily("Consolas");
+
+        ActiveTypeDot.Fill = SessionColorBrush.Create(color);
+        CurrentHeading.Text = running.Type == SessionType.Work ? "WORK SESSION" : "BREAK SESSION";
+        CurrentHeading.Foreground = Presentation.ThemeBrush("FkSecondary", isDark);
+
         RunningText.Text = snapshot.HasReachedPlannedEnd ? "00:00" : string.Create(CultureInfo.InvariantCulture, $"{(long)remaining.TotalMinutes:00}:{remaining.Seconds:00}");
-        RunningHint.Text = snapshot.HasReachedPlannedEnd ? "Finishing…" : "remaining";
-        SessionProgress.Value = 100 * snapshot.Elapsed.TotalSeconds / snapshot.PlannedDuration.TotalSeconds;
-        SessionProgress.Foreground = foreground;
-        SessionProgress.Visibility = StopButton.Visibility = Visibility.Visible;
+        RunningText.Foreground = Presentation.ThemeBrush("FkForeground", isDark);
+
+        RunningHint.Text = snapshot.HasReachedPlannedEnd ? "Finishing…" : "Remaining";
+        RunningHint.Foreground = Presentation.ThemeBrush("FkSecondary", isDark);
+
+        SessionProgress.Value = Math.Clamp(100 * snapshot.Elapsed.TotalSeconds / snapshot.PlannedDuration.TotalSeconds, 0.0, 100.0);
+        SessionProgress.Foreground = SessionColorBrush.Create(color);
+        SessionProgress.Background = Presentation.ThemeBrush("FkSurface2", isDark);
+        SessionProgress.Visibility = Visibility.Visible;
+
+        StopButton.Background = Presentation.ThemeBrush("FkSurface2", isDark);
+        StopButton.BorderBrush = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", CurrentCard);
+        StopButton.Foreground = Presentation.ThemeBrush("FkSecondary", isDark);
+        StopButton.Visibility = Visibility.Visible;
         StopButton.IsEnabled = !_today.IsRefreshing && !_today.IsStopping && !_today.IsStarting && _today.Error is null;
 
         if (stateChanged)
@@ -473,8 +502,4 @@ public sealed partial class MainWindow : Window
         _displayTimer.Interval = wait < TimeSpan.FromSeconds(1) ? TimeSpan.FromSeconds(1) : wait;
         _displayTimer.Start();
     }
-
-    private static string Duration(TimeSpan duration) =>
-        duration.TotalHours >= 1 ? $"{(long)duration.TotalHours}h {duration.Minutes:00}m {duration.Seconds:00}s" :
-        $"{(long)duration.TotalMinutes}m {duration.Seconds:00}s";
 }

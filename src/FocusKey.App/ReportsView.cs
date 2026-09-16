@@ -58,9 +58,13 @@ internal sealed class ReportsView : UserControl, IDisposable
         topHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         topHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-        var title = Presentation.Text("Reports", 16);
-        title.FontWeight = Microsoft.UI.Text.FontWeights.Medium;
-        title.CharacterSpacing = -10;
+        var title = new TextBlock
+        {
+            Text = "Reports",
+            Style = (Style)Application.Current.Resources["FkPageTitleText"],
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        AutomationProperties.SetHeadingLevel(title, Microsoft.UI.Xaml.Automation.Peers.AutomationHeadingLevel.Level1);
         topHeader.Children.Add(title);
 
         _periodSelector.HorizontalAlignment = HorizontalAlignment.Right;
@@ -84,11 +88,11 @@ internal sealed class ReportsView : UserControl, IDisposable
             HorizontalAlignment = HorizontalAlignment.Right,
             VerticalAlignment = VerticalAlignment.Center
         };
-        navRow.Children.Add(NavButton("‹", () => _reports.MoveAsync(-1), "Previous period"));
+        navRow.Children.Add(NavButton(new FontIcon { Glyph = "\uE76B", FontSize = 12 }, () => _reports.MoveAsync(-1), "Previous period", "Previous period"));
         navRow.Children.Add(_date);
-        navRow.Children.Add(NavButton("›", () => _reports.MoveAsync(1), "Next period"));
-        navRow.Children.Add(NavButton("Today", _reports.CurrentAsync, "Current period"));
-        navRow.Children.Add(NavButton("↻", _reports.RefreshAsync, "Refresh reports"));
+        navRow.Children.Add(NavButton(new FontIcon { Glyph = "\uE76C", FontSize = 12 }, () => _reports.MoveAsync(1), "Next period", "Next period"));
+        navRow.Children.Add(NavButton("Current", _reports.CurrentAsync, "Current period", "Current period"));
+        navRow.Children.Add(NavButton(new FontIcon { Glyph = "\uE72C", FontSize = 12 }, _reports.RefreshAsync, "Refresh reports", "Refresh"));
         Grid.SetColumn(navRow, 1);
         navGrid.Children.Add(navRow);
 
@@ -195,9 +199,24 @@ internal sealed class ReportsView : UserControl, IDisposable
             // 3-column metric tiles matching Figma layout
             var metrics = new Grid { ColumnSpacing = 8 };
             for (var i = 0; i < 3; i++) metrics.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            metrics.Children.Add(Metric("Focus Time", ReportsFormatting.FormatDuration(totals.FocusTime), "work sessions", 0));
-            metrics.Children.Add(Metric("Break Time", ReportsFormatting.FormatDuration(totals.BreakTime), "break sessions", 1));
-            metrics.Children.Add(Metric("Completion Rate", totals.CompletionRate is { } rate ? ReportsFormatting.FormatRate(rate) : "—", "sessions finished", 2));
+            var (card1, val1) = Metric("Focus Time", ReportsFormatting.FormatDuration(totals.FocusTime), "work sessions", 0);
+            var (card2, val2) = Metric("Break Time", ReportsFormatting.FormatDuration(totals.BreakTime), "break sessions", 1);
+            var (card3, val3) = Metric("Completion Rate", totals.CompletionRate is { } rate ? ReportsFormatting.FormatRate(rate) : "—", "sessions finished", 2);
+            metrics.Children.Add(card1);
+            metrics.Children.Add(card2);
+            metrics.Children.Add(card3);
+
+            metrics.SizeChanged += (_, _) =>
+            {
+                if (metrics.ActualWidth <= 0) return;
+                bool compact = metrics.ActualWidth < 540;
+                double fontSize = compact ? 21 : 28;
+                var pad = new Thickness(compact ? 12 : 20, 18, compact ? 12 : 20, 18);
+                card1.Padding = pad; val1.FontSize = fontSize;
+                card2.Padding = pad; val2.FontSize = fontSize;
+                card3.Padding = pad; val3.FontSize = fontSize;
+            };
+
             _results.Children.Add(metrics);
 
             // Secondary streak companion card
@@ -232,7 +251,7 @@ internal sealed class ReportsView : UserControl, IDisposable
             TextReadingOrder = TextReadingOrder.UseFlowDirection,
             Margin = new Thickness(0, 0, 0, 2)
         };
-        if (Application.Current?.Resources["FkMetricText"] is Style metricStyle)
+        if (Application.Current?.Resources["FkMetricValueText"] is Style metricStyle)
         {
             curValue.Style = metricStyle;
             curValue.FontSize = 20;
@@ -242,7 +261,6 @@ internal sealed class ReportsView : UserControl, IDisposable
         var curLabel = Presentation.Text("Current Streak", 12);
         curLabel.FontWeight = Microsoft.UI.Text.FontWeights.Medium;
         left.Children.Add(curLabel);
-        left.Children.Add(Presentation.DimText("active focus streak", 11));
         AutomationProperties.SetName(left, $"Current Streak, {curValue.Text}");
         grid.Children.Add(left);
 
@@ -269,7 +287,7 @@ internal sealed class ReportsView : UserControl, IDisposable
             TextReadingOrder = TextReadingOrder.UseFlowDirection,
             Margin = new Thickness(0, 0, 0, 2)
         };
-        if (Application.Current?.Resources["FkMetricText"] is Style metricStyle2)
+        if (Application.Current?.Resources["FkMetricValueText"] is Style metricStyle2)
         {
             longValue.Style = metricStyle2;
             longValue.FontSize = 20;
@@ -279,13 +297,12 @@ internal sealed class ReportsView : UserControl, IDisposable
         var longLabel = Presentation.Text("Longest Streak", 12);
         longLabel.FontWeight = Microsoft.UI.Text.FontWeights.Medium;
         right.Children.Add(longLabel);
-        right.Children.Add(Presentation.DimText("all-time best streak", 11));
         AutomationProperties.SetName(right, $"Longest Streak, {longValue.Text}");
         Grid.SetColumn(right, 2);
         grid.Children.Add(right);
 
-        var card = Card(grid, 14);
-        card.Padding = new Thickness(20, 14, 20, 14);
+        var card = Card(grid, 18);
+        card.Padding = new Thickness(20, 18, 20, 18);
         return card;
     }
 
@@ -321,34 +338,6 @@ internal sealed class ReportsView : UserControl, IDisposable
         var chart = new ReportsChart(snapshot.Trend, snapshot.Period, palette);
         AutomationProperties.SetName(chart, "Focus activity trend chart");
         body.Children.Add(chart);
-
-        // Calendar info strip at bottom of card for Weekly mode
-        if (snapshot.Period == ReportPeriod.Weekly)
-        {
-            var infoStrip = new Border
-            {
-                Background = Presentation.ThemeBrush("FkSurface2", this),
-                BorderBrush = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", this),
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(4),
-                Padding = new Thickness(12, 8, 12, 8),
-                Margin = new Thickness(0, 4, 0, 0)
-            };
-            var infoStack = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, VerticalAlignment = VerticalAlignment.Center };
-            var calIcon = new FontIcon
-            {
-                Glyph = "\uE787", // Calendar icon
-                FontSize = 13,
-                Foreground = Presentation.ThemeBrush("FkSecondary", this),
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            infoStack.Children.Add(calIcon);
-            var infoText = Presentation.DimText("Showing the last 7 days. Today is on the right.", 11);
-            infoText.VerticalAlignment = VerticalAlignment.Center;
-            infoStack.Children.Add(infoText);
-            infoStrip.Child = infoStack;
-            body.Children.Add(infoStrip);
-        }
 
         return Card(body, 20);
     }
@@ -410,7 +399,7 @@ internal sealed class ReportsView : UserControl, IDisposable
         return string.Create(CultureInfo.InvariantCulture,
             $"{topStr}Total focus for the month: {ReportsFormatting.FormatDuration(s.Totals.FocusTime)} across {s.Totals.CompletedWork} completed sessions (completion rate {ReportsFormatting.FormatRate(s.Totals.CompletionRate ?? 0)}).");
     }
-    private UIElement Metric(string label, string value, string sub, int column)
+    private (Border Card, TextBlock Value) Metric(string label, string value, string sub, int column)
     {
         var p = new StackPanel { Spacing = 4 };
         var valueText = new TextBlock
@@ -424,7 +413,7 @@ internal sealed class ReportsView : UserControl, IDisposable
             TextReadingOrder = TextReadingOrder.UseFlowDirection,
             Margin = new Thickness(0, 0, 0, 4)
         };
-        if (Application.Current?.Resources["FkMetricText"] is Style metricStyle)
+        if (Application.Current?.Resources["FkMetricValueText"] is Style metricStyle)
         {
             valueText.Style = metricStyle;
             valueText.FontSize = 28;
@@ -435,10 +424,10 @@ internal sealed class ReportsView : UserControl, IDisposable
         labelText.FontWeight = Microsoft.UI.Text.FontWeights.Medium;
         p.Children.Add(labelText);
         p.Children.Add(Presentation.DimText(sub, 11));
-        var b = Card(p, 20);
-        b.Padding = new Thickness(20, 22, 20, 22);
+        var b = Card(p, 18);
+        b.Padding = new Thickness(20, 18, 20, 18);
         Grid.SetColumn(b, column);
-        return b;
+        return (b, valueText);
     }
 
     private static UIElement Swatch(string label, FocusKey.Foundation.Settings.HexColor color)
@@ -464,18 +453,20 @@ internal sealed class ReportsView : UserControl, IDisposable
         return b;
     }
 
-    private static Button NavButton(string label, Func<Task> action, string name)
+    private static Button NavButton(object content, Func<Task> action, string name, string? tooltip = null)
     {
         var b = new Button
         {
-            Content = label,
+            Content = content,
             MinWidth = 32,
             Height = 32,
             FontSize = 12,
             Padding = new Thickness(8, 0, 8, 0),
             VerticalAlignment = VerticalAlignment.Center,
+            CornerRadius = (CornerRadius)(Application.Current?.Resources["FkControlRadius"] ?? new CornerRadius(4)),
         };
         AutomationProperties.SetName(b, name);
+        if (!string.IsNullOrEmpty(tooltip)) ToolTipService.SetToolTip(b, tooltip);
         b.Click += async (_, _) => await action();
         return b;
     }

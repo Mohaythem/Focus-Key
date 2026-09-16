@@ -136,9 +136,9 @@ public sealed partial class MainWindow : Window
             bool narrow = MainSurface.ActualWidth < 740;
             NavColumn.Width = new GridLength(narrow ? 180 : 216);
             PageContent.Padding = new Thickness(narrow ? 24 : 40, 28, narrow ? 24 : 40, 36);
-            UpdateTodayPanelWidth();
+            UpdatePageWidths();
         };
-        PageScrollViewer.SizeChanged += (_, _) => UpdateTodayPanelWidth();
+        PageScrollViewer.SizeChanged += (_, _) => UpdatePageWidths();
         _today = new TodayController(startup.Today.ReadAsync, start, stop, report);
         _today.Changed += Render;
         _displayTimer = DispatcherQueue.CreateTimer();
@@ -147,7 +147,7 @@ public sealed partial class MainWindow : Window
         Closed += (_, _) => { _visible = false; _displayTimer.Stop(); _today.Dispose(); _reports.Dispose(); };
         UpdateActivityVisuals();
         Render();
-        UpdateTodayPanelWidth();
+        UpdatePageWidths();
         startup.Logger.Info("Today main window created.");
     }
 
@@ -156,7 +156,7 @@ public sealed partial class MainWindow : Window
         _settings.CommitPendingDurations();
         _visible = true;
         _reports.Hide();
-        UpdateTodayPanelWidth();
+        UpdatePageWidths();
         await _today.OpenAsync();
     }
 
@@ -185,6 +185,7 @@ public sealed partial class MainWindow : Window
     internal async Task OpenReportsAsync(bool scrollToChart = false)
     {
         _settings.CommitPendingDurations();
+        UpdatePageWidths();
         await _today.NavigateAsync(MainPage.Reports);
         await _reports.OpenAsync();
         if (scrollToChart)
@@ -201,8 +202,8 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private async void OnTodayClick(object sender, RoutedEventArgs args) { _settings.CommitPendingDurations(); _reports.Hide(); UpdateTodayPanelWidth(); await _today.NavigateAsync(MainPage.Today); }
-    private async void OnReportsClick(object sender, RoutedEventArgs args) => await OpenReportsAsync();
+    private async void OnTodayClick(object sender, RoutedEventArgs args) { _settings.CommitPendingDurations(); _reports.Hide(); UpdatePageWidths(); await _today.NavigateAsync(MainPage.Today); }
+    private async void OnReportsClick(object sender, RoutedEventArgs args) { UpdatePageWidths(); await OpenReportsAsync(); }
     private async void OnSettingsClick(object sender, RoutedEventArgs args)
     {
         _settings.CommitPendingDurations();
@@ -224,16 +225,19 @@ public sealed partial class MainWindow : Window
             ActivityContentPanel.Visibility = _activityCollapsed ? Visibility.Collapsed : Visibility.Visible;
     }
 
-    private void UpdateTodayPanelWidth()
+    private void UpdatePageWidths()
     {
-        if (TodayPanel is null || PageScrollViewer is null || PageContent is null) return;
+        if (PageScrollViewer is null || PageContent is null) return;
         if (PageScrollViewer.ActualWidth > 0)
         {
             PageContent.Width = PageScrollViewer.ActualWidth;
             double available = PageScrollViewer.ActualWidth - PageContent.Padding.Left - PageContent.Padding.Right;
             if (available > 0)
             {
-                TodayPanel.Width = Math.Min(880, available);
+                if (TodayPanel is not null)
+                    TodayPanel.Width = Math.Min(880, available);
+                if (ReportsHost is not null)
+                    ReportsHost.Width = Math.Min(1040, available);
             }
         }
     }

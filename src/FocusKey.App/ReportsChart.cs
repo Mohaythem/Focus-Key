@@ -18,8 +18,8 @@ namespace FocusKey;
 internal sealed class ReportsChart : Grid
 {
     private const double TopHeadroom = 28;
-    private const double PlotAreaHeight = 252;
-    private const double TotalPlotHeight = TopHeadroom + PlotAreaHeight; // 280 DIP
+    private const double PlotAreaHeight = 260;
+    private const double TotalPlotHeight = TopHeadroom + PlotAreaHeight; // 288 DIP
 
     internal ReportsChart(IReadOnlyList<ReportBucket> trend, ReportPeriod period, ReportsPalette palette)
     {
@@ -101,6 +101,7 @@ internal sealed class ReportsChart : Grid
 
         // Vertical lines separating day/week columns (plus left and right boundary lines)
         int count = trend.Count;
+        const double vGridOpacity = 0.18;
         for (int c = 0; c <= count; c++)
         {
             var line = new Line
@@ -112,7 +113,7 @@ internal sealed class ReportsChart : Grid
                 Stroke = gridStroke,
                 StrokeThickness = 1,
                 StrokeDashArray = new DoubleCollection { 3, 3 },
-                Opacity = gridOpacity
+                Opacity = vGridOpacity
             };
             vLines.Add(line);
             gridCanvas.Children.Add(line);
@@ -225,7 +226,7 @@ internal sealed class ReportsChart : Grid
                 }
 
                 // Update bar widths: ~72% of column width, clamped comfortably
-                double dynamicBarWidth = Math.Clamp(Math.Floor(colW * 0.72), 24, 76);
+                double dynamicBarWidth = Math.Clamp(Math.Floor(colW * 0.72), 24, 108);
                 foreach (var bar in barBorders)
                 {
                     bar.Width = dynamicBarWidth;

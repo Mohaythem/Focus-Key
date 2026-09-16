@@ -35,7 +35,7 @@
    <StackPanel x:Name="PageContent" Spacing="20" Padding="40,28,40,36" HorizontalAlignment="Stretch">
     <TextBlock x:Name="PageTitle" Text="Today" Style="{StaticResource FkText}" FontSize="16" FontWeight="Medium" AutomationProperties.HeadingLevel="Level1" CharacterSpacing="-10" Visibility="Collapsed"/>
     <ContentControl x:Name="SettingsHost" Visibility="Collapsed" HorizontalContentAlignment="Stretch"/>
-    <ContentControl x:Name="ReportsHost" Visibility="Collapsed" HorizontalContentAlignment="Stretch"/>
+    <ContentControl x:Name="ReportsHost" Visibility="Collapsed" HorizontalAlignment="Center" HorizontalContentAlignment="Stretch" MaxWidth="{StaticResource FkReportsPageMaxWidth}"/>
     <StackPanel x:Name="TodayPanel" Spacing="20" HorizontalAlignment="Center" MaxWidth="{StaticResource FkUtilityPageMaxWidth}">
      <!-- Today Header: Title, Localized Date, and Refresh Action -->
      <Grid ColumnSpacing="8">

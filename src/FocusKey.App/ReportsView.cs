@@ -219,11 +219,87 @@ internal sealed class ReportsView : UserControl, IDisposable
 
             _results.Children.Add(metrics);
 
-            // Secondary streak companion card
-            _results.Children.Add(StreaksCard(snapshot.Streaks));
+            // Responsive main content below metrics:
+            // Wide (>= 900 DIP): Side-by-side (73% Focus Activity chart / 27% secondary right rail with Streaks & Insight)
+            // Restored / narrow (< 900 DIP): Graceful collapse into stacked composition
+            var contentGrid = new Grid
+            {
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                RowSpacing = 12,
+                ColumnSpacing = 12
+            };
 
-            _results.Children.Add(ChartCard(snapshot));
-            _results.Children.Add(InsightCard(snapshot));
+            var chart = ChartCard(snapshot);
+            var sideRail = SideRailCard(snapshot);
+            var stackedStreaks = StreaksCard(snapshot.Streaks);
+            var stackedInsight = InsightCard(snapshot);
+
+            contentGrid.Children.Add(chart);
+            contentGrid.Children.Add(sideRail);
+            contentGrid.Children.Add(stackedStreaks);
+            contentGrid.Children.Add(stackedInsight);
+
+            bool? lastWide = null;
+            Action updateLayout = () =>
+            {
+                double width = contentGrid.ActualWidth;
+                bool isWide = width <= 0 || width >= 900;
+                if (lastWide == isWide) return;
+                lastWide = isWide;
+
+                contentGrid.ColumnDefinitions.Clear();
+                contentGrid.RowDefinitions.Clear();
+
+                if (isWide)
+                {
+                    // Wide desktop side-by-side mode (~73% chart, ~27% secondary rail)
+                    contentGrid.ColumnSpacing = 12;
+                    contentGrid.RowSpacing = 0;
+                    contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(73, GridUnitType.Star) });
+                    contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(27, GridUnitType.Star) });
+                    contentGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+                    Grid.SetColumn(chart, 0);
+                    Grid.SetRow(chart, 0);
+                    chart.Visibility = Visibility.Visible;
+
+                    Grid.SetColumn(sideRail, 1);
+                    Grid.SetRow(sideRail, 0);
+                    sideRail.Visibility = Visibility.Visible;
+
+                    stackedStreaks.Visibility = Visibility.Collapsed;
+                    stackedInsight.Visibility = Visibility.Collapsed;
+                }
+                else
+                {
+                    // Restored / narrow stacked mode
+                    contentGrid.ColumnSpacing = 0;
+                    contentGrid.RowSpacing = 12;
+                    contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                    contentGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                    contentGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                    contentGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+                    Grid.SetColumn(chart, 0);
+                    Grid.SetRow(chart, 0);
+                    chart.Visibility = Visibility.Visible;
+
+                    Grid.SetColumn(stackedStreaks, 0);
+                    Grid.SetRow(stackedStreaks, 1);
+                    stackedStreaks.Visibility = Visibility.Visible;
+
+                    Grid.SetColumn(stackedInsight, 0);
+                    Grid.SetRow(stackedInsight, 2);
+                    stackedInsight.Visibility = Visibility.Visible;
+
+                    sideRail.Visibility = Visibility.Collapsed;
+                }
+            };
+
+            contentGrid.SizeChanged += (_, _) => updateLayout();
+            updateLayout();
+
+            _results.Children.Add(contentGrid);
         }
         catch (Exception ex)
         {
@@ -231,7 +307,117 @@ internal sealed class ReportsView : UserControl, IDisposable
         }
     }
 
-    private UIElement StreaksCard(StreakStatistics streaks)
+    private FrameworkElement SideRailCard(ReportsSnapshot snapshot)
+    {
+        var grid = new Grid
+        {
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Stretch
+        };
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // 0: Current Streak
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // 1: Divider 1
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // 2: Longest Streak
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // 3: Divider 2
+        grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // 4: Insight
+
+        // 1. Current Streak
+        var curPanel = new StackPanel { Spacing = 6, Margin = new Thickness(0, 4, 0, 8) };
+        var curHeader = Presentation.DimText("CURRENT STREAK", 11);
+        if (Application.Current?.Resources["FkSectionText"] is Style secStyle1) curHeader.Style = secStyle1;
+        curPanel.Children.Add(curHeader);
+
+        var curValue = new TextBlock
+        {
+            Text = ReportsFormatting.FormatStreak(snapshot.Streaks.CurrentStreak),
+            FontSize = 26,
+            FontFamily = new FontFamily("Consolas"),
+            FontWeight = Microsoft.UI.Text.FontWeights.Normal,
+            Language = "en-US",
+            FlowDirection = FlowDirection.LeftToRight,
+            TextReadingOrder = TextReadingOrder.UseFlowDirection,
+            Margin = new Thickness(0, 1, 0, 0)
+        };
+        if (Application.Current?.Resources["FkMetricValueText"] is Style metricStyle1)
+        {
+            curValue.Style = metricStyle1;
+            curValue.FontSize = 26;
+            curValue.Margin = new Thickness(0, 1, 0, 0);
+        }
+        curPanel.Children.Add(curValue);
+        AutomationProperties.SetName(curPanel, $"Current Streak, {curValue.Text}");
+        Grid.SetRow(curPanel, 0);
+        grid.Children.Add(curPanel);
+
+        // Divider 1
+        var div1 = new Border
+        {
+            Height = 1,
+            Background = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", this),
+            Margin = new Thickness(0, 16, 0, 16)
+        };
+        Grid.SetRow(div1, 1);
+        grid.Children.Add(div1);
+
+        // 2. Longest Streak
+        var longPanel = new StackPanel { Spacing = 6, Margin = new Thickness(0, 8, 0, 8) };
+        var longHeader = Presentation.DimText("LONGEST STREAK", 11);
+        if (Application.Current?.Resources["FkSectionText"] is Style secStyle2) longHeader.Style = secStyle2;
+        longPanel.Children.Add(longHeader);
+
+        var longValue = new TextBlock
+        {
+            Text = ReportsFormatting.FormatStreak(snapshot.Streaks.LongestStreak),
+            FontSize = 26,
+            FontFamily = new FontFamily("Consolas"),
+            FontWeight = Microsoft.UI.Text.FontWeights.Normal,
+            Language = "en-US",
+            FlowDirection = FlowDirection.LeftToRight,
+            TextReadingOrder = TextReadingOrder.UseFlowDirection,
+            Margin = new Thickness(0, 1, 0, 0)
+        };
+        if (Application.Current?.Resources["FkMetricValueText"] is Style metricStyle2)
+        {
+            longValue.Style = metricStyle2;
+            longValue.FontSize = 26;
+            longValue.Margin = new Thickness(0, 1, 0, 0);
+        }
+        longPanel.Children.Add(longValue);
+        AutomationProperties.SetName(longPanel, $"Longest Streak, {longValue.Text}");
+        Grid.SetRow(longPanel, 2);
+        grid.Children.Add(longPanel);
+
+        // Divider 2
+        var div2 = new Border
+        {
+            Height = 1,
+            Background = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", this),
+            Margin = new Thickness(0, 16, 0, 16)
+        };
+        Grid.SetRow(div2, 3);
+        grid.Children.Add(div2);
+
+        // 3. Insight
+        var insightPanel = new StackPanel { Spacing = 8, Margin = new Thickness(0, 8, 0, 0), VerticalAlignment = VerticalAlignment.Top };
+        var insightHeader = Presentation.DimText("INSIGHT", 11);
+        if (Application.Current?.Resources["FkSectionText"] is Style secStyle3) insightHeader.Style = secStyle3;
+        insightPanel.Children.Add(insightHeader);
+
+        string insightText = GenerateInsightText(snapshot);
+        var insightContent = Presentation.Text(insightText, 12);
+        if (Application.Current?.Resources["FkMutedText"] is Style muted) insightContent.Style = muted;
+        insightContent.TextWrapping = TextWrapping.Wrap;
+        insightContent.LineHeight = 22;
+        insightPanel.Children.Add(insightContent);
+        Grid.SetRow(insightPanel, 4);
+        grid.Children.Add(insightPanel);
+
+        var card = Card(grid, 22);
+        card.Padding = new Thickness(24, 22, 24, 22);
+        card.VerticalAlignment = VerticalAlignment.Stretch;
+        return card;
+    }
+
+    private FrameworkElement StreaksCard(StreakStatistics streaks)
     {
         var grid = new Grid { HorizontalAlignment = HorizontalAlignment.Stretch };
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -306,7 +492,7 @@ internal sealed class ReportsView : UserControl, IDisposable
         return card;
     }
 
-    private UIElement ChartCard(ReportsSnapshot snapshot)
+    private FrameworkElement ChartCard(ReportsSnapshot snapshot)
     {
         var body = new StackPanel { Spacing = 14 };
 
@@ -341,6 +527,7 @@ internal sealed class ReportsView : UserControl, IDisposable
 
         var card2 = Card(body, 22);
         card2.Padding = new Thickness(24, 22, 24, 22);
+        card2.VerticalAlignment = VerticalAlignment.Stretch;
         return card2;
     }
 

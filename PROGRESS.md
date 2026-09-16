@@ -4,7 +4,7 @@
 Establish harness-reliability workflow and prepare for Stage 4 (Settings Page & Quick Overlay Refinement).
 
 ## Current Checkpoint
-Visual foundation, Today page refinement, and Reports page refinement (including 1220 DIP maximized desktop space usage and 10h monthly interval) are complete, verified, and pushed. Awaiting user authorization to begin Stage 4.
+Visual foundation, Today page refinement, and final Reports desktop-composition refinement (including wide desktop 73%/27% chart & secondary rail composition with graceful narrow collapse) are complete, verified, and committed. Ready for Stage 4.
 
 ## Completed Work
 - **Visual & UX Audit**: Comprehensive desktop/full-screen audit documented in `VISUAL_AUDIT.md`.
@@ -14,6 +14,8 @@ Visual foundation, Today page refinement, and Reports page refinement (including
 - **Stage 3 (Reports Page)**:
   - Responsive 1220 DIP centered composition, dynamic 72% column fill bars, aspect ratio normalization (`2c1d64d`).
   - Monthly 10h Y-axis interval scaling, 330 DIP plot height, vertical breathing room optimization (`7a8f842`).
+  - Desktop-wide side-by-side composition: 73% Focus Activity dominant chart on left, 27% secondary right rail with Current Streak, Longest Streak, and Insight.
+  - Graceful responsive collapse to stacked layout on Restored (< 900 DIP) and Minimum (< 540 DIP) viewports.
   - Dynamic responsive font/padding scaling on `< 540 DIP` viewports (tested down to 680x500 minimum window).
 
 ## Remaining Work
@@ -28,6 +30,7 @@ Visual foundation, Today page refinement, and Reports page refinement (including
 - **Architecture**: Single authoritative session engine pipeline (`App.xaml.cs` -> `CompletionCoordinator` -> `SessionCoordinator` -> `SessionEngine`). Zero duplicate timers or secondary state.
 - **Desktop Sizing**: Dedicated content width tiers (`880 DIP` for Today/Settings, `1220 DIP` for Reports). Never stretch unbounded across 1600+ DIP desktop viewports.
 - **Reporting Grid Intervals**: 5-hour increments for Weekly charts; 10-hour increments for Monthly charts.
+- **Reporting Composition**: Side-by-side (73% chart / 27% secondary rail) on wide/maximized screens (>= 900 DIP); stacked hierarchy on Restored/narrow screens (< 900 DIP).
 - **Culture Invariance**: Strict `CultureInfo.InvariantCulture`, Western Latin digits (`0-9`), and Gregorian calendar enforcement.
 - **Safety**: Preserve user runtime processes, credentials, and persistent data root (`%LOCALAPPDATA%\FocusKey`).
 
@@ -37,4 +40,4 @@ Visual foundation, Today page refinement, and Reports page refinement (including
 - **Visual Verification**: Live runtime screenshots verified across Dark/Light in Maximized (1920x1080), Restored (1000x720), and Minimum (680x500) viewports for both Weekly and Monthly.
 
 ## Last Commit
-`7a8f842` — `refactor(reports): optimize maximized space usage and adopt 10h interval for monthly chart` on branch `native/phased-rewrite`.
+Pending commit on branch `native/phased-rewrite`.

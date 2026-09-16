@@ -40,4 +40,4 @@ Visual foundation, Today page refinement, and final Reports desktop-composition 
 - **Visual Verification**: Live runtime screenshots verified across Dark/Light in Maximized (1920x1080), Restored (1000x720), and Minimum (680x500) viewports for both Weekly and Monthly.
 
 ## Last Commit
-Pending commit on branch `native/phased-rewrite`.
+`b54c03c` — `refactor(reports): redesign wide desktop layout with dominant chart and secondary rail` on branch `native/phased-rewrite`.

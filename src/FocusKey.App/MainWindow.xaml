@@ -213,19 +213,20 @@
       </Border>
 
       <!-- TODAY SUMMARY SURFACE -->
-      <Border x:Name="TodaySummaryCard" Grid.Column="1" Grid.Row="0" Style="{StaticResource FkCard}" HorizontalAlignment="Stretch" Padding="24,24,24,24" MinHeight="380">
+      <Border x:Name="TodaySummaryCard" Grid.Column="1" Grid.Row="0" Style="{StaticResource FkCard}" HorizontalAlignment="Stretch" Padding="28,24,28,24" MinHeight="380">
        <Grid VerticalAlignment="Stretch">
         <Grid.RowDefinitions>
          <RowDefinition Height="Auto"/>
          <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" Text="TODAY" Style="{StaticResource FkSectionText}" VerticalAlignment="Top" Margin="0,0,0,16"/>
+        <TextBlock Grid.Row="0" Text="TODAY" Style="{StaticResource FkSectionText}" VerticalAlignment="Top" Margin="0,0,0,12"/>
 
-        <Grid Grid.Row="1" x:Name="SummaryGrid" RowSpacing="20" ColumnSpacing="20" VerticalAlignment="Center">
+        <Grid Grid.Row="1" x:Name="SummaryGrid" VerticalAlignment="Stretch">
          <Grid.RowDefinitions>
+          <RowDefinition Height="*"/>
           <RowDefinition Height="Auto"/>
-          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="*"/>
          </Grid.RowDefinitions>
          <Grid.ColumnDefinitions>
           <ColumnDefinition Width="*"/>
@@ -233,26 +234,29 @@
          </Grid.ColumnDefinitions>
 
          <!-- Top-Left: Focus Time -->
-         <StackPanel Grid.Row="0" Grid.Column="0" Spacing="4">
-          <TextBlock x:Name="FocusValue" Text="0m" FontSize="28" FontWeight="Normal" FontFamily="Consolas" Style="{StaticResource FkMetricValueText}"/>
+         <StackPanel Grid.Row="0" Grid.Column="0" Spacing="4" VerticalAlignment="Center" Margin="0,0,12,0">
+          <TextBlock x:Name="FocusValue" Text="0m" FontSize="26" FontWeight="SemiBold" FontFamily="Consolas" Style="{StaticResource FkMetricValueText}"/>
           <TextBlock Text="Focus Time" Style="{StaticResource FkText}" FontSize="12" FontWeight="Medium"/>
          </StackPanel>
 
          <!-- Top-Right: Work Sessions -->
-         <StackPanel Grid.Row="0" Grid.Column="1" Spacing="4">
-          <TextBlock x:Name="WorkValue" Text="0" FontSize="28" FontWeight="Normal" FontFamily="Consolas" Style="{StaticResource FkMetricValueText}"/>
+         <StackPanel Grid.Row="0" Grid.Column="1" Spacing="4" VerticalAlignment="Center" Margin="12,0,0,0">
+          <TextBlock x:Name="WorkValue" Text="0" FontSize="26" FontWeight="SemiBold" FontFamily="Consolas" Style="{StaticResource FkMetricValueText}"/>
           <TextBlock Text="Work Sessions" Style="{StaticResource FkText}" FontSize="12" FontWeight="Medium"/>
          </StackPanel>
 
+         <!-- Middle Divider Line -->
+         <Border Grid.Row="1" Grid.ColumnSpan="2" Height="1" Margin="0,8,0,8" Opacity="0.5" Background="{ThemeResource CardStrokeColorDefaultBrush}"/>
+
          <!-- Bottom-Left: Break Time -->
-         <StackPanel Grid.Row="1" Grid.Column="0" Spacing="4">
-          <TextBlock x:Name="BreakValue" Text="0m" FontSize="28" FontWeight="Normal" FontFamily="Consolas" Style="{StaticResource FkMetricValueText}"/>
+         <StackPanel Grid.Row="2" Grid.Column="0" Spacing="4" VerticalAlignment="Center" Margin="0,0,12,0">
+          <TextBlock x:Name="BreakValue" Text="0m" FontSize="26" FontWeight="SemiBold" FontFamily="Consolas" Style="{StaticResource FkMetricValueText}"/>
           <TextBlock Text="Break Time" Style="{StaticResource FkText}" FontSize="12" FontWeight="Medium"/>
          </StackPanel>
 
          <!-- Bottom-Right: Completion Rate -->
-         <StackPanel Grid.Row="1" Grid.Column="1" Spacing="4">
-          <TextBlock x:Name="CompletionValue" Text="—" FontSize="28" FontWeight="Normal" FontFamily="Consolas" Style="{StaticResource FkMetricValueText}"/>
+         <StackPanel Grid.Row="2" Grid.Column="1" Spacing="4" VerticalAlignment="Center" Margin="12,0,0,0">
+          <TextBlock x:Name="CompletionValue" Text="—" FontSize="26" FontWeight="SemiBold" FontFamily="Consolas" Style="{StaticResource FkMetricValueText}"/>
           <TextBlock Text="Completion Rate" Style="{StaticResource FkText}" FontSize="12" FontWeight="Medium"/>
          </StackPanel>
         </Grid>

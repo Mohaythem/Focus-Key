@@ -14,7 +14,12 @@ This document serves as the persistent repository-level source of truth for all 
 
 ## Active Work (Current Roadmap Task)
 
-*No active task currently in progress. All approved tasks implemented and awaiting final user acceptance.*
+### Reports Insights Vertical Composition + Today Summary Polish + Yearly Preview Verification (Implemented — Awaiting Final User Acceptance)
+Focused visual acceptance refinements across Reports and Today:
+- **Reports Insights Vertical Distribution**: Tall Insights rail matches chart height (~380–420 DIP) with its 4 insight groups (Period Comparison, Streaks, Strongest Period, Consistency & Averages) distributed vertically and intentionally across distinct proportional `1*` zones with subtle 1px dividers, eliminating bottom dead space.
+- **72% / 28% Reports Ratio**: 72% Main Chart / 28% Insights Rail with 16 DIP column spacing gives ~340 DIP width to the rail on standard wide desktop, eliminating text wrapping on streaks and descriptions.
+- **Today Summary Card Polish**: Refined internal 2 × 2 metric grid on `TodaySummaryCard` with proportional rows, subtle horizontal divider line, Consolas 26 SemiBold metric values, and clean vertical centering.
+- **Yearly Preview Verification**: Verified `FOCUSKEY_YEARLY_PREVIEW=1` development override with synthetic isolated full-year data (12 months in 2025, Jan–Dec) without modifying real data eligibility logic or altering the user's real database.
 
 ---
 
@@ -22,6 +27,9 @@ This document serves as the persistent repository-level source of truth for all 
 
 ### 1. Window Close (X) Choice Dialog
 - When the title bar window close (`X`) button is pressed, present a clear user choice between hiding Focus Key (background shell / system tray) and fully quitting the application.
+
+### 2. User-Selectable 12-Hour / 24-Hour Time Format (Settings)
+- Add a user preference in Settings allowing selection between 12-hour (AM/PM) and 24-hour time formats for timestamps across Today, Activity, and Reports. *(Planned for Settings milestone — do not implement in current goal).*
 
 ---
 

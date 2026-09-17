@@ -287,11 +287,11 @@ internal sealed class ReportsView : UserControl, IDisposable
 
                 if (isWide)
                 {
-                    // Dominant chart hero (~75%) + Insights rail (~25%)
-                    contentGrid.ColumnSpacing = 12;
+                    // Dominant chart hero (~72%) + Insights rail (~28%)
+                    contentGrid.ColumnSpacing = 16;
                     contentGrid.RowSpacing = 0;
-                    contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(75, GridUnitType.Star) });
-                    contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(25, GridUnitType.Star) });
+                    contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(72, GridUnitType.Star) });
+                    contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(28, GridUnitType.Star) });
                     contentGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
                     Grid.SetColumn(chart, 0);
@@ -306,7 +306,7 @@ internal sealed class ReportsView : UserControl, IDisposable
                 {
                     // Restored / narrow stacked mode
                     contentGrid.ColumnSpacing = 0;
-                    contentGrid.RowSpacing = 12;
+                    contentGrid.RowSpacing = 16;
                     contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                     contentGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
                     contentGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -340,7 +340,11 @@ internal sealed class ReportsView : UserControl, IDisposable
             VerticalAlignment = VerticalAlignment.Stretch
         };
 
-        var contentHost = new Grid { HorizontalAlignment = HorizontalAlignment.Stretch };
+        var contentHost = new Grid
+        {
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Stretch
+        };
         mainGrid.Children.Add(contentHost);
 
         void RebuildInsights(double actualWidth)
@@ -349,16 +353,14 @@ internal sealed class ReportsView : UserControl, IDisposable
             contentHost.ColumnDefinitions.Clear();
             contentHost.RowDefinitions.Clear();
 
-            var outerPanel = new StackPanel { Spacing = 0, HorizontalAlignment = HorizontalAlignment.Stretch };
-
-            // Header: "INSIGHTS"
-            var header = Presentation.DimText("INSIGHTS", 11);
-            if (Application.Current?.Resources["FkSectionText"] is Style secStyle) header.Style = secStyle;
-            header.Margin = new Thickness(0, 2, 0, 14);
-            outerPanel.Children.Add(header);
-
             if (snapshot.Totals.Started == 0 && snapshot.Totals.FocusTime == TimeSpan.Zero)
             {
+                var outerPanel = new StackPanel { Spacing = 0, HorizontalAlignment = HorizontalAlignment.Stretch };
+                var header = Presentation.DimText("INSIGHTS", 11);
+                if (Application.Current?.Resources["FkSectionText"] is Style secStyle) header.Style = secStyle;
+                header.Margin = new Thickness(0, 2, 0, 14);
+                outerPanel.Children.Add(header);
+
                 var emptyPanel = new StackPanel { Spacing = 6, Margin = new Thickness(0, 4, 0, 0) };
                 var emptyTitle = Presentation.Text("No session activity", 13);
                 emptyTitle.FontWeight = FontWeights.SemiBold;
@@ -426,18 +428,19 @@ internal sealed class ReportsView : UserControl, IDisposable
                 {
                     string strongestValue;
                     string strongestLabel;
+                    string strongestSub = ReportsFormatting.FormatDuration(topBucket.Totals.FocusTime);
 
                     if (snapshot.Period == ReportPeriod.Weekly &&
                         DateOnly.TryParseExact(topBucket.Label, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var topDate))
                     {
                         strongestValue = ReportsFormatting.FormatDayOfWeekAbbrev(topDate);
-                        strongestLabel = $"Strongest day ({ReportsFormatting.FormatDuration(topBucket.Totals.FocusTime)})";
+                        strongestLabel = "Strongest day";
                     }
                     else if (snapshot.Period == ReportPeriod.Yearly &&
                         DateOnly.TryParseExact(topBucket.Label + "-01", "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var topMonth))
                     {
                         strongestValue = ReportsFormatting.FormatYearMonthLong(topMonth.Month);
-                        strongestLabel = $"Strongest month ({ReportsFormatting.FormatDuration(topBucket.Totals.FocusTime)})";
+                        strongestLabel = "Strongest month";
                     }
                     else
                     {
@@ -447,10 +450,10 @@ internal sealed class ReportsView : UserControl, IDisposable
                             if (snapshot.Trend[b] == topBucket) { weekIndex = b + 1; break; }
                         }
                         strongestValue = $"Week {weekIndex}";
-                        strongestLabel = $"Strongest week ({ReportsFormatting.FormatDuration(topBucket.Totals.FocusTime)})";
+                        strongestLabel = "Strongest week";
                     }
 
-                    items.Add(CreateInsightItem(strongestValue, strongestLabel));
+                    items.Add(CreateInsightItem(strongestValue, strongestLabel, strongestSub));
                 }
             }
 
@@ -500,6 +503,12 @@ internal sealed class ReportsView : UserControl, IDisposable
             if (twoColumns && items.Count > 1)
             {
                 // Wide stacked layout: 2 columns
+                var outerPanel = new StackPanel { Spacing = 0, HorizontalAlignment = HorizontalAlignment.Stretch };
+                var header = Presentation.DimText("INSIGHTS", 11);
+                if (Application.Current?.Resources["FkSectionText"] is Style secStyle) header.Style = secStyle;
+                header.Margin = new Thickness(0, 2, 0, 14);
+                outerPanel.Children.Add(header);
+
                 var itemsGrid = new Grid { ColumnSpacing = 24, RowSpacing = 16 };
                 itemsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 itemsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -516,28 +525,57 @@ internal sealed class ReportsView : UserControl, IDisposable
                     itemsGrid.Children.Add(items[i]);
                 }
                 outerPanel.Children.Add(itemsGrid);
+                contentHost.Children.Add(outerPanel);
             }
             else
             {
-                // Single column vertical layout (in side rail or narrow stacked)
-                var itemsStack = new StackPanel { Spacing = 0 };
+                // Single column vertical layout (Side rail or narrow stacked)
+                // Use a vertical Grid that distributes the items evenly across the full height of the card
+                var railGrid = new Grid
+                {
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
+                    VerticalAlignment = VerticalAlignment.Stretch
+                };
+
+                // Row 0: Header
+                railGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                var header = Presentation.DimText("INSIGHTS", 11);
+                if (Application.Current?.Resources["FkSectionText"] is Style secStyle) header.Style = secStyle;
+                header.Margin = new Thickness(0, 2, 0, 8);
+                Grid.SetRow(header, 0);
+                railGrid.Children.Add(header);
+
+                int rowIndex = 1;
                 for (int i = 0; i < items.Count; i++)
                 {
                     if (i > 0)
                     {
+                        // Divider row
+                        railGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
                         var div = new Border
                         {
-                            Style = Application.Current?.Resources["FkChartGridLine"] as Style,
-                            Margin = new Thickness(0, 12, 0, 12)
+                            Height = 1,
+                            HorizontalAlignment = HorizontalAlignment.Stretch,
+                            Background = (Application.Current?.Resources["CardStrokeColorDefaultBrush"] as Brush) ?? Presentation.ThemeBrush("FkBorder", true),
+                            Opacity = 0.5,
+                            Margin = new Thickness(0, 4, 0, 4)
                         };
-                        itemsStack.Children.Add(div);
+                        Grid.SetRow(div, rowIndex);
+                        railGrid.Children.Add(div);
+                        rowIndex++;
                     }
-                    itemsStack.Children.Add(items[i]);
-                }
-                outerPanel.Children.Add(itemsStack);
-            }
 
-            contentHost.Children.Add(outerPanel);
+                    // Item zone row with 1* height
+                    railGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+                    var itemElem = (FrameworkElement)items[i];
+                    itemElem.VerticalAlignment = VerticalAlignment.Center;
+                    Grid.SetRow(itemElem, rowIndex);
+                    railGrid.Children.Add(itemElem);
+                    rowIndex++;
+                }
+
+                contentHost.Children.Add(railGrid);
+            }
         }
 
         double lastWidth = -1;
@@ -557,20 +595,26 @@ internal sealed class ReportsView : UserControl, IDisposable
         RebuildInsights(0);
 
         var card = Card(mainGrid, 22);
-        card.Padding = new Thickness(22, 20, 22, 20);
+        card.Padding = new Thickness(24, 20, 24, 20);
         card.VerticalAlignment = VerticalAlignment.Stretch;
         return card;
     }
 
     private UIElement CreateStreaksInsightGroup(int currentStreak, int longestStreak)
     {
+        var groupPanel = new StackPanel { Spacing = 4 };
+        var header = Presentation.DimText("STREAKS", 11);
+        if (Application.Current?.Resources["FkSectionText"] is Style secStyle) header.Style = secStyle;
+        header.Margin = new Thickness(0, 0, 0, 2);
+        groupPanel.Children.Add(header);
+
         var grid = new Grid { ColumnSpacing = 16 };
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
         var currentCol = new StackPanel { Spacing = 2 };
         var currentVal = CreateValueTextBlock($"{currentStreak} {(currentStreak == 1 ? "day" : "days")}");
-        var currentLbl = Presentation.Text("Current streak", 12);
+        var currentLbl = Presentation.Text("Current", 12);
         currentLbl.FontWeight = FontWeights.Medium;
         currentCol.Children.Add(currentVal);
         currentCol.Children.Add(currentLbl);
@@ -578,7 +622,7 @@ internal sealed class ReportsView : UserControl, IDisposable
 
         var longestCol = new StackPanel { Spacing = 2 };
         var longestVal = CreateValueTextBlock($"{longestStreak} {(longestStreak == 1 ? "day" : "days")}");
-        var longestLbl = Presentation.Text("Longest streak", 12);
+        var longestLbl = Presentation.Text("Longest", 12);
         longestLbl.FontWeight = FontWeights.Medium;
         longestCol.Children.Add(longestVal);
         longestCol.Children.Add(longestLbl);
@@ -586,9 +630,10 @@ internal sealed class ReportsView : UserControl, IDisposable
 
         grid.Children.Add(currentCol);
         grid.Children.Add(longestCol);
+        groupPanel.Children.Add(grid);
 
-        AutomationProperties.SetName(grid, $"Current streak: {currentStreak} days, Longest streak: {longestStreak} days");
-        return grid;
+        AutomationProperties.SetName(groupPanel, $"Streaks. Current streak: {currentStreak} days, Longest streak: {longestStreak} days");
+        return groupPanel;
     }
 
     private static TextBlock CreateValueTextBlock(string value)
@@ -628,7 +673,7 @@ internal sealed class ReportsView : UserControl, IDisposable
             itemPanel.Children.Add(subBlock);
         }
 
-        AutomationProperties.SetName(itemPanel, $"{label}, {value}");
+        AutomationProperties.SetName(itemPanel, $"{label}, {value}{(string.IsNullOrEmpty(subtext) ? "" : $", {subtext}")}");
         return itemPanel;
     }
 

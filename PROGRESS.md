@@ -1,29 +1,26 @@
 # Focus Key — Project Progress & State Checkpoint
 
 ## Current Goal
-Today Final Hero Redesign completed and verified.
+Reports Insights Vertical Composition + Today Summary Polish + Yearly Preview Verification completed and verified.
 
 ## Current Checkpoint
-Today Final Hero Redesign is 100% implemented and verified:
-- **3-Tier Visual Composition on Maximized Desktop (1240 DIP Max Width)**:
-  - **Page Header**: Quiet "Today" page title + date subtitle (`Thursday, 17 September 2026`) + compact Refresh action.
-  - **Main Row**: Unified `SessionHeroCard` (~2/3 width, 380 DIP min height) + `TodaySummaryCard` (~1/3 width) with 20 DIP column spacing.
-  - **Activity Section**: Full-width `ActivityCard` below hero row with compact desktop activity rows (`11:00 • Work 30m Completed`) and calm empty state.
-- **Shared Session Hero Surface (Running, Paused, Idle)**:
-  - **Running State**: `• WORK SESSION` / `• BREAK SESSION` header with semantic dot, `RUNNING` status badge, dominant 80 DIP Consolas SemiBold timer (`21:58` / `09:58`) with `remaining` subtext, 6 DIP semantic progress bar, elevated primary `[ Pause ]` and neutral secondary `[ Stop ]` buttons.
-  - **Paused State**: `PAUSED` status badge, frozen timer + `paused` subtext, progress bar, elevated primary `[ Continue ]` and neutral secondary `[ Start New ]` buttons.
-  - **Idle State**: `START A SESSION` header, `Ready when you are` prompt, substantial `Work` and `Break` selector cards with actual configured durations (`22 min`, `10 min`), subtle tint/border selection highlighting, and dynamic `[ Start ]` button.
-- **Today Summary Surface**:
-  - Single coherent card with a 2 × 2 internal metric grid (Focus Time, Work Sessions, Break Time, Completion Rate) with Consolas 28 SemiBold values.
-- **Responsive Reflow**:
-  - Wide (>= 860 DIP available / >= 1100 DIP window): 2/3 + 1/3 side-by-side layout, 80 DIP timer typography.
-  - Medium / Restored (< 860 DIP available): Hero full width, Summary below Hero (2x2 grid), 68 DIP timer typography.
-  - Narrow (< 580 DIP available): Single vertical column flow, 56 DIP timer typography, zero horizontal clipping.
-- **Accessibility & Automation**:
-  - `WorkChoiceCard` and `BreakChoiceCard` implemented as accessible Button controls with full keyboard support, `AutomationProperties.AutomationId`, and `AutomationProperties.Name`.
+Visual acceptance refinements across Reports and Today are 100% implemented and verified:
+- **Reports Insights Vertical Composition**:
+  - Maintained the full-height Insights rail matching the adjacent chart card height (~380–420 DIP).
+  - Rebuilt `InsightsRailCard.RebuildInsights` using a proportional `Grid` with `1*` rows and vertical centering for each zone (Comparison, Streaks, Strongest Period, Consistency & Averages) separated by subtle 1px dividers, eliminating bottom dead space.
+  - Symmetrical 2-column Streaks group (`STREAKS` header with `Current` and `Longest` metrics side-by-side).
+  - 3-tier item visual hierarchy (Primary Value, Secondary Label, Supporting Subtext).
+  - Balanced wide desktop proportions: 72% Main Chart / 28% Insights Rail with 16 DIP column spacing for optimal breathing room and zero label wrapping.
+- **Today Summary Card Polish**:
+  - Maintained 1 single coherent card (`TodaySummaryCard`) with `Padding="28,24,28,24"`.
+  - Refined internal 2 × 2 metric grid: Row 0 (`1*`) for Focus Time & Work Sessions, Row 1 (`Auto`) for subtle horizontal divider line, Row 2 (`1*`) for Break Time & Completion Rate.
+  - Symmetrical vertical centering, Consolas 26 SemiBold metric values, and clean column alignment.
+- **Yearly Preview Verification**:
+  - `FOCUSKEY_YEARLY_PREVIEW=1` verified to reliably expose the Yearly report selector on pre-1-year installations without altering real data-driven eligibility or touching the user's real DB.
+  - Synthetically seeded 12-month full-year dataset (2025: Jan–Dec, 355h 42m total focus, 176 work sessions, 100% completion rate) and sparse week dataset in isolated `DbTool` test database.
+  - Multi-theme and responsive reflow verification completed (Maximized Dark/Light, Restored, Minimum-size).
 - **Automated Tests**: 715/715 unit tests passing (`dotnet test -c Release`), 0 failed, 0 skipped.
 - **Build**: 0 Warning(s), 0 Error(s) (`dotnet build -c Release`).
-- **Visual Verification**: Authoritative runtime inspection completed across all states, themes, and viewport sizes.
 
 ## Completed Work
 - **Visual & UX Audit**: Comprehensive desktop/full-screen audit documented in `VISUAL_AUDIT.md`.
@@ -34,14 +31,16 @@ Today Final Hero Redesign is 100% implemented and verified:
   - Destructive Stop interaction replaced with non-destructive Pause / Continue / Start New lifecycle.
   - Minimize to tray with single-instance activation and global hotkey restoration.
   - Dual global shortcuts (`Shift + F3` Quick Overlay, `Shift + F4` Open Focus Key) with SQLite persistence and conflict management (`4e5e783`).
-- **Stage 4 (Reports Redesign: Cohesive Desktop Dashboard)**: Dominant chart hero (~75%), 3 compact summary metrics, secondary contextual insights rail (~25%), reflow to stacked, truthful period comparison & insights.
+- **Stage 4 (Reports Redesign: Cohesive Desktop Dashboard)**: Dominant chart hero (~72%), 3 compact summary metrics, secondary contextual insights rail (~28%), reflow to stacked, truthful period comparison & insights.
 - **Stage 5 (Yearly Reports)**: Data-driven eligibility, 12-month calendar aggregation, dynamic yearly ceiling/intervals, truthful prior-year comparison and insights, and future navigation clamping.
 - **Stage 5b (Reports Acceptance Refinement & Temporary Preview)**: Balanced streaks group, zero metric repetition, comprehensive consistency metrics across all periods, and temporary `FOCUSKEY_YEARLY_PREVIEW` override.
 - **Stage 6 (Today Final Hero Redesign)**: Maximized 3-tier desktop composition (2/3 Hero + 1/3 Summary + full-width Activity), unified zero-layout-jump hero surface, dominant 80 DIP typography, semantic Pause/Continue/Start New/Stop actions, responsive 3-breakpoint scaling.
+- **Stage 6b (Reports Insights Vertical Composition + Today Summary Polish + Yearly Preview Verification)**: Proportional 4-zone grid distribution in Reports Insights rail, 72%/28% ratio, polished Today Summary 2x2 grid with horizontal divider, and full-year synthetic dataset verification.
 
 ## Remaining Work
 - **Stage 7: Approved Pending Items from FUTURE_PLAN.md**
   - Item 1: Window Close (X) Choice Dialog (hide to background tray vs. quit).
+  - Item 2: User-Selectable 12-Hour / 24-Hour Time Format (Settings).
 - **Stage 8: Settings Page & Quick Overlay Refinement**
   - Settings Page: Constrain container to 880 DIP max-width, center on desktop, expand color preset click targets (36x36 DIP), clean microcopy echoes.
   - Quick Overlay: Clean floating card hierarchy, standardize Stop action, harmonize keyboard hints (`[← →]`, `[Enter]`, `[Esc]`).
@@ -50,29 +49,31 @@ Today Final Hero Redesign is 100% implemented and verified:
   - Package clean standalone Release installer (`FocusKeySetup.exe`).
 
 ## Important Active Decisions
-- **Unified Hero Card**: `SessionHeroCard` provides a single stable container (~380 DIP min height on wide) for Active and Idle states, eliminating layout jumping when sessions start or end.
-- **Accessible Card Buttons**: Selector cards are native Button controls enabling keyboard tab stop, Space/Enter activation, and UIAutomation.
-- **Year Eligibility Invariant**: Derived strictly from real data (`earliestDate.AddYears(1) <= today`), surviving app restarts without arbitrary UI flags. Ineligible users see only `[ Week | Month ]`.
-- **Zero Fabrication**: Imported historical focus contributes to focus duration and historical span, never fabricating fake session counts, completion numbers, or completion rates.
+- **Proportional Insights Distribution**: Using a vertical `Grid` with `1*` rows inside `InsightsRailCard` dynamically expands each insight quadrant to match the adjacent chart card height, eliminating dead lower half space.
+- **72% / 28% Reports Ratio**: Gives ~340 DIP width to the Insights rail on standard wide desktop, ensuring ample room for 2-column streaks and comparison copy without wrapping.
+- **Unified Today Summary Card**: Symmetrically dividing the 2x2 metric grid into two `1*` rows with a subtle divider line creates an intentional desktop panel harmonizing with `SessionHeroCard`.
+- **Year Eligibility Invariant**: Derived strictly from real data (`earliestDate.AddYears(1) <= today`), surviving app restarts without arbitrary UI flags. Ineligible users see only `[ Week | Month ]`. The temporary `FOCUSKEY_YEARLY_PREVIEW=1` override is strictly a development aid and will be removed after final acceptance.
 
 ## Last Verification
 - **Build**: `dotnet build -c Release` (0 Warnings, 0 Errors).
 - **Test Suite**: `dotnet test -c Release` (715 passed, 0 failed, 0 skipped).
-- **Visual Captures**:
-  - `today_idle_maximized_dark.png`: 2/3 Hero + 1/3 Summary side-by-side, Work selected card, Start button, 2x2 metric grid, 4 activity rows.
-  - `today_break_selected_idle_dark.png`: Break card selected with mauve border/tint, Work unselected, Start button themed mauve.
-  - `today_running_work_maximized_dark.png`: `• WORK SESSION` header, `RUNNING` badge, dominant 80 DIP timer `21:58`, teal progress bar, `[ Pause ]` and `[ Stop ]` buttons, live running activity row.
-  - `today_running_break_maximized_dark.png`: `• BREAK SESSION` header, `RUNNING` badge, dominant 80 DIP timer `09:58`, mauve progress bar, live running break row.
-  - `today_paused_work_maximized_dark.png`: `PAUSED` badge, frozen timer `15:00` + `paused` subtext, `[ Continue ]` (elevated teal) and `[ Start New ]` (neutral surface2) buttons.
-  - `today_idle_maximized_light.png`: Light theme idle launcher with crisp high-contrast cards and dark typography.
-  - `today_running_maximized_light.png`: Light theme running timer `21:58` with high-contrast text and buttons.
-  - `today_paused_maximized_light.png`: Light theme paused state `21:56` with `[ Continue ]` and `[ Start New ]`.
-  - `today_running_restored_dark.png`: Medium restored window (~1000x720 DIP) with stacked 1-column hero + 2x2 summary and 68 DIP timer font.
-  - `today_idle_restored_dark.png`: Medium restored window in idle state with stacked reflow.
-  - `today_minimum_size_dark.png`: Minimum size (680x500 DIP) boundary check with 56 DIP timer font, 172 DIP sidebar, zero clipping.
-  - `today_activity_empty_dark.png`: Empty activity state with calm `No sessions recorded today.` text.
+- **Visual Captures Inspected**:
+  - `today_idle_maximized_dark_refined.png`: Maximized Today idle with polished 2x2 summary card, Work selector, Start button.
+  - `today_running_work_maximized_dark_refined.png`: Maximized Today running work with 80 DIP countdown and balanced summary metrics.
+  - `today_paused_work_maximized_dark_refined.png`: Maximized Today paused state with `[ Continue ]` and `[ Start New ]`.
+  - `today_idle_maximized_light_refined.png`: Maximized Today light theme.
+  - `today_restored_dark_refined.png`: Restored window Today reflow.
+  - `reports_week_maximized_dark_refined.png`: Weekly reports with 72%/28% ratio and vertically distributed 4-zone Insights rail.
+  - `reports_month_maximized_dark_refined.png`: Monthly reports with 4 weekly bars and balanced Insights rail.
+  - `reports_year_maximized_dark_refined.png`: 2026 Yearly reports (9 active months) with full vertical rail coverage.
+  - `reports_year_fullyear_2025_dark_refined.png`: 2025 Full-year dataset (12 monthly bars) with 355h 42m focus and 4 balanced rail zones.
+  - `reports_year_maximized_light_refined.png`: Yearly reports in Light theme.
+  - `reports_week_sparse_dark_refined.png`: Weekly reports with sparse data (2 active days) cleanly balanced.
+  - `reports_restored_dark_refined.png`: Reports in medium restored window (~1000x720 DIP).
+  - `reports_minimum_size_dark_refined.png`: Reports in minimum size window (680x500 DIP).
 
 ## Current Git State
 - Branch: `native/phased-rewrite`
-- Working tree contains complete, verified Today Final Hero Redesign implementation.
+- Working tree contains complete, verified Reports Insights Vertical Composition + Today Summary Polish + Yearly Preview Verification implementation.
+
 

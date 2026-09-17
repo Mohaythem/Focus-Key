@@ -13,6 +13,8 @@ public enum ShortcutModifiers
 public sealed record GlobalShortcut(ShortcutModifiers Modifiers, uint VirtualKey)
 {
     public static GlobalShortcut Default { get; } = new(ShortcutModifiers.Shift, 0x72); // Shift + F3
+    public static GlobalShortcut DefaultOverlay => Default;
+    public static GlobalShortcut DefaultMainWindow { get; } = new(ShortcutModifiers.Shift, 0x73); // Shift + F4
 
     public void Validate()
     {

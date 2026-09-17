@@ -14,14 +14,20 @@ public sealed record SessionSnapshot
     private SessionSnapshot(
         SessionId id,
         SessionType type,
+        SessionStatus status,
         DateTimeOffset startedAt,
+        DateTimeOffset resumedAt,
         TimeSpan plannedDuration,
+        TimeSpan accumulatedActiveDuration,
         DateTimeOffset observedAt)
     {
         Id = id;
         Type = type;
+        Status = status;
         StartedAt = startedAt;
+        ResumedAt = resumedAt;
         PlannedDuration = plannedDuration;
+        AccumulatedActiveDuration = accumulatedActiveDuration;
         ObservedAt = observedAt;
     }
 
@@ -29,38 +35,54 @@ public sealed record SessionSnapshot
 
     public SessionType Type { get; }
 
+    public SessionStatus Status { get; }
+
     public DateTimeOffset StartedAt { get; }
 
+    public DateTimeOffset ResumedAt { get; }
+
     public TimeSpan PlannedDuration { get; }
+
+    public TimeSpan AccumulatedActiveDuration { get; }
 
     /// <summary>The instant this view describes.</summary>
     public DateTimeOffset ObservedAt { get; }
 
-    public DateTimeOffset PlannedEndAt => StartedAt + PlannedDuration;
+    public bool IsPaused => Status == SessionStatus.Paused;
 
-    /// <summary><c>max(PlannedEndAt - ObservedAt, 0)</c>. Never negative.</summary>
+    public DateTimeOffset PlannedEndAt => ResumedAt + (PlannedDuration - AccumulatedActiveDuration);
+
+    /// <summary>Remaining active time until planned end. Never negative.</summary>
     public TimeSpan Remaining
     {
         get
         {
+            if (IsPaused)
+            {
+                TimeSpan rem = PlannedDuration - AccumulatedActiveDuration;
+                return rem > TimeSpan.Zero ? rem : TimeSpan.Zero;
+            }
+
             TimeSpan remaining = PlannedEndAt - ObservedAt;
             return remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero;
         }
     }
 
-    /// <summary><c>clamp(ObservedAt - StartedAt, 0, PlannedDuration)</c>.</summary>
+    /// <summary>Total active time elapsed so far.</summary>
     public TimeSpan Elapsed
     {
         get
         {
-            TimeSpan elapsed = ObservedAt - StartedAt;
-
-            if (elapsed < TimeSpan.Zero)
+            if (IsPaused)
             {
-                return TimeSpan.Zero;
+                return AccumulatedActiveDuration;
             }
 
-            return elapsed > PlannedDuration ? PlannedDuration : elapsed;
+            TimeSpan leg = ObservedAt - ResumedAt;
+            if (leg < TimeSpan.Zero) leg = TimeSpan.Zero;
+            TimeSpan remainingCap = PlannedDuration - AccumulatedActiveDuration;
+            if (leg > remainingCap) leg = remainingCap;
+            return AccumulatedActiveDuration + leg;
         }
     }
 
@@ -74,14 +96,21 @@ public sealed record SessionSnapshot
         session.Validate();
         if (!session.IsActive)
         {
-            throw new ArgumentException("An active snapshot requires a Running session.", nameof(session));
+            throw new ArgumentException("An active snapshot requires a Running or Paused session.", nameof(session));
         }
+
+        DateTimeOffset effectiveObserved = session.Status == SessionStatus.Paused && session.PausedAt is { } p
+            ? p
+            : observedAt.ToUniversalTime();
 
         return new SessionSnapshot(
             session.Id,
             session.Type,
+            session.Status,
             session.StartedAt,
+            session.ResumedAt,
             session.PlannedDuration,
-            observedAt.ToUniversalTime());
+            session.AccumulatedActiveDuration,
+            effectiveObserved);
     }
 }

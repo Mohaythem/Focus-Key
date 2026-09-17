@@ -16,7 +16,7 @@ namespace FocusKey.Foundation.Sessions;
 public sealed class SqliteSessionRepository : ISessionRepository
 {
     private const string SelectSessions =
-        "SELECT id, type, status, started_at_utc, planned_duration_seconds, ended_at_utc, created_at_utc FROM sessions";
+        "SELECT id, type, status, started_at_utc, planned_duration_seconds, ended_at_utc, created_at_utc, resumed_at_utc, accumulated_active_seconds, paused_at_utc FROM sessions";
 
     private readonly SqliteConnectionFactory _connections;
 
@@ -44,7 +44,7 @@ public sealed class SqliteSessionRepository : ISessionRepository
         }
 
         if (session.IsActive
-            && await ReadRunningIdAsync(connection, transaction, cancellationToken).ConfigureAwait(false)
+            && await ReadActiveIdAsync(connection, transaction, cancellationToken).ConfigureAwait(false)
                 is { } alreadyRunning)
         {
             throw new ActiveSessionAlreadyExistsException(alreadyRunning);
@@ -55,8 +55,10 @@ public sealed class SqliteSessionRepository : ISessionRepository
         command.CommandText =
             """
             INSERT INTO sessions (
-                id, type, status, started_at_utc, planned_duration_seconds, ended_at_utc, created_at_utc)
-            VALUES ($id, $type, $status, $startedAt, $plannedSeconds, $endedAt, $createdAt);
+                id, type, status, started_at_utc, planned_duration_seconds, ended_at_utc,
+                created_at_utc, resumed_at_utc, accumulated_active_seconds, paused_at_utc)
+            VALUES ($id, $type, $status, $startedAt, $plannedSeconds, $endedAt,
+                $createdAt, $resumedAt, $accumulatedSeconds, $pausedAt);
             """;
         AddSessionParameters(command, session);
 
@@ -103,7 +105,7 @@ public sealed class SqliteSessionRepository : ISessionRepository
         }
 
         if (session.IsActive
-            && await ReadRunningIdAsync(connection, transaction, cancellationToken).ConfigureAwait(false)
+            && await ReadActiveIdAsync(connection, transaction, cancellationToken).ConfigureAwait(false)
                 is { } alreadyRunning
             && alreadyRunning != session.Id)
         {
@@ -115,12 +117,15 @@ public sealed class SqliteSessionRepository : ISessionRepository
         command.CommandText =
             """
             UPDATE sessions
-            SET type                     = $type,
-                status                   = $status,
-                started_at_utc           = $startedAt,
-                planned_duration_seconds = $plannedSeconds,
-                ended_at_utc             = $endedAt,
-                created_at_utc           = $createdAt
+            SET type                       = $type,
+                status                     = $status,
+                started_at_utc             = $startedAt,
+                planned_duration_seconds   = $plannedSeconds,
+                ended_at_utc               = $endedAt,
+                created_at_utc             = $createdAt,
+                resumed_at_utc             = $resumedAt,
+                accumulated_active_seconds = $accumulatedSeconds,
+                paused_at_utc              = $pausedAt
             WHERE id = $id;
             """;
         AddSessionParameters(command, session);
@@ -161,10 +166,13 @@ public sealed class SqliteSessionRepository : ISessionRepository
             UPDATE sessions
             SET type = $type, status = $status, started_at_utc = $startedAt,
                 planned_duration_seconds = $plannedSeconds, ended_at_utc = $endedAt,
-                created_at_utc = $createdAt
+                created_at_utc = $createdAt, resumed_at_utc = $resumedAt,
+                accumulated_active_seconds = $accumulatedSeconds, paused_at_utc = $pausedAt
             WHERE id = $id AND type = $expectedType AND status = $expectedStatus
                 AND started_at_utc = $expectedStart AND planned_duration_seconds = $expectedSeconds
-                AND ended_at_utc IS $expectedEnd AND created_at_utc = $expectedCreated;
+                AND ended_at_utc IS $expectedEnd AND created_at_utc = $expectedCreated
+                AND resumed_at_utc = $expectedResumed AND accumulated_active_seconds = $expectedAccumulated
+                AND paused_at_utc IS $expectedPaused;
             """;
         AddSessionParameters(command, replacement);
         command.Parameters.AddWithValue("$expectedType", SessionTypeText.Format(expected.Type));
@@ -174,6 +182,10 @@ public sealed class SqliteSessionRepository : ISessionRepository
         command.Parameters.AddWithValue("$expectedEnd",
             expected.EndedAt is { } end ? UtcTimestamp.Format(end) : (object)DBNull.Value);
         command.Parameters.AddWithValue("$expectedCreated", UtcTimestamp.Format(expected.CreatedAt));
+        command.Parameters.AddWithValue("$expectedResumed", UtcTimestamp.Format(expected.ResumedAt));
+        command.Parameters.AddWithValue("$expectedAccumulated", expected.AccumulatedActiveDuration.Ticks / TimeSpan.TicksPerSecond);
+        command.Parameters.AddWithValue("$expectedPaused",
+            expected.PausedAt is { } paused ? UtcTimestamp.Format(paused) : (object)DBNull.Value);
 
         int affected = await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         // There is deliberately no cancellable work after commit: cancellation cannot turn a
@@ -181,6 +193,22 @@ public sealed class SqliteSessionRepository : ISessionRepository
         cancellationToken.ThrowIfCancellationRequested();
         transaction.Commit();
         return affected == 1;
+    }
+
+    public async Task<SessionRecord?> GetActiveAsync(CancellationToken cancellationToken = default)
+    {
+        await using SqliteConnection connection =
+            await _connections.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+
+        await using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = $"{SelectSessions} WHERE status IN ('running', 'paused');";
+
+        await using SqliteDataReader reader =
+            await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+
+        return await reader.ReadAsync(cancellationToken).ConfigureAwait(false)
+            ? Map(reader)
+            : null;
     }
 
     public async Task<SessionRecord?> GetRunningAsync(CancellationToken cancellationToken = default)
@@ -249,15 +277,14 @@ public sealed class SqliteSessionRepository : ISessionRepository
         return await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is not null;
     }
 
-    private static async Task<SessionId?> ReadRunningIdAsync(
+    private static async Task<SessionId?> ReadActiveIdAsync(
         SqliteConnection connection,
         SqliteTransaction transaction,
         CancellationToken cancellationToken)
     {
         await using SqliteCommand command = connection.CreateCommand();
         command.Transaction = transaction;
-        command.CommandText = "SELECT id FROM sessions WHERE status = $status;";
-        command.Parameters.AddWithValue("$status", SessionStatusText.Running);
+        command.CommandText = "SELECT id FROM sessions WHERE status IN ('running', 'paused');";
 
         object? id = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
 
@@ -269,6 +296,9 @@ public sealed class SqliteSessionRepository : ISessionRepository
         object endedAt = session.EndedAt is { } value
             ? UtcTimestamp.Format(value)
             : DBNull.Value;
+        object pausedAt = session.PausedAt is { } paused
+            ? UtcTimestamp.Format(paused)
+            : DBNull.Value;
 
         command.Parameters.AddWithValue("$id", session.Id.ToText());
         command.Parameters.AddWithValue("$type", SessionTypeText.Format(session.Type));
@@ -278,6 +308,10 @@ public sealed class SqliteSessionRepository : ISessionRepository
             "$plannedSeconds", session.PlannedDuration.Ticks / TimeSpan.TicksPerSecond);
         command.Parameters.AddWithValue("$endedAt", endedAt);
         command.Parameters.AddWithValue("$createdAt", UtcTimestamp.Format(session.CreatedAt));
+        command.Parameters.AddWithValue("$resumedAt", UtcTimestamp.Format(session.ResumedAt));
+        command.Parameters.AddWithValue(
+            "$accumulatedSeconds", session.AccumulatedActiveDuration.Ticks / TimeSpan.TicksPerSecond);
+        command.Parameters.AddWithValue("$pausedAt", pausedAt);
     }
 
     /// <summary>
@@ -295,6 +329,9 @@ public sealed class SqliteSessionRepository : ISessionRepository
             PlannedDuration = TimeSpan.FromTicks(checked(reader.GetInt64(4) * TimeSpan.TicksPerSecond)),
             EndedAt = reader.IsDBNull(5) ? null : UtcTimestamp.Parse(reader.GetString(5)),
             CreatedAt = UtcTimestamp.Parse(reader.GetString(6)),
+            ResumedAt = UtcTimestamp.Parse(reader.GetString(7)),
+            AccumulatedActiveDuration = TimeSpan.FromTicks(checked(reader.GetInt64(8) * TimeSpan.TicksPerSecond)),
+            PausedAt = reader.IsDBNull(9) ? null : UtcTimestamp.Parse(reader.GetString(9)),
         };
         session.Validate();
         return session;

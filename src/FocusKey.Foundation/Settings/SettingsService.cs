@@ -40,6 +40,8 @@ public sealed class SettingsService(ISettingsRepository repository)
         UpdateAsync(current => current with { ActivityCollapsed = value }, cancellationToken);
     public Task<ApplicationSettings> UpdateGlobalShortcutAsync(GlobalShortcut value, CancellationToken cancellationToken = default) =>
         UpdateAsync(current => current with { GlobalShortcut = value }, cancellationToken);
+    public Task<ApplicationSettings> UpdateMainWindowShortcutAsync(GlobalShortcut value, CancellationToken cancellationToken = default) =>
+        UpdateAsync(current => current with { MainWindowShortcut = value }, cancellationToken);
 
     private async Task<ApplicationSettings> UpdateAsync(
         Func<ApplicationSettings, ApplicationSettings> change, CancellationToken cancellationToken)

@@ -14,6 +14,8 @@ public interface IQuickOverlayView : IDisposable
 {
     event Action<SessionType>? SelectionRequested;
     event Action? StartRequested;
+    event Action? PauseRequested;
+    event Action? StartNewRequested;
     event Action? StopRequested;
     event Action? DismissRequested;
     void Render(QuickOverlayState state);

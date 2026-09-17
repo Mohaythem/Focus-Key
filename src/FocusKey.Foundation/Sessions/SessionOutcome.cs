@@ -17,6 +17,12 @@ public enum SessionOutcomeKind
 
     /// <summary>The observed record changed before this request could write. Nothing was written.</summary>
     Conflict = 5,
+
+    /// <summary>The session was paused.</summary>
+    Paused = 6,
+
+    /// <summary>The session was continued.</summary>
+    Continued = 7,
 }
 
 /// <summary>
@@ -43,7 +49,7 @@ public sealed record SessionOutcome
 
     /// <summary>True when this outcome wrote a state change to storage.</summary>
     public bool ChangedStoredState =>
-        Kind is SessionOutcomeKind.Stopped or SessionOutcomeKind.Completed;
+        Kind is SessionOutcomeKind.Stopped or SessionOutcomeKind.Completed or SessionOutcomeKind.Paused or SessionOutcomeKind.Continued;
 
     internal static SessionOutcome NoActiveSession() =>
         new(SessionOutcomeKind.NoActiveSession, session: null);
@@ -59,4 +65,10 @@ public sealed record SessionOutcome
 
     internal static SessionOutcome Conflict(SessionRecord observed) =>
         new(SessionOutcomeKind.Conflict, observed);
+
+    internal static SessionOutcome Paused(SessionRecord session) =>
+        new(SessionOutcomeKind.Paused, session);
+
+    internal static SessionOutcome Continued(SessionRecord session) =>
+        new(SessionOutcomeKind.Continued, session);
 }

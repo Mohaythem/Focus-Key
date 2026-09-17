@@ -48,6 +48,37 @@ public sealed class CompletionCoordinator : IDisposable
     /// <summary>Safe entry point for native clock/resume signals and the one-shot timer.</summary>
     public void RequestEvaluation() => _ = EvaluateAsync();
 
+    public async Task<SessionOutcome> PauseAsync(SessionId expectedId, CancellationToken cancellationToken = default)
+    {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (_shutdown) throw new InvalidOperationException("Completion coordination has shut down.");
+            SessionOutcome outcome = await _sessions.PauseAsync(expectedId, cancellationToken).ConfigureAwait(false);
+            if (outcome.Kind != SessionOutcomeKind.Conflict) Disarm();
+            return outcome;
+        }
+        finally { _gate.Release(); }
+    }
+
+    public async Task<SessionOutcome> ContinueAsync(SessionId expectedId, CancellationToken cancellationToken = default)
+    {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (_shutdown) throw new InvalidOperationException("Completion coordination has shut down.");
+            SessionOutcome outcome = await _sessions.ContinueAsync(expectedId, cancellationToken).ConfigureAwait(false);
+            if (outcome.Kind == SessionOutcomeKind.Continued && outcome.Session is { } continued)
+            {
+                Arm(continued.PlannedEndAt - _time.GetUtcNow());
+            }
+            return outcome;
+        }
+        finally { _gate.Release(); }
+    }
+
     public async Task<SessionOutcome> StopAsync(SessionId expectedId, CancellationToken cancellationToken = default)
     {
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -80,7 +111,7 @@ public sealed class CompletionCoordinator : IDisposable
                     await NotifyAsync(result.Session!).ConfigureAwait(false);
                 }
                 SessionSnapshot? active = await _sessions.GetActiveAsync().ConfigureAwait(false);
-                if (active is not null)
+                if (active is not null && active.Status == SessionStatus.Running)
                 {
                     TimeSpan remaining = active.PlannedEndAt - _time.GetUtcNow();
                     Arm(result.Kind == SessionOutcomeKind.Conflict && remaining <= TimeSpan.Zero ? RetryDelay : remaining);

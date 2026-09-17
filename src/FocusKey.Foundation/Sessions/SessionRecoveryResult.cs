@@ -7,6 +7,7 @@ public enum SessionRecoveryKind
     Completed = 2,
     Interrupted = 3,
     Conflict = 4,
+    StillPaused = 5,
 }
 
 /// <summary>
@@ -29,4 +30,5 @@ public sealed record SessionRecoveryResult
     internal static SessionRecoveryResult Completed(SessionRecord session) => new(SessionRecoveryKind.Completed, session);
     internal static SessionRecoveryResult Interrupted(SessionRecord session) => new(SessionRecoveryKind.Interrupted, session);
     internal static SessionRecoveryResult Conflict(SessionRecord observed) => new(SessionRecoveryKind.Conflict, observed);
+    internal static SessionRecoveryResult StillPaused(SessionRecord session) => new(SessionRecoveryKind.StillPaused, session);
 }

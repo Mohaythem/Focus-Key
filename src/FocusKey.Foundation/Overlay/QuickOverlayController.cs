@@ -14,6 +14,8 @@ public sealed class QuickOverlayController : IDisposable
     private readonly Func<CancellationToken, Task<SessionDurations>> _getDurations;
     private readonly Func<SessionType, CancellationToken, Task<SessionRecord>> _start;
     private readonly Func<SessionId, CancellationToken, Task<SessionOutcome>> _stop;
+    private readonly Func<SessionId, CancellationToken, Task<SessionOutcome>>? _pause;
+    private readonly Func<SessionId, CancellationToken, Task<SessionOutcome>>? _continue;
     private IQuickOverlayView? _view;
     private bool _visible;
     private bool _starting;
@@ -25,7 +27,9 @@ public sealed class QuickOverlayController : IDisposable
         Func<CancellationToken, Task<SessionSnapshot?>> getActive,
         Func<CancellationToken, Task<SessionDurations>> getDurations,
         Func<SessionType, CancellationToken, Task<SessionRecord>> start,
-        Func<SessionId, CancellationToken, Task<SessionOutcome>> stop)
+        Func<SessionId, CancellationToken, Task<SessionOutcome>> stop,
+        Func<SessionId, CancellationToken, Task<SessionOutcome>>? pause = null,
+        Func<SessionId, CancellationToken, Task<SessionOutcome>>? @continue = null)
     {
         ArgumentNullException.ThrowIfNull(createView);
         ArgumentNullException.ThrowIfNull(getActive);
@@ -37,6 +41,8 @@ public sealed class QuickOverlayController : IDisposable
         _getDurations = getDurations;
         _start = start;
         _stop = stop;
+        _pause = pause;
+        _continue = @continue;
     }
 
     public event Action<Exception>? ErrorOccurred;
@@ -49,6 +55,8 @@ public sealed class QuickOverlayController : IDisposable
             _view = _createView();
             _view.SelectionRequested += Select;
             _view.StartRequested += OnStartRequested;
+            _view.PauseRequested += OnPauseRequested;
+            _view.StartNewRequested += OnStartNewRequested;
             _view.StopRequested += OnStopRequested;
             _view.DismissRequested += Dismiss;
         }
@@ -68,7 +76,9 @@ public sealed class QuickOverlayController : IDisposable
         {
             (SessionSnapshot? active, SessionDurations durations) = await ReadStateAsync();
             if (!IsCurrent(observation)) return;
-            SetState(new(SessionType.Work, false, active is null, null)
+            bool canStart = active is null || active.Status == SessionStatus.Paused;
+            SessionType selected = active?.Status == SessionStatus.Paused ? active.Type : SessionType.Work;
+            SetState(new(selected, false, canStart, null)
                 { Durations = durations, Active = active });
         }
         catch (Exception exception)
@@ -95,8 +105,12 @@ public sealed class QuickOverlayController : IDisposable
         {
             (SessionSnapshot? active, SessionDurations durations) = await ReadStateAsync();
             if (IsCurrent(observation) && !_starting)
-                SetState(new(_state.Selected, false, active is null, null)
+            {
+                SessionType selected = active is not null ? active.Type : _state.Selected;
+                bool canStart = active is null || active.Status == SessionStatus.Paused;
+                SetState(new(selected, false, canStart, null)
                     { Durations = durations, Active = active });
+            }
         }
         catch (Exception exception)
         {
@@ -106,12 +120,39 @@ public sealed class QuickOverlayController : IDisposable
         }
     }
 
+    public async Task PauseAsync()
+    {
+        if (_disposed || !_visible || _starting || _state.IsBusy || _state.Active is not { Status: SessionStatus.Running } active || _pause is null) return;
+        _starting = true; ++_observation; bool reconcile = true;
+        SetState(_state with { IsBusy = true, Feedback = null });
+        try { await _pause(active.Id, CancellationToken.None); }
+        catch (Exception ex) { reconcile = false; if (!_disposed) SetState(_state with { IsBusy = false, Feedback = "Could not pause the session. Please try again." }); ErrorOccurred?.Invoke(ex); }
+        finally { _starting = false; }
+        if (reconcile) await RefreshIfVisibleAsync();
+    }
+
     public async Task StartAsync()
     {
-        if (_disposed || !_visible || _starting || !_state.CanStart || _state.IsBusy) return;
+        if (_disposed || !_visible || _starting || _state.IsBusy) return;
+
+        if (_state.Active is { Status: SessionStatus.Paused } paused)
+        {
+            if (_continue is not null)
+            {
+                _starting = true; ++_observation; bool reconcile = true;
+                SetState(_state with { IsBusy = true, CanStart = false, Feedback = null });
+                try { await _continue(paused.Id, CancellationToken.None); }
+                catch (Exception ex) { reconcile = false; if (!_disposed) SetState(new(_state.Selected, false, true, "Could not continue the session. Please try again.")); ErrorOccurred?.Invoke(ex); }
+                finally { _starting = false; }
+                if (reconcile) await RefreshIfVisibleAsync();
+                return;
+            }
+        }
+
+        if (!_state.CanStart) return;
         _starting = true;
         ++_observation;
-        bool reconcile = true;
+        bool reconcileNormal = true;
         SessionType selected = _state.Selected;
         SetState(_state with { IsBusy = true, CanStart = false, Feedback = null });
         try
@@ -125,12 +166,12 @@ public sealed class QuickOverlayController : IDisposable
         }
         catch (Exception exception)
         {
-            reconcile = false;
+            reconcileNormal = false;
             if (!_disposed) SetState(new(selected, false, true, "Could not start the session. Please try again."));
             ErrorOccurred?.Invoke(exception);
         }
         finally { _starting = false; }
-        if (reconcile) await RefreshIfVisibleAsync();
+        if (reconcileNormal) await RefreshIfVisibleAsync();
     }
 
     public async Task StopAsync()
@@ -151,6 +192,24 @@ public sealed class QuickOverlayController : IDisposable
         if (reconcile) await RefreshIfVisibleAsync();
     }
 
+    public async Task StartNewAsync()
+    {
+        if (_disposed || !_visible || _starting || _state.IsBusy || _state.Active is not { Status: SessionStatus.Paused } paused) return;
+        _starting = true;
+        ++_observation;
+        bool reconcile = true;
+        SetState(_state with { IsBusy = true, Feedback = null });
+        try { await _stop(paused.Id, CancellationToken.None); }
+        catch (Exception exception)
+        {
+            reconcile = false;
+            if (!_disposed) SetState(_state with { IsBusy = false, Feedback = "Could not finalize the paused session. Please try again." });
+            ErrorOccurred?.Invoke(exception);
+        }
+        finally { _starting = false; }
+        if (reconcile) await RefreshIfVisibleAsync();
+    }
+
     public void Dismiss()
     {
         if (_disposed) return;
@@ -160,6 +219,8 @@ public sealed class QuickOverlayController : IDisposable
     }
 
     private async void OnStartRequested() => await StartAsync();
+    private async void OnPauseRequested() => await PauseAsync();
+    private async void OnStartNewRequested() => await StartNewAsync();
     private async void OnStopRequested() => await StopAsync();
     private async Task<(SessionSnapshot? Active, SessionDurations Durations)> ReadStateAsync()
     {
@@ -184,6 +245,8 @@ public sealed class QuickOverlayController : IDisposable
         if (_view is null) return;
         _view.SelectionRequested -= Select;
         _view.StartRequested -= OnStartRequested;
+        _view.PauseRequested -= OnPauseRequested;
+        _view.StartNewRequested -= OnStartNewRequested;
         _view.StopRequested -= OnStopRequested;
         _view.DismissRequested -= Dismiss;
         _view.Dispose();

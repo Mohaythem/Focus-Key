@@ -437,11 +437,106 @@ public sealed class QuickOverlayControllerTests
         Assert.NotNull(view.LastState.Active);
     }
 
+    [Fact]
+    public async Task RunningSession_CanBePausedFromOverlay()
+    {
+        using var store = new SessionStore();
+        var clock = new ManualTimeProvider(TestSessions.Anchor);
+        var sessions = new SessionCoordinator(store.Repository, clock);
+        await sessions.InitializeAsync();
+        var work = await sessions.StartAsync(SessionType.Work);
+
+        var view = new FakeView();
+        using var controller = New(view, getActive: sessions.GetActiveAsync, stop: sessions.StopAsync,
+            pause: sessions.PauseAsync, @continue: sessions.ContinueAsync);
+
+        await controller.HandleActivationAsync(ShellActivationKind.Hotkey);
+        Assert.NotNull(view.LastState.Active);
+        Assert.Equal(SessionStatus.Running, view.LastState.Active.Status);
+
+        view.RaisePause();
+        await view.WaitFor(s => s.Active?.Status == SessionStatus.Paused);
+
+        Assert.Equal(SessionStatus.Paused, view.LastState.Active!.Status);
+        Assert.True(view.LastState.CanStart);
+        Assert.Equal(SessionType.Work, view.LastState.Selected);
+    }
+
+    [Fact]
+    public async Task PausedSession_CanBeContinuedFromOverlay()
+    {
+        using var store = new SessionStore();
+        var clock = new ManualTimeProvider(TestSessions.Anchor);
+        var sessions = new SessionCoordinator(store.Repository, clock);
+        await sessions.InitializeAsync();
+        var work = await sessions.StartAsync(SessionType.Work);
+        await sessions.PauseAsync(work.Id);
+
+        var view = new FakeView();
+        using var controller = New(view, getActive: sessions.GetActiveAsync, stop: sessions.StopAsync,
+            pause: sessions.PauseAsync, @continue: sessions.ContinueAsync);
+
+        await controller.HandleActivationAsync(ShellActivationKind.Hotkey);
+        Assert.NotNull(view.LastState.Active);
+        Assert.Equal(SessionStatus.Paused, view.LastState.Active.Status);
+        Assert.True(view.LastState.CanStart);
+
+        view.RaiseStart();
+        await view.WaitFor(s => s.Active?.Status == SessionStatus.Running);
+
+        Assert.Equal(SessionStatus.Running, view.LastState.Active!.Status);
+        Assert.False(view.LastState.CanStart);
+    }
+
+    [Fact]
+    public async Task StartNewWhilePaused_StopsPreviousSessionAndAllowsStartingNewType()
+    {
+        using var store = new SessionStore();
+        var clock = new ManualTimeProvider(TestSessions.Anchor);
+        var sessions = new SessionCoordinator(store.Repository, clock);
+        await sessions.InitializeAsync();
+        var work = await sessions.StartAsync(SessionType.Work);
+        clock.Advance(TimeSpan.FromMinutes(5));
+        await sessions.PauseAsync(work.Id);
+
+        var view = new FakeView();
+        using var controller = New(view, getActive: sessions.GetActiveAsync,
+            start: sessions.StartAsync, stop: sessions.StopAsync,
+            pause: sessions.PauseAsync, @continue: sessions.ContinueAsync);
+
+        await controller.HandleActivationAsync(ShellActivationKind.Hotkey);
+        Assert.Equal(SessionStatus.Paused, view.LastState.Active!.Status);
+
+        // Click Start New to finalize the paused session
+        view.RaiseStartNew();
+        await view.WaitFor(s => s.Active is null);
+
+        // Verify previous work session was cleanly stopped with partial credit
+        var previousWork = await store.Repository.GetAsync(work.Id);
+        Assert.NotNull(previousWork);
+        Assert.Equal(SessionStatus.Stopped, previousWork.Status);
+        Assert.Equal(TimeSpan.FromMinutes(5), previousWork.EffectiveDuration);
+
+        // Switch selection to Break and start
+        view.RaiseSelection(SessionType.Break);
+        Assert.Equal(SessionType.Break, view.LastState.Selected);
+
+        view.RaiseStart();
+        await view.WaitFor(s => s.Active?.Status == SessionStatus.Running && s.Active?.Type == SessionType.Break);
+
+        // Verify new break session is running
+        var currentBreak = await store.Repository.GetRunningAsync();
+        Assert.NotNull(currentBreak);
+        Assert.Equal(SessionType.Break, currentBreak.Type);
+    }
+
     private static QuickOverlayController New(FakeView view, Func<IQuickOverlayView>? create = null,
         Func<CancellationToken, Task<SessionSnapshot?>>? getActive = null,
         Func<CancellationToken, Task<SessionDurations>>? getDurations = null,
         Func<SessionType, CancellationToken, Task<SessionRecord>>? start = null,
-        Func<SessionId, CancellationToken, Task<SessionOutcome>>? stop = null)
+        Func<SessionId, CancellationToken, Task<SessionOutcome>>? stop = null,
+        Func<SessionId, CancellationToken, Task<SessionOutcome>>? pause = null,
+        Func<SessionId, CancellationToken, Task<SessionOutcome>>? @continue = null)
     {
         SessionSnapshot? current = null;
         return new(create ?? (() => view), getActive ?? (_ => Task.FromResult(current)),
@@ -451,7 +546,8 @@ public sealed class QuickOverlayControllerTests
                 var record = start is null ? TestSessions.Running(type: type) : await start(type, token);
                 current = SessionSnapshot.For(record, TestSessions.Anchor);
                 return record;
-            }, stop ?? ((_, _) => Task.FromException<SessionOutcome>(new NotSupportedException())));
+            }, stop ?? ((_, _) => Task.FromException<SessionOutcome>(new NotSupportedException())),
+            pause, @continue);
     }
     private sealed class FakeView : IQuickOverlayView
     {
@@ -461,12 +557,14 @@ public sealed class QuickOverlayControllerTests
         internal QuickOverlayState LastState => States[^1];
         internal Task WaitFor(Func<QuickOverlayState, bool> p) { var t = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously); foreach (var s in States) if (p(s)) t.TrySetResult(); if (!t.Task.IsCompleted) _watchers.Add((p,t)); return t.Task; }
         private readonly List<(Func<QuickOverlayState,bool> P, TaskCompletionSource T)> _watchers = [];
-        public event Action<SessionType>? SelectionRequested; public event Action? StartRequested; public event Action? StopRequested; public event Action? DismissRequested;
+        public event Action<SessionType>? SelectionRequested; public event Action? StartRequested; public event Action? StopRequested; public event Action? PauseRequested; public event Action? StartNewRequested; public event Action? DismissRequested;
         public void Render(QuickOverlayState state) { States.Add(state); RenderCount++; foreach (var w in _watchers.ToArray()) if (w.P(state)) w.T.TrySetResult(); }
         public void ShowAndFocus() => ShowCount++;
         public void Hide() { HideCount++; Hidden.TrySetResult(); }
         public void RaiseSelection(SessionType t) => SelectionRequested?.Invoke(t); public void RaiseStart() => StartRequested?.Invoke(); public void RaiseDismiss() => DismissRequested?.Invoke();
         public void RaiseStop() => StopRequested?.Invoke();
+        public void RaisePause() => PauseRequested?.Invoke();
+        public void RaiseStartNew() => StartNewRequested?.Invoke();
         public void Dispose() => DisposeCount++;
     }
 }

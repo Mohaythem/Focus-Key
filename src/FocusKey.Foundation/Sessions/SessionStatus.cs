@@ -17,6 +17,9 @@ public enum SessionStatus
 
     /// <summary>The session ended without completing or being stopped by the user.</summary>
     Interrupted = 4,
+
+    /// <summary>The session is paused and timer is held.</summary>
+    Paused = 5,
 }
 
 /// <summary>
@@ -30,6 +33,7 @@ public static class SessionStatusText
     public const string Completed = "completed";
     public const string Stopped = "stopped";
     public const string Interrupted = "interrupted";
+    public const string Paused = "paused";
 
     public static string Format(SessionStatus status) => status switch
     {
@@ -37,6 +41,7 @@ public static class SessionStatusText
         SessionStatus.Completed => Completed,
         SessionStatus.Stopped => Stopped,
         SessionStatus.Interrupted => Interrupted,
+        SessionStatus.Paused => Paused,
         _ => throw new ArgumentOutOfRangeException(
             nameof(status), status, "Unknown session status cannot be persisted."),
     };
@@ -62,6 +67,9 @@ public static class SessionStatusText
                 return true;
             case Interrupted:
                 status = SessionStatus.Interrupted;
+                return true;
+            case Paused:
+                status = SessionStatus.Paused;
                 return true;
             default:
                 status = default;

@@ -34,6 +34,16 @@ internal sealed class LifecycleTestRepository(ISessionRepository inner) : ISessi
         return changed;
     }
 
+    public async Task<SessionRecord?> GetActiveAsync(CancellationToken cancellationToken = default)
+    {
+        RunningReads++;
+        cancellationToken.ThrowIfCancellationRequested();
+        if (FailReads) throw new InvalidOperationException("test read failure");
+        var result = await inner.GetActiveAsync(cancellationToken);
+        if (AfterRead is not null) await AfterRead();
+        return result;
+    }
+
     public async Task<SessionRecord?> GetRunningAsync(CancellationToken cancellationToken = default)
     {
         RunningReads++;

@@ -6,7 +6,11 @@ internal static class NativeMethods
 {
     internal const int WM_NCCREATE = 0x0081;
     internal const int WM_DESTROY = 0x0002;
+    internal const int WM_SIZE = 0x0005;
+    internal const int SIZE_MINIMIZED = 1;
     internal const int WM_COMMAND = 0x0111;
+    internal const int WM_SYSCOMMAND = 0x0112;
+    internal const int SC_MINIMIZE = 0xF020;
     internal const int WM_HOTKEY = 0x0312;
     internal const int WM_CONTEXTMENU = 0x007B;
     internal const int WM_NULL = 0x0000;
@@ -52,6 +56,9 @@ internal static class NativeMethods
 
     [UnmanagedFunctionPointer(CallingConvention.Winapi)]
     internal delegate IntPtr WndProc(IntPtr hWnd, uint message, IntPtr wParam, IntPtr lParam);
+
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+    internal delegate IntPtr SubclassProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, UIntPtr uIdSubclass, IntPtr dwRefData);
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     internal struct WNDCLASSEX
@@ -118,6 +125,15 @@ internal static class NativeMethods
     [DllImport("user32.dll", SetLastError = true)] internal static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
     [DllImport("user32.dll", SetLastError = true)] internal static extern bool GetCursorPos(out POINT point);
     [DllImport("user32.dll")] internal static extern uint GetDpiForWindow(IntPtr window);
+
+    [DllImport("comctl32.dll", SetLastError = true)]
+    internal static extern bool SetWindowSubclass(IntPtr hWnd, SubclassProc pfnSubclass, UIntPtr uIdSubclass, IntPtr dwRefData);
+
+    [DllImport("comctl32.dll", SetLastError = true)]
+    internal static extern bool RemoveWindowSubclass(IntPtr hWnd, SubclassProc pfnSubclass, UIntPtr uIdSubclass);
+
+    [DllImport("comctl32.dll", SetLastError = true)]
+    internal static extern IntPtr DefSubclassProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam);
 
     internal static void ForceForeground(IntPtr targetWindow)
     {

@@ -92,6 +92,13 @@ public sealed class SessionConcurrencyTests
 
     private sealed class ReadHookRepository(ISessionRepository inner, Func<Task> afterRead) : ISessionRepository
     {
+        public async Task<SessionRecord?> GetActiveAsync(CancellationToken cancellationToken = default)
+        {
+            SessionRecord? observed = await inner.GetActiveAsync(cancellationToken);
+            await afterRead();
+            return observed;
+        }
+
         public async Task<SessionRecord?> GetRunningAsync(CancellationToken cancellationToken = default)
         {
             SessionRecord? observed = await inner.GetRunningAsync(cancellationToken);

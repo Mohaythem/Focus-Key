@@ -158,18 +158,30 @@
                         HorizontalAlignment="Left"
                         Width="0" />
                 </Border>
-                <!-- Stop Session button (aligned bottom-right) -->
-                <Grid HorizontalAlignment="Right">
+                <!-- Action buttons (aligned bottom-right) -->
+                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
                     <Button
-                        x:Name="StopButton"
-                        Content="Stop Session"
+                        x:Name="StartNewButton"
+                        Content="Start New"
                         Style="{StaticResource FkOverlayStopButton}"
                         UseSystemFocusVisuals="True"
                         FocusVisualPrimaryBrush="{ThemeResource FkSecondary}"
                         FocusVisualSecondaryBrush="Transparent"
                         FocusVisualPrimaryThickness="1"
-                        Click="OnStopClicked" />
-                </Grid>
+                        Visibility="Collapsed"
+                        AutomationProperties.Name="Start New Session"
+                        Click="OnStartNewClicked" />
+                    <Button
+                        x:Name="PauseButton"
+                        Content="Pause"
+                        Style="{StaticResource FkOverlayStopButton}"
+                        UseSystemFocusVisuals="True"
+                        FocusVisualPrimaryBrush="{ThemeResource FkSecondary}"
+                        FocusVisualSecondaryBrush="Transparent"
+                        FocusVisualPrimaryThickness="1"
+                        AutomationProperties.Name="Pause Session"
+                        Click="OnPauseClicked" />
+                </StackPanel>
             </StackPanel>
 
             <TextBlock
@@ -222,6 +234,7 @@
                             Foreground="{ThemeResource FkSecondary}" />
                     </Border>
                     <TextBlock
+                        x:Name="StartKeyHint"
                         Text="Start"
                         FontSize="10"
                         Foreground="{ThemeResource FkSecondary}"

@@ -414,8 +414,10 @@ public sealed class SqliteSessionRepositoryTests
         store.ExecuteRaw(
             """
             INSERT INTO sessions (
-                id, type, status, started_at_utc, planned_duration_seconds, ended_at_utc, created_at_utc)
-            VALUES ($id, 'work', 'running', 'XXXXXXXXXXXXXXXXXXXXXXXXXXXX', 1800, NULL, $createdAt);
+                id, type, status, started_at_utc, planned_duration_seconds, ended_at_utc, created_at_utc,
+                resumed_at_utc, accumulated_active_seconds, paused_at_utc)
+            VALUES ($id, 'work', 'running', 'XXXXXXXXXXXXXXXXXXXXXXXXXXXX', 1800, NULL, $createdAt,
+                'XXXXXXXXXXXXXXXXXXXXXXXXXXXX', 0, NULL);
             """,
             ("$id", id.ToText()),
             ("$createdAt", Data.UtcTimestamp.Format(TestSessions.Anchor)));

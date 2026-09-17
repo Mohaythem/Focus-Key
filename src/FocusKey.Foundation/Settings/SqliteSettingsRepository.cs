@@ -13,7 +13,7 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
         await using SqliteCommand command = connection.CreateCommand();
         command.CommandText =
             """
-            SELECT work_duration_seconds, break_duration_seconds, appearance, work_color, break_color, session_sounds_enabled, activity_collapsed, global_shortcut
+            SELECT work_duration_seconds, break_duration_seconds, appearance, work_color, break_color, session_sounds_enabled, activity_collapsed, global_shortcut, main_window_shortcut
             FROM application_settings WHERE singleton = 1;
             """;
         await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
@@ -31,6 +31,9 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
             var globalShortcut = GlobalShortcut.TryParse(reader.GetString(7), out var parsedShortcut)
                 ? parsedShortcut
                 : GlobalShortcut.Default;
+            var mainWindowShortcut = GlobalShortcut.TryParse(reader.GetString(8), out var parsedMainWindowShortcut)
+                ? parsedMainWindowShortcut
+                : GlobalShortcut.DefaultMainWindow;
             if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
                 throw new InvalidDataException("More than one authoritative application settings record exists.");
             await reader.CloseAsync().ConfigureAwait(false);
@@ -50,6 +53,7 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
                 SessionSoundsEnabled = soundsEnabled,
                 ActivityCollapsed = activityCollapsed,
                 GlobalShortcut = globalShortcut,
+                MainWindowShortcut = mainWindowShortcut,
             };
             settings.Validate();
             return settings;
@@ -79,7 +83,8 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
                 break_color = $breakColor,
                 session_sounds_enabled = $sounds,
                 activity_collapsed = $activityCollapsed,
-                global_shortcut = $globalShortcut
+                global_shortcut = $globalShortcut,
+                main_window_shortcut = $mainWindowShortcut
             WHERE singleton = 1;
             """;
         var light = settings.LightTheme ?? ThemeConfiguration.DefaultLight;
@@ -92,6 +97,7 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
         command.Parameters.AddWithValue("$sounds", settings.SessionSoundsEnabled ? 1 : 0);
         command.Parameters.AddWithValue("$activityCollapsed", settings.ActivityCollapsed ? 1 : 0);
         command.Parameters.AddWithValue("$globalShortcut", (settings.GlobalShortcut ?? GlobalShortcut.Default).ToString());
+        command.Parameters.AddWithValue("$mainWindowShortcut", (settings.MainWindowShortcut ?? GlobalShortcut.DefaultMainWindow).ToString());
         if (await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
             throw new InvalidDataException("The authoritative application settings record is missing.");
 

@@ -76,13 +76,22 @@ internal sealed class SettingsView : UserControl
     private readonly Action<Exception> _report;
     internal delegate bool TryUpdateShortcutHandler(GlobalShortcut newShortcut, out string? error);
     private readonly TryUpdateShortcutHandler? _tryUpdateShortcut;
+    private readonly TryUpdateShortcutHandler? _tryUpdateMainWindowShortcut;
     private readonly Action<GlobalShortcut>? _onShortcutChanged;
+    private readonly Action<GlobalShortcut>? _onMainWindowShortcutChanged;
     private readonly Button _shortcutButton = new();
     private readonly TextBlock _shortcutText = new();
     private readonly Button _resetShortcutButton = new();
     private readonly TextBlock _shortcutError = new() { Visibility = Visibility.Collapsed };
     private GlobalShortcut _currentShortcut = GlobalShortcut.Default;
     private bool _isListeningForShortcut;
+
+    private readonly Button _mainWindowShortcutButton = new();
+    private readonly TextBlock _mainWindowShortcutText = new();
+    private readonly Button _resetMainWindowShortcutButton = new();
+    private readonly TextBlock _mainWindowShortcutError = new() { Visibility = Visibility.Collapsed };
+    private GlobalShortcut _currentMainWindowShortcut = GlobalShortcut.DefaultMainWindow;
+    private bool _isListeningForMainWindowShortcut;
 
     internal SettingsView(
         SettingsService settings,
@@ -93,7 +102,9 @@ internal sealed class SettingsView : UserControl
         Func<IntPtr> getWindowHandle,
         Action<Exception> report,
         TryUpdateShortcutHandler? tryUpdateShortcut = null,
-        Action<GlobalShortcut>? onShortcutChanged = null)
+        TryUpdateShortcutHandler? tryUpdateMainWindowShortcut = null,
+        Action<GlobalShortcut>? onShortcutChanged = null,
+        Action<GlobalShortcut>? onMainWindowShortcutChanged = null)
     {
         _windowsStartup = windowsStartup ?? throw new ArgumentNullException(nameof(windowsStartup));
         _historyService = history ?? throw new ArgumentNullException(nameof(history));
@@ -101,7 +112,9 @@ internal sealed class SettingsView : UserControl
         _getWindowHandle = getWindowHandle ?? throw new ArgumentNullException(nameof(getWindowHandle));
         _report = report ?? throw new ArgumentNullException(nameof(report));
         _tryUpdateShortcut = tryUpdateShortcut;
+        _tryUpdateMainWindowShortcut = tryUpdateMainWindowShortcut;
         _onShortcutChanged = onShortcutChanged;
+        _onMainWindowShortcutChanged = onMainWindowShortcutChanged;
         _controller = new(settings, refresh, report);
         _colorDebounceTimer = DispatcherQueue.CreateTimer();
         _colorDebounceTimer.Interval = TimeSpan.FromMilliseconds(250);
@@ -168,11 +181,13 @@ internal sealed class SettingsView : UserControl
         sessions.Children.Add(Row("Session sounds", "Play a soft tick on start and a chime on completion", _sessionSounds, true));
         _fields.Children.Add(Section("SESSIONS", sessions));
 
-        // 6. SHORTCUT
-        var shortcut = new StackPanel { Spacing = 0 };
-        var shortcutControl = BuildShortcutControl();
-        shortcut.Children.Add(Row("Open overlay", "Global keyboard shortcut", shortcutControl, true));
-        _fields.Children.Add(Section("SHORTCUT", shortcut));
+        // 6. SHORTCUTS
+        var shortcuts = new StackPanel { Spacing = 0 };
+        var overlayShortcutControl = BuildShortcutControl();
+        var mainWindowShortcutControl = BuildMainWindowShortcutControl();
+        shortcuts.Children.Add(Row("Quick Overlay", "Global shortcut to toggle quick overlay (default Shift + F3)", overlayShortcutControl, false));
+        shortcuts.Children.Add(Row("Open Focus Key", "Global shortcut to open and focus the main window (default Shift + F4)", mainWindowShortcutControl, true));
+        _fields.Children.Add(Section("SHORTCUTS", shortcuts));
 
         // 7. SYSTEM
         var system = new StackPanel { Spacing = 0 };
@@ -497,6 +512,9 @@ internal sealed class SettingsView : UserControl
                 case SettingsField.GlobalShortcut:
                     UpdateShortcutVisuals(saved.GlobalShortcut ?? GlobalShortcut.Default);
                     break;
+                case SettingsField.MainWindowShortcut:
+                    UpdateMainWindowShortcutVisuals(saved.MainWindowShortcut ?? GlobalShortcut.DefaultMainWindow);
+                    break;
             }
         }
         finally { _applying = false; }
@@ -807,6 +825,13 @@ internal sealed class SettingsView : UserControl
 
     private async Task ApplyNewShortcutAsync(GlobalShortcut candidate)
     {
+        if (candidate == _currentMainWindowShortcut)
+        {
+            _shortcutError.Text = "Quick Overlay shortcut cannot be identical to Open Focus Key shortcut.";
+            _shortcutError.Visibility = Visibility.Visible;
+            return;
+        }
+
         _applying = true;
         try
         {
@@ -825,6 +850,184 @@ internal sealed class SettingsView : UserControl
                 UpdateShortcutVisuals(_currentShortcut);
                 _shortcutError.Text = regError ?? "Could not register shortcut.";
                 _shortcutError.Visibility = Visibility.Visible;
+            }
+        }
+        finally
+        {
+            _applying = false;
+        }
+    }
+
+    private FrameworkElement BuildMainWindowShortcutControl()
+    {
+        var root = new StackPanel { Spacing = 6, HorizontalAlignment = HorizontalAlignment.Right };
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, VerticalAlignment = VerticalAlignment.Center };
+
+        _mainWindowShortcutButton.Style = Application.Current?.Resources["FkColorButton"] as Style;
+        _mainWindowShortcutButton.MinWidth = 120;
+        _mainWindowShortcutButton.Padding = new Thickness(12, 6, 12, 6);
+        _mainWindowShortcutButton.HorizontalContentAlignment = HorizontalAlignment.Center;
+        _mainWindowShortcutButton.VerticalAlignment = VerticalAlignment.Center;
+
+        _mainWindowShortcutText.Text = _currentMainWindowShortcut.ToString();
+        _mainWindowShortcutText.FontFamily = new FontFamily("Consolas");
+        _mainWindowShortcutText.FontSize = 12;
+        _mainWindowShortcutText.Foreground = Presentation.ThemeBrush("FkSecondary", this);
+        _mainWindowShortcutText.HorizontalAlignment = HorizontalAlignment.Center;
+        _mainWindowShortcutButton.Content = _mainWindowShortcutText;
+
+        AutomationProperties.SetName(_mainWindowShortcutButton, $"Open Focus Key shortcut, {_currentMainWindowShortcut}, click to change");
+
+        _resetMainWindowShortcutButton.Content = "Reset";
+        _resetMainWindowShortcutButton.FontSize = 12;
+        _resetMainWindowShortcutButton.Padding = new Thickness(10, 6, 10, 6);
+        _resetMainWindowShortcutButton.CornerRadius = new CornerRadius(4);
+        _resetMainWindowShortcutButton.Background = Presentation.ThemeBrush("FkSurface2", this);
+        _resetMainWindowShortcutButton.BorderBrush = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", this);
+        _resetMainWindowShortcutButton.BorderThickness = new Thickness(1);
+        _resetMainWindowShortcutButton.Foreground = Presentation.ThemeBrush("FkSecondary", this);
+        _resetMainWindowShortcutButton.VerticalAlignment = VerticalAlignment.Center;
+        ToolTipService.SetToolTip(_resetMainWindowShortcutButton, "Reset to Shift + F4");
+        AutomationProperties.SetName(_resetMainWindowShortcutButton, "Reset shortcut to Shift + F4");
+
+        row.Children.Add(_mainWindowShortcutButton);
+        row.Children.Add(_resetMainWindowShortcutButton);
+        root.Children.Add(row);
+
+        _mainWindowShortcutError.Style = Application.Current?.Resources["FkMutedText"] as Style;
+        _mainWindowShortcutError.Foreground = Presentation.ThemeBrush("FkStatusStopped", this);
+        _mainWindowShortcutError.FontSize = 11;
+        _mainWindowShortcutError.TextWrapping = TextWrapping.Wrap;
+        _mainWindowShortcutError.HorizontalAlignment = HorizontalAlignment.Right;
+        AutomationProperties.SetLiveSetting(_mainWindowShortcutError, AutomationLiveSetting.Polite);
+        root.Children.Add(_mainWindowShortcutError);
+
+        _mainWindowShortcutButton.Click += (_, _) =>
+        {
+            if (_isListeningForMainWindowShortcut)
+            {
+                CancelMainWindowShortcutListening();
+            }
+            else
+            {
+                StartMainWindowShortcutListening();
+            }
+        };
+
+        _mainWindowShortcutButton.PreviewKeyDown += OnMainWindowShortcutPreviewKeyDown;
+        _mainWindowShortcutButton.LostFocus += (_, _) =>
+        {
+            if (_isListeningForMainWindowShortcut) CancelMainWindowShortcutListening();
+        };
+
+        _resetMainWindowShortcutButton.Click += async (_, _) =>
+        {
+            if (_applying) return;
+            CancelMainWindowShortcutListening();
+            await ApplyNewMainWindowShortcutAsync(GlobalShortcut.DefaultMainWindow);
+        };
+
+        return root;
+    }
+
+    private void StartMainWindowShortcutListening()
+    {
+        _isListeningForMainWindowShortcut = true;
+        _mainWindowShortcutError.Visibility = Visibility.Collapsed;
+        _mainWindowShortcutText.Text = "[ Press combination ]";
+        _mainWindowShortcutText.Foreground = Presentation.ThemeBrush("FkAccent", this);
+        AutomationProperties.SetName(_mainWindowShortcutButton, "Listening for shortcut. Press key combination or Escape to cancel.");
+    }
+
+    private void CancelMainWindowShortcutListening()
+    {
+        _isListeningForMainWindowShortcut = false;
+        UpdateMainWindowShortcutVisuals(_currentMainWindowShortcut);
+    }
+
+    private void UpdateMainWindowShortcutVisuals(GlobalShortcut shortcut)
+    {
+        _currentMainWindowShortcut = shortcut;
+        _mainWindowShortcutText.Text = shortcut.ToString();
+        _mainWindowShortcutText.Foreground = Presentation.ThemeBrush("FkSecondary", this);
+        AutomationProperties.SetName(_mainWindowShortcutButton, $"Open Focus Key shortcut, {shortcut}, click to change");
+    }
+
+    private async void OnMainWindowShortcutPreviewKeyDown(object sender, KeyRoutedEventArgs args)
+    {
+        if (!_isListeningForMainWindowShortcut) return;
+        args.Handled = true;
+
+        uint vk = (uint)(args.Key != VirtualKey.None ? args.Key : args.OriginalKey);
+
+        if (vk == 0x1B) // VK_ESCAPE
+        {
+            CancelMainWindowShortcutListening();
+            return;
+        }
+
+        ShortcutModifiers mods = ShortcutModifiers.None;
+        if ((NativeMethods.GetKeyState(0x10) & 0x8000) != 0) mods |= ShortcutModifiers.Shift;
+        if ((NativeMethods.GetKeyState(0x11) & 0x8000) != 0) mods |= ShortcutModifiers.Control;
+        if ((NativeMethods.GetKeyState(0x12) & 0x8000) != 0) mods |= ShortcutModifiers.Alt;
+        if ((NativeMethods.GetKeyState(0x5B) & 0x8000) != 0 || (NativeMethods.GetKeyState(0x5C) & 0x8000) != 0) mods |= ShortcutModifiers.Windows;
+
+        if (vk is 0x10 or 0xA0 or 0xA1) mods |= ShortcutModifiers.Shift;
+        else if (vk is 0x11 or 0xA2 or 0xA3) mods |= ShortcutModifiers.Control;
+        else if (vk is 0x12 or 0xA4 or 0xA5) mods |= ShortcutModifiers.Alt;
+        else if (vk is 0x5B or 0x5C) mods |= ShortcutModifiers.Windows;
+
+        bool isModifierOnly = vk is 0x10 or 0x11 or 0x12 or 0x5B or 0x5C or 0xA0 or 0xA1 or 0xA2 or 0xA3 or 0xA4 or 0xA5;
+        if (isModifierOnly)
+        {
+            var parts = new List<string>();
+            if (mods.HasFlag(ShortcutModifiers.Windows)) parts.Add("Win");
+            if (mods.HasFlag(ShortcutModifiers.Control)) parts.Add("Ctrl");
+            if (mods.HasFlag(ShortcutModifiers.Alt)) parts.Add("Alt");
+            if (mods.HasFlag(ShortcutModifiers.Shift)) parts.Add("Shift");
+            _mainWindowShortcutText.Text = parts.Count > 0 ? $"{string.Join(" + ", parts)} + …" : "[ Press combination ]";
+            return;
+        }
+
+        var candidate = new GlobalShortcut(mods, vk);
+        if (!candidate.IsValid(out string? valError))
+        {
+            _mainWindowShortcutError.Text = valError ?? "Invalid shortcut combination.";
+            _mainWindowShortcutError.Visibility = Visibility.Visible;
+            return;
+        }
+
+        CancelMainWindowShortcutListening();
+        await ApplyNewMainWindowShortcutAsync(candidate);
+    }
+
+    private async Task ApplyNewMainWindowShortcutAsync(GlobalShortcut candidate)
+    {
+        if (candidate == _currentShortcut)
+        {
+            _mainWindowShortcutError.Text = "Open Focus Key shortcut cannot be identical to Quick Overlay shortcut.";
+            _mainWindowShortcutError.Visibility = Visibility.Visible;
+            return;
+        }
+
+        _applying = true;
+        try
+        {
+            string? regError = null;
+            bool registered = _tryUpdateMainWindowShortcut == null || _tryUpdateMainWindowShortcut(candidate, out regError);
+            if (registered)
+            {
+                UpdateMainWindowShortcutVisuals(candidate);
+                _mainWindowShortcutError.Text = string.Empty;
+                _mainWindowShortcutError.Visibility = Visibility.Collapsed;
+                await _controller.UpdateMainWindowShortcutAsync(candidate);
+                _onMainWindowShortcutChanged?.Invoke(candidate);
+            }
+            else
+            {
+                UpdateMainWindowShortcutVisuals(_currentMainWindowShortcut);
+                _mainWindowShortcutError.Text = regError ?? "Could not register shortcut.";
+                _mainWindowShortcutError.Visibility = Visibility.Visible;
             }
         }
         finally

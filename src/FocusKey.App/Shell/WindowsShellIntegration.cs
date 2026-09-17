@@ -8,7 +8,9 @@ namespace FocusKey.Shell;
 
 internal sealed class WindowsShellIntegration : IShellIntegration
 {
-    private const int HotkeyId = 0x464B;
+    private const int OverlayHotkeyId = 0x464B;
+    private const int MainWindowHotkeyId = 0x464C;
+    private const int HotkeyId = OverlayHotkeyId;
     private const uint TrayCallback = 0x0400 + 71;
     private const uint OpenCommand = 1;
     private const uint ExitCommand = 2;
@@ -22,16 +24,19 @@ internal sealed class WindowsShellIntegration : IShellIntegration
     private bool _classRegistered;
     private bool _trayAdded;
     private bool _hotkeyRegistered;
+    private bool _mainWindowHotkeyRegistered;
     private bool _started;
     private bool _disposed;
     private uint _taskbarCreated;
 
     public GlobalShortcut CurrentShortcut { get; private set; } = GlobalShortcut.Default;
+    public GlobalShortcut CurrentMainWindowShortcut { get; private set; } = GlobalShortcut.DefaultMainWindow;
 
-    public WindowsShellIntegration(GlobalShortcut? initialShortcut = null)
+    public WindowsShellIntegration(GlobalShortcut? initialShortcut = null, GlobalShortcut? initialMainWindowShortcut = null)
     {
         _windowProcedure = WindowProcedure;
         if (initialShortcut is not null) CurrentShortcut = initialShortcut;
+        if (initialMainWindowShortcut is not null) CurrentMainWindowShortcut = initialMainWindowShortcut;
     }
 
     public event Action<ShellActivationKind>? ActivationRequested;
@@ -81,7 +86,7 @@ internal sealed class WindowsShellIntegration : IShellIntegration
             _powerRegistration = NativeMethods.RegisterSuspendResumeNotification(_window, 0); // DEVICE_NOTIFY_WINDOW_HANDLE
             if (_powerRegistration == IntPtr.Zero) throw LastError("Could not subscribe to system resume notifications.");
             uint fsModifiers = NativeMethods.MOD_NOREPEAT | MapModifiers(CurrentShortcut.Modifiers);
-            if (!NativeMethods.RegisterHotKey(_window, HotkeyId, fsModifiers, CurrentShortcut.VirtualKey))
+            if (!NativeMethods.RegisterHotKey(_window, OverlayHotkeyId, fsModifiers, CurrentShortcut.VirtualKey))
             {
                 // Hotkey is a convenience; do not crash the application if it is taken.
                 _hotkeyRegistered = false;
@@ -89,6 +94,16 @@ internal sealed class WindowsShellIntegration : IShellIntegration
             else
             {
                 _hotkeyRegistered = true;
+            }
+
+            uint mwModifiers = NativeMethods.MOD_NOREPEAT | MapModifiers(CurrentMainWindowShortcut.Modifiers);
+            if (!NativeMethods.RegisterHotKey(_window, MainWindowHotkeyId, mwModifiers, CurrentMainWindowShortcut.VirtualKey))
+            {
+                _mainWindowHotkeyRegistered = false;
+            }
+            else
+            {
+                _mainWindowHotkeyRegistered = true;
             }
             AddTrayIcon();
             _started = true;
@@ -145,7 +160,12 @@ internal sealed class WindowsShellIntegration : IShellIntegration
                 return message == NativeMethods.WM_POWERBROADCAST ? (IntPtr)1 : IntPtr.Zero;
             }
             if (message == _taskbarCreated && _started) { AddTrayIcon(); return IntPtr.Zero; }
-            if (message == NativeMethods.WM_HOTKEY && wParam.ToInt64() == HotkeyId) { RaiseActivation(ShellActivationKind.Hotkey); return IntPtr.Zero; }
+            if (message == NativeMethods.WM_HOTKEY)
+            {
+                long id = wParam.ToInt64();
+                if (id == OverlayHotkeyId) { RaiseActivation(ShellActivationKind.Hotkey); return IntPtr.Zero; }
+                if (id == MainWindowHotkeyId) { RaiseActivation(ShellActivationKind.ShowWindow); return IntPtr.Zero; }
+            }
             if (message == TrayCallback)
             {
                 // NOTIFYICON_VERSION_4 packs event in LOWORD and icon id in HIWORD.
@@ -200,6 +220,12 @@ internal sealed class WindowsShellIntegration : IShellIntegration
             return false;
         }
 
+        if (newShortcut == CurrentMainWindowShortcut)
+        {
+            error = "Quick Overlay shortcut cannot be identical to Open Focus Key shortcut.";
+            return false;
+        }
+
         if (_disposed)
         {
             error = "The shell integration has been disposed.";
@@ -215,12 +241,12 @@ internal sealed class WindowsShellIntegration : IShellIntegration
         // Unregister existing hotkey if currently registered
         if (_hotkeyRegistered)
         {
-            NativeMethods.UnregisterHotKey(_window, HotkeyId);
+            NativeMethods.UnregisterHotKey(_window, OverlayHotkeyId);
             _hotkeyRegistered = false;
         }
 
         uint fsModifiers = NativeMethods.MOD_NOREPEAT | MapModifiers(newShortcut.Modifiers);
-        if (NativeMethods.RegisterHotKey(_window, HotkeyId, fsModifiers, newShortcut.VirtualKey))
+        if (NativeMethods.RegisterHotKey(_window, OverlayHotkeyId, fsModifiers, newShortcut.VirtualKey))
         {
             _hotkeyRegistered = true;
             CurrentShortcut = newShortcut;
@@ -234,9 +260,66 @@ internal sealed class WindowsShellIntegration : IShellIntegration
 
         // Rollback to previous working shortcut
         uint prevModifiers = NativeMethods.MOD_NOREPEAT | MapModifiers(CurrentShortcut.Modifiers);
-        if (NativeMethods.RegisterHotKey(_window, HotkeyId, prevModifiers, CurrentShortcut.VirtualKey))
+        if (NativeMethods.RegisterHotKey(_window, OverlayHotkeyId, prevModifiers, CurrentShortcut.VirtualKey))
         {
             _hotkeyRegistered = true;
+        }
+
+        return false;
+    }
+
+    public bool TryUpdateMainWindowHotkey(GlobalShortcut newShortcut, out string? error)
+    {
+        error = null;
+        if (!newShortcut.IsValid(out string? validationError))
+        {
+            error = validationError;
+            return false;
+        }
+
+        if (newShortcut == CurrentShortcut)
+        {
+            error = "Open Focus Key shortcut cannot be identical to Quick Overlay shortcut.";
+            return false;
+        }
+
+        if (_disposed)
+        {
+            error = "The shell integration has been disposed.";
+            return false;
+        }
+
+        if (!_started || _window == IntPtr.Zero)
+        {
+            CurrentMainWindowShortcut = newShortcut;
+            return true;
+        }
+
+        // Unregister existing hotkey if currently registered
+        if (_mainWindowHotkeyRegistered)
+        {
+            NativeMethods.UnregisterHotKey(_window, MainWindowHotkeyId);
+            _mainWindowHotkeyRegistered = false;
+        }
+
+        uint fsModifiers = NativeMethods.MOD_NOREPEAT | MapModifiers(newShortcut.Modifiers);
+        if (NativeMethods.RegisterHotKey(_window, MainWindowHotkeyId, fsModifiers, newShortcut.VirtualKey))
+        {
+            _mainWindowHotkeyRegistered = true;
+            CurrentMainWindowShortcut = newShortcut;
+            return true;
+        }
+
+        int err = Marshal.GetLastWin32Error();
+        error = err == 1409
+            ? $"The shortcut '{newShortcut}' is already in use by another application."
+            : $"Failed to register shortcut '{newShortcut}' (Error {err}).";
+
+        // Rollback to previous working shortcut
+        uint prevModifiers = NativeMethods.MOD_NOREPEAT | MapModifiers(CurrentMainWindowShortcut.Modifiers);
+        if (NativeMethods.RegisterHotKey(_window, MainWindowHotkeyId, prevModifiers, CurrentMainWindowShortcut.VirtualKey))
+        {
+            _mainWindowHotkeyRegistered = true;
         }
 
         return false;
@@ -256,8 +339,10 @@ internal sealed class WindowsShellIntegration : IShellIntegration
     {
         if (_powerRegistration != IntPtr.Zero) NativeMethods.UnregisterSuspendResumeNotification(_powerRegistration);
         _powerRegistration = IntPtr.Zero;
-        if (_hotkeyRegistered && _window != IntPtr.Zero) NativeMethods.UnregisterHotKey(_window, HotkeyId);
+        if (_hotkeyRegistered && _window != IntPtr.Zero) NativeMethods.UnregisterHotKey(_window, OverlayHotkeyId);
         _hotkeyRegistered = false;
+        if (_mainWindowHotkeyRegistered && _window != IntPtr.Zero) NativeMethods.UnregisterHotKey(_window, MainWindowHotkeyId);
+        _mainWindowHotkeyRegistered = false;
         if (_trayAdded && _window != IntPtr.Zero)
         {
             var data = TrayData(0);

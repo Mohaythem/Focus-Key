@@ -32,6 +32,7 @@ public partial class App : Application
     private Appearance? _appliedAppearance;
     private SoundPlayerService? _sounds;
     private volatile bool _sessionSoundsEnabled = true;
+    private NativeMethods.SubclassProc? _windowSubclassProc;
 
     public App()
     {
@@ -72,12 +73,12 @@ public partial class App : Application
             _sessionSoundsEnabled = initialSettings.SessionSoundsEnabled;
             _sounds = new SoundPlayerService(() => _sessionSoundsEnabled);
             _startup.Logger.Info("Single-instance shell ownership acquired.");
-            var integration = new WindowsShellIntegration(initialSettings.GlobalShortcut);
+            var integration = new WindowsShellIntegration(initialSettings.GlobalShortcut, initialSettings.MainWindowShortcut);
             _shellIntegration = integration;
             ApplyThemePalettes(_startup.Appearance.LightPalette, _startup.Appearance.DarkPalette);
             _window = new MainWindow(_startup, StartSessionAsync, StopSessionAsync,
                 exception => _startup?.Logger.Error("Main-page operation failed.", exception), RefreshSettingsAsync,
-                integration);
+                integration, PauseSessionAsync, ContinueSessionAsync);
             _window.ApplyShortcut(initialSettings.GlobalShortcut);
             _window.GlobalShortcutUpdated += shortcut => _quickOverlayWindow?.ApplyShortcut(shortcut);
             _window.SetActivityCollapsed(initialSettings.ActivityCollapsed);
@@ -89,7 +90,11 @@ public partial class App : Application
             _window.OverlayRequested += () => OnShellActivation(ShellActivationKind.Hotkey);
             _window.ExitRequested += OnExplicitExitRequested;
             _window.AppWindow.Closing += OnAppWindowClosing;
+            _window.AppWindow.Changed += OnAppWindowChanged;
             _window.Closed += OnMainWindowClosed;
+            var mainWindowHwnd = WinRT.Interop.WindowNative.GetWindowHandle(_window);
+            _windowSubclassProc = MainWindowSubclassProc;
+            NativeMethods.SetWindowSubclass(mainWindowHwnd, _windowSubclassProc, (UIntPtr)1, IntPtr.Zero);
             _completion = new CompletionCoordinator(_startup.Sessions, session => NotifyCompletedAsync(integration, session),
                 exception => _startup?.Logger.Error("Completion coordination failed.", exception));
             integration.ClockChangedOrResumed += _completion.RequestEvaluation;
@@ -100,7 +105,8 @@ public partial class App : Application
                 if (_quickOverlay is not null) _ = _quickOverlay.RefreshIfVisibleAsync();
             };
             _quickOverlay = new QuickOverlayController(CreateQuickOverlay,
-                _startup.Sessions.GetActiveAsync, _startup.Sessions.GetDurationsAsync, StartSessionAsync, StopSessionAsync);
+                _startup.Sessions.GetActiveAsync, _startup.Sessions.GetDurationsAsync, StartSessionAsync, StopSessionAsync,
+                PauseSessionAsync, ContinueSessionAsync);
             _quickOverlay.ErrorOccurred += exception => _startup?.Logger.Error("Quick overlay operation failed.", exception);
             _shell = new BackgroundShell(integration, ShutdownSessionsAsync);
             _shell.ActivationRequested += OnShellActivation;
@@ -156,6 +162,38 @@ public partial class App : Application
         _window?.HideToday();
         sender.Hide();
         _startup?.Logger.Info("Main window hidden; shell remains running.");
+    }
+
+    private void OnAppWindowChanged(AppWindow sender, AppWindowChangedEventArgs args)
+    {
+        if (sender.Presenter is OverlappedPresenter presenter && presenter.State == OverlappedPresenterState.Minimized)
+        {
+            _window?.HideToday();
+            sender.Hide();
+            _startup?.Logger.Info("Main window minimized to tray.");
+        }
+    }
+
+    private IntPtr MainWindowSubclassProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, UIntPtr uIdSubclass, IntPtr dwRefData)
+    {
+        if ((uMsg == NativeMethods.WM_SYSCOMMAND && (wParam.ToInt64() & 0xFFF0) == NativeMethods.SC_MINIMIZE) ||
+            (uMsg == NativeMethods.WM_SIZE && wParam.ToInt64() == NativeMethods.SIZE_MINIMIZED))
+        {
+            _window?.HideToday();
+            _window?.AppWindow.Hide();
+            _startup?.Logger.Info("Main window minimized to tray.");
+            return IntPtr.Zero;
+        }
+
+        if (uMsg == NativeMethods.WM_DESTROY)
+        {
+            if (_windowSubclassProc is not null)
+            {
+                NativeMethods.RemoveWindowSubclass(hWnd, _windowSubclassProc, uIdSubclass);
+            }
+        }
+
+        return NativeMethods.DefSubclassProc(hWnd, uMsg, wParam, lParam);
     }
 
     private async void OnShellActivation(ShellActivationKind kind)
@@ -340,6 +378,8 @@ public partial class App : Application
             presenter.Restore();
         }
         _window.Activate();
+        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(_window);
+        NativeMethods.ForceForeground(hwnd);
         _window.OpenToday();
     }
 
@@ -355,6 +395,23 @@ public partial class App : Application
     private async Task<SessionOutcome> StopSessionAsync(SessionId expectedId, CancellationToken cancellationToken)
     {
         SessionOutcome result = await _completion!.StopAsync(expectedId, cancellationToken);
+        _window?.RefreshPages();
+        if (_quickOverlay is not null) await _quickOverlay.RefreshIfVisibleAsync();
+        return result;
+    }
+
+    private async Task<SessionOutcome> PauseSessionAsync(SessionId expectedId, CancellationToken cancellationToken)
+    {
+        SessionOutcome result = await _completion!.PauseAsync(expectedId, cancellationToken);
+        _window?.RefreshPages();
+        if (_quickOverlay is not null) await _quickOverlay.RefreshIfVisibleAsync();
+        return result;
+    }
+
+    private async Task<SessionOutcome> ContinueSessionAsync(SessionId expectedId, CancellationToken cancellationToken)
+    {
+        SessionOutcome result = await _completion!.ContinueAsync(expectedId, cancellationToken);
+        _sounds?.PlayStartTick();
         _window?.RefreshPages();
         if (_quickOverlay is not null) await _quickOverlay.RefreshIfVisibleAsync();
         return result;

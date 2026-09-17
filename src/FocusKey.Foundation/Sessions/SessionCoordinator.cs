@@ -54,6 +54,18 @@ public sealed class SessionCoordinator
     public Task<SessionDurations> GetDurationsAsync(CancellationToken cancellationToken = default) =>
         UseEngineAsync(_engine.GetDurationsAsync, cancellationToken);
 
+    public Task<SessionOutcome> PauseAsync(CancellationToken cancellationToken = default) =>
+        UseEngineAsync(token => _engine.PauseAsync(token), cancellationToken);
+
+    public Task<SessionOutcome> PauseAsync(SessionId expectedId, CancellationToken cancellationToken = default) =>
+        UseEngineAsync(token => _engine.PauseAsync(expectedId, token), cancellationToken);
+
+    public Task<SessionOutcome> ContinueAsync(CancellationToken cancellationToken = default) =>
+        UseEngineAsync(token => _engine.ContinueAsync(token), cancellationToken);
+
+    public Task<SessionOutcome> ContinueAsync(SessionId expectedId, CancellationToken cancellationToken = default) =>
+        UseEngineAsync(token => _engine.ContinueAsync(expectedId, token), cancellationToken);
+
     public Task<SessionOutcome> StopAsync(CancellationToken cancellationToken = default) =>
         UseEngineAsync(_engine.StopAsync, cancellationToken);
 

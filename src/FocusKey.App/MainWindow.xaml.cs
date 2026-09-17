@@ -1,4 +1,5 @@
 using System.Globalization;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using FocusKey.Foundation.Sessions;
@@ -52,7 +53,8 @@ public sealed partial class MainWindow : Window
     internal void ApplyShortcut(GlobalShortcut shortcut)
     {
         string text = shortcut.ToString();
-        if (SidebarOverlayShortcutHint is not null) SidebarOverlayShortcutHint.Text = text;
+        if (OverlayNavButton is not null)
+            ToolTipService.SetToolTip(OverlayNavButton, $"Quick Overlay ({text})");
     }
 
     private Appearance _appearance = Appearance.System;
@@ -101,7 +103,9 @@ public sealed partial class MainWindow : Window
         Func<SessionType, CancellationToken, Task<SessionRecord>> start,
         Func<SessionId, CancellationToken, Task<SessionOutcome>> stop, Action<Exception> report,
         Func<Task> refreshSettings,
-        WindowsShellIntegration shellIntegration)
+        WindowsShellIntegration shellIntegration,
+        Func<SessionId, CancellationToken, Task<SessionOutcome>>? pause = null,
+        Func<SessionId, CancellationToken, Task<SessionOutcome>>? @continue = null)
     {
         InitializeComponent();
         _settingsService = startup.Settings;
@@ -117,10 +121,15 @@ public sealed partial class MainWindow : Window
             () => WindowNative.GetWindowHandle(this),
             report,
             (GlobalShortcut sc, out string? err) => shellIntegration.TryUpdateHotkey(sc, out err),
+            (GlobalShortcut sc, out string? err) => shellIntegration.TryUpdateMainWindowHotkey(sc, out err),
             sc =>
             {
                 ApplyShortcut(sc);
                 GlobalShortcutUpdated?.Invoke(sc);
+            },
+            sc =>
+            {
+                // Main window shortcut updated
             });
         SettingsHost.Content = _settings;
         var hwnd = WindowNative.GetWindowHandle(this);
@@ -133,13 +142,14 @@ public sealed partial class MainWindow : Window
         MainSurface.ActualThemeChanged += (_, _) => { if (_appearance == Appearance.System) UpdateAppearance(); };
         MainSurface.SizeChanged += (_, _) =>
         {
-            bool narrow = MainSurface.ActualWidth < 740;
-            NavColumn.Width = new GridLength(narrow ? 180 : 216);
+            double w = MainSurface.ActualWidth;
+            bool narrow = w < 740;
+            UpdateSidebarDimensions(w);
             PageContent.Padding = new Thickness(narrow ? 24 : 40, 28, narrow ? 24 : 40, 36);
             UpdatePageWidths();
         };
         PageScrollViewer.SizeChanged += (_, _) => UpdatePageWidths();
-        _today = new TodayController(startup.Today.ReadAsync, start, stop, report);
+        _today = new TodayController(startup.Today.ReadAsync, start, stop, report, pause, @continue);
         _today.Changed += Render;
         _displayTimer = DispatcherQueue.CreateTimer();
         _displayTimer.IsRepeating = false;
@@ -147,6 +157,7 @@ public sealed partial class MainWindow : Window
         Closed += (_, _) => { _visible = false; _displayTimer.Stop(); _today.Dispose(); _reports.Dispose(); };
         UpdateActivityVisuals();
         Render();
+        UpdateSidebarDimensions(MainSurface.ActualWidth > 0 ? MainSurface.ActualWidth : 880);
         UpdatePageWidths();
         startup.Logger.Info("Today main window created.");
     }
@@ -214,7 +225,14 @@ public sealed partial class MainWindow : Window
     private async void OnRefreshClick(object sender, RoutedEventArgs args) => await _today.RefreshAsync();
     private async void OnStartWorkClick(object sender, RoutedEventArgs args) => await _today.StartAsync(SessionType.Work);
     private async void OnStartBreakClick(object sender, RoutedEventArgs args) => await _today.StartAsync(SessionType.Break);
-    private async void OnStopClick(object sender, RoutedEventArgs args) => await _today.StopAsync();
+    private async void OnPauseClick(object sender, RoutedEventArgs args)
+    {
+        if (_today.Snapshot?.Paused is not null)
+            await _today.ContinueAsync();
+        else
+            await _today.PauseAsync();
+    }
+    private async void OnStartNewClick(object sender, RoutedEventArgs args) => await _today.StartNewAsync();
     private void OnExitClick(object sender, RoutedEventArgs args) => ExitRequested?.Invoke();
 
     private void UpdateActivityVisuals()
@@ -324,8 +342,13 @@ public sealed partial class MainWindow : Window
 
         WorkDurationNumber.Text = workNum;
         WorkDurationUnit.Text = workUnit;
+        StartWorkButton.Content = "Start";
+        AutomationProperties.SetName(StartWorkButton, "Start Work");
+
         BreakDurationNumber.Text = brkNum;
         BreakDurationUnit.Text = brkUnit;
+        StartBreakButton.Content = "Start";
+        AutomationProperties.SetName(StartBreakButton, "Start Break");
 
         bool canStart = !_today.IsStarting && !_today.IsStopping && !_today.IsRefreshing && _today.Error is null;
         StartWorkButton.IsEnabled = canStart;
@@ -389,21 +412,22 @@ public sealed partial class MainWindow : Window
 
     private void RenderRunning()
     {
-        bool hasRunning = _today.Snapshot?.Running is not null;
+        bool hasActive = _today.Snapshot?.Active is not null;
 
         // Sidebar active indicator
-        ActiveIndicator.Visibility = hasRunning ? Visibility.Visible : Visibility.Collapsed;
-        if (hasRunning)
+        ActiveIndicator.Visibility = hasActive ? Visibility.Visible : Visibility.Collapsed;
+        if (hasActive)
         {
-            var indicatorColor = _today.Snapshot!.Running!.Type == SessionType.Work ? _colors.Work : _colors.Break;
+            var indicatorColor = _today.Snapshot!.Active!.Type == SessionType.Work ? _colors.Work : _colors.Break;
             ActiveDot.Fill = SessionColorBrush.Create(indicatorColor);
+            ActiveDot.Opacity = _today.Snapshot!.Active!.Status == SessionStatus.Paused ? 0.45 : 1.0;
         }
 
-        bool stateChanged = _hasRenderedRunning && (_lastHasRunning != hasRunning);
-        _lastHasRunning = hasRunning;
+        bool stateChanged = _hasRenderedRunning && (_lastHasRunning != hasActive);
+        _lastHasRunning = hasActive;
         _hasRenderedRunning = true;
 
-        if (_today.Snapshot?.Running is not { } running)
+        if (_today.Snapshot?.Active is not { } active)
         {
             ActiveContent.Visibility = Visibility.Collapsed;
             IdleContent.Visibility = Visibility.Visible;
@@ -424,10 +448,11 @@ public sealed partial class MainWindow : Window
         IdleContent.Visibility = Visibility.Collapsed;
         ActiveContent.Visibility = Visibility.Visible;
 
-        var snapshot = SessionSnapshot.For(running, DateTimeOffset.UtcNow);
+        var snapshot = SessionSnapshot.For(active, DateTimeOffset.UtcNow);
         var remaining = TimeSpan.FromSeconds(Math.Ceiling(snapshot.Remaining.TotalSeconds));
-        var color = running.Type == SessionType.Work ? _colors.Work : _colors.Break;
+        var color = active.Type == SessionType.Work ? _colors.Work : _colors.Break;
         bool isDark = IsCurrentThemeDark();
+        bool isPaused = active.Status == SessionStatus.Paused;
 
         CurrentCard.Background = SessionColorBrush.CreateTint(color, isDark, 0.06);
         CurrentCard.BorderBrush = SessionColorBrush.CreateSemanticBorder(color, 0.40);
@@ -435,13 +460,15 @@ public sealed partial class MainWindow : Window
         CurrentCard.MinHeight = 180;
 
         ActiveTypeDot.Fill = SessionColorBrush.Create(color);
-        CurrentHeading.Text = running.Type == SessionType.Work ? "WORK SESSION" : "BREAK SESSION";
+        CurrentHeading.Text = active.Type == SessionType.Work ? "WORK SESSION" : "BREAK SESSION";
         CurrentHeading.Foreground = Presentation.ThemeBrush("FkSecondary", isDark);
 
-        RunningText.Text = snapshot.HasReachedPlannedEnd ? "00:00" : string.Create(CultureInfo.InvariantCulture, $"{(long)remaining.TotalMinutes:00}:{remaining.Seconds:00}");
+        RunningText.Text = isPaused
+            ? string.Create(CultureInfo.InvariantCulture, $"{(long)remaining.TotalMinutes:00}:{remaining.Seconds:00}")
+            : snapshot.HasReachedPlannedEnd ? "00:00" : string.Create(CultureInfo.InvariantCulture, $"{(long)remaining.TotalMinutes:00}:{remaining.Seconds:00}");
         RunningText.Foreground = Presentation.ThemeBrush("FkForeground", isDark);
 
-        RunningHint.Text = snapshot.HasReachedPlannedEnd ? "Finishing…" : "Remaining";
+        RunningHint.Text = isPaused ? "Paused" : snapshot.HasReachedPlannedEnd ? "Finishing…" : "Remaining";
         RunningHint.Foreground = Presentation.ThemeBrush("FkSecondary", isDark);
 
         SessionProgress.Value = Math.Clamp(100 * snapshot.Elapsed.TotalSeconds / snapshot.PlannedDuration.TotalSeconds, 0.0, 100.0);
@@ -449,11 +476,27 @@ public sealed partial class MainWindow : Window
         SessionProgress.Background = Presentation.ThemeBrush("FkSurface2", isDark);
         SessionProgress.Visibility = Visibility.Visible;
 
-        StopButton.Background = Presentation.ThemeBrush("FkSurface2", isDark);
-        StopButton.BorderBrush = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", CurrentCard);
-        StopButton.Foreground = Presentation.ThemeBrush("FkSecondary", isDark);
-        StopButton.Visibility = Visibility.Visible;
-        StopButton.IsEnabled = !_today.IsRefreshing && !_today.IsStopping && !_today.IsStarting && _today.Error is null;
+        bool canAct = !_today.IsRefreshing && !_today.IsStopping && !_today.IsStarting && _today.Error is null;
+
+        PauseButton.Content = isPaused ? "Continue" : "Pause";
+        PauseButton.Background = isPaused
+            ? SessionColorBrush.CreateElevated(color, isDark, false)
+            : Presentation.ThemeBrush("FkSurface2", isDark);
+        PauseButton.BorderBrush = isPaused
+            ? SessionColorBrush.CreateAlpha(color, isDark ? 0.70 : 0.50)
+            : Presentation.ThemeBrush("CardStrokeColorDefaultBrush", CurrentCard);
+        PauseButton.Foreground = isPaused
+            ? Presentation.ThemeBrush("FkForeground", isDark)
+            : Presentation.ThemeBrush("FkSecondary", isDark);
+        PauseButton.Visibility = Visibility.Visible;
+        PauseButton.IsEnabled = canAct;
+        AutomationProperties.SetName(PauseButton, isPaused ? "Continue Session" : "Pause Session");
+
+        StartNewButton.Visibility = isPaused ? Visibility.Visible : Visibility.Collapsed;
+        StartNewButton.IsEnabled = canAct;
+        StartNewButton.Background = Presentation.ThemeBrush("FkSurface2", isDark);
+        StartNewButton.BorderBrush = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", CurrentCard);
+        StartNewButton.Foreground = Presentation.ThemeBrush("FkSecondary", isDark);
 
         if (stateChanged)
         {
@@ -505,5 +548,132 @@ public sealed partial class MainWindow : Window
         TimeSpan wait = snapshot.Running is null ? snapshot.NextDayAt - DateTimeOffset.UtcNow : TimeSpan.FromSeconds(1);
         _displayTimer.Interval = wait < TimeSpan.FromSeconds(1) ? TimeSpan.FromSeconds(1) : wait;
         _displayTimer.Start();
+    }
+
+    private void UpdateSidebarDimensions(double windowWidth)
+    {
+        if (windowWidth <= 0 || NavColumn is null || NavGrid is null) return;
+
+        bool narrow = windowWidth < 740;
+
+        double sidebarWidth;
+        double iconContainerSize;
+        double iconFontSize;
+        double labelFontSize;
+        double buttonMinHeight;
+        Thickness buttonPadding;
+        Thickness navGridPadding;
+        double navItemSpacing;
+        double navSectionSpacing;
+        double itemInnerSpacing;
+        double brandFontSize;
+        Thickness brandHeaderPadding;
+
+        if (narrow)
+        {
+            // 1. Narrow / Minimum practical size (< 740 DIP, down to 640-680 DIP)
+            // Bounded compact width between 168 DIP and 176 DIP (e.g. 171-172 DIP at 680 DIP)
+            double tNarrow = Math.Clamp((windowWidth - 640.0) / 100.0, 0.0, 1.0);
+            sidebarWidth = Math.Round(168.0 + 8.0 * tNarrow);
+
+            iconContainerSize = 24;
+            iconFontSize = 15.5;
+            labelFontSize = 12.5;
+            buttonMinHeight = 36;
+            buttonPadding = new Thickness(8, 4, 8, 4);
+            navGridPadding = new Thickness(8, 16, 8, 12);
+            navItemSpacing = 2;
+            navSectionSpacing = 16;
+            itemInnerSpacing = 8;
+            brandFontSize = 12.5;
+            brandHeaderPadding = new Thickness(8, 0, 8, 0);
+        }
+        else if (windowWidth < 1360)
+        {
+            // 2. Restored / Medium Desktop (740 to 1360 DIP, e.g. 1000x720 window)
+            // Bounded intermediate width smoothly scaling between 218 DIP and 244 DIP (228 DIP at 1000 DIP)
+            double tRestored = (windowWidth - 740.0) / (1360.0 - 740.0);
+            sidebarWidth = Math.Round(218.0 + 26.0 * tRestored);
+
+            iconContainerSize = 28;
+            iconFontSize = 17.5;
+            labelFontSize = 13.0;
+            buttonMinHeight = 40;
+            buttonPadding = new Thickness(10, 6, 10, 6);
+            navGridPadding = new Thickness(10, 18, 10, 14);
+            navItemSpacing = 3;
+            navSectionSpacing = 20;
+            itemInnerSpacing = 10;
+            brandFontSize = 13.0;
+            brandHeaderPadding = new Thickness(10, 0, 10, 0);
+        }
+        else
+        {
+            // 3. Maximized / Wide Desktop (>= 1360 DIP, up to 1920x1080 and larger)
+            // Substantial desktop rail smoothly scaling from 244 DIP to 272 DIP (max bound at 272 DIP)
+            double tWide = Math.Clamp((windowWidth - 1360.0) / (1920.0 - 1360.0), 0.0, 1.0);
+            sidebarWidth = Math.Round(244.0 + 28.0 * tWide);
+
+            iconContainerSize = 32;
+            iconFontSize = 20.0;
+            labelFontSize = 13.5;
+            buttonMinHeight = 44;
+            buttonPadding = new Thickness(12, 6, 12, 6);
+            navGridPadding = new Thickness(14, 24, 14, 20);
+            navItemSpacing = 4;
+            navSectionSpacing = 24;
+            itemInnerSpacing = 12;
+            brandFontSize = 14.0;
+            brandHeaderPadding = new Thickness(12, 0, 12, 0);
+        }
+
+        NavColumn.Width = new GridLength(sidebarWidth);
+        NavGrid.Padding = navGridPadding;
+
+        if (TopNavSection is not null) TopNavSection.Spacing = navSectionSpacing;
+        if (TopNavItems is not null) TopNavItems.Spacing = navItemSpacing;
+        if (BottomNavSection is not null) BottomNavSection.Spacing = navItemSpacing;
+
+        if (NavHeaderPanel is not null) NavHeaderPanel.Padding = brandHeaderPadding;
+        if (NavBrandTitle is not null) NavBrandTitle.FontSize = brandFontSize;
+
+        ApplyNavItemDimensions(TodayNav, TodayNavContent, TodayIconContainer, TodayIcon, TodayLabel,
+            buttonMinHeight, buttonPadding, itemInnerSpacing, iconContainerSize, iconFontSize, labelFontSize);
+        ApplyNavItemDimensions(ReportsNav, ReportsNavContent, ReportsIconContainer, ReportsIcon, ReportsLabel,
+            buttonMinHeight, buttonPadding, itemInnerSpacing, iconContainerSize, iconFontSize, labelFontSize);
+        ApplyNavItemDimensions(OverlayNavButton, OverlayNavContent, OverlayIconContainer, OverlayIcon, OverlayLabel,
+            buttonMinHeight, buttonPadding, itemInnerSpacing, iconContainerSize, iconFontSize, labelFontSize);
+        ApplyNavItemDimensions(SettingsNav, SettingsNavContent, SettingsIconContainer, SettingsIcon, SettingsLabel,
+            buttonMinHeight, buttonPadding, itemInnerSpacing, iconContainerSize, iconFontSize, labelFontSize);
+        ApplyNavItemDimensions(ExitButton, ExitNavContent, ExitIconContainer, ExitIcon, ExitLabel,
+            buttonMinHeight, buttonPadding, itemInnerSpacing, iconContainerSize, iconFontSize, labelFontSize);
+    }
+
+    private static void ApplyNavItemDimensions(
+        Control? button, StackPanel? content, Border? iconContainer, FontIcon? icon, TextBlock? label,
+        double minHeight, Thickness padding, double innerSpacing, double containerSize, double iconSize, double labelSize)
+    {
+        if (button is not null)
+        {
+            button.MinHeight = minHeight;
+            button.Padding = padding;
+        }
+        if (content is not null)
+        {
+            content.Spacing = innerSpacing;
+        }
+        if (iconContainer is not null)
+        {
+            iconContainer.Width = containerSize;
+            iconContainer.Height = containerSize;
+        }
+        if (icon is not null)
+        {
+            icon.FontSize = iconSize;
+        }
+        if (label is not null)
+        {
+            label.FontSize = labelSize;
+        }
     }
 }

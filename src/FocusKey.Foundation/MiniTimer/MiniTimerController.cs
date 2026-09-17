@@ -17,7 +17,7 @@ public sealed class MiniTimerController(Func<CancellationToken, Task<SessionSnap
     public event Action? Changed;
     public TimeSpan Remaining => RemainingAt(Session, _time.GetUtcNow());
     public static TimeSpan RemainingAt(SessionSnapshot? session, DateTimeOffset now) => session is not null
-        ? TimeSpan.FromTicks(Math.Max(0, (session.PlannedEndAt - now).Ticks)) : TimeSpan.Zero;
+        ? (session.IsPaused ? session.Remaining : TimeSpan.FromTicks(Math.Max(0, (session.PlannedEndAt - now).Ticks))) : TimeSpan.Zero;
     public string Text => Error ?? (IsLoading ? "Loading…" : Session is { } session
         ? $"{session.Type} · {Format(Remaining)}" : "No active session");
     public static string Format(TimeSpan remaining)

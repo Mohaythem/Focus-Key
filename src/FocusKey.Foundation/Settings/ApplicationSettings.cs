@@ -16,6 +16,7 @@ public sealed record ApplicationSettings
         SessionSoundsEnabled = true,
         ActivityCollapsed = true,
         GlobalShortcut = GlobalShortcut.Default,
+        MainWindowShortcut = GlobalShortcut.DefaultMainWindow,
     };
 
     public required TimeSpan WorkDuration { get; init; }
@@ -29,6 +30,7 @@ public sealed record ApplicationSettings
     public bool SessionSoundsEnabled { get; init; } = true;
     public bool ActivityCollapsed { get; init; } = true;
     public GlobalShortcut GlobalShortcut { get; init; } = GlobalShortcut.Default;
+    public GlobalShortcut MainWindowShortcut { get; init; } = GlobalShortcut.DefaultMainWindow;
 
     public void Validate()
     {
@@ -42,7 +44,14 @@ public sealed record ApplicationSettings
         ValidateColor(BreakColor, nameof(BreakColor));
         (LightTheme ?? ThemeConfiguration.DefaultLight).Validate(false);
         (DarkTheme ?? ThemeConfiguration.DefaultDark).Validate(true);
-        (GlobalShortcut ?? GlobalShortcut.Default).Validate();
+        var overlayShortcut = GlobalShortcut ?? GlobalShortcut.Default;
+        var mainWindowShortcut = MainWindowShortcut ?? GlobalShortcut.DefaultMainWindow;
+        overlayShortcut.Validate();
+        mainWindowShortcut.Validate();
+        if (overlayShortcut == mainWindowShortcut)
+        {
+            throw new ArgumentException("Quick Overlay shortcut and Open Focus Key shortcut cannot be identical.");
+        }
     }
 
     private static void ValidateDuration(TimeSpan duration, string name)

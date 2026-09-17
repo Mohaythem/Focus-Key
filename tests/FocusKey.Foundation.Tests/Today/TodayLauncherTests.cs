@@ -279,6 +279,38 @@ public sealed class TodayLauncherTests
         Assert.Same(failure, errors[0]);
     }
 
+    [Fact]
+    public async Task StartNewAsync_WhenPaused_StopsSessionAndRefreshes()
+    {
+        var paused = TestSessions.Running(type: SessionType.Work) with
+        {
+            Status = SessionStatus.Paused,
+            AccumulatedActiveDuration = TimeSpan.FromMinutes(5),
+            PausedAt = TestSessions.Anchor.AddMinutes(5),
+        };
+        SessionId? stoppedId = null;
+        int reads = 0;
+
+        using var controller = new TodayController(
+            _ => Task.FromResult(++reads == 1 ? EmptySnapshot(paused) : EmptySnapshot(null)),
+            (_, _) => throw new InvalidOperationException(),
+            (id, _) =>
+            {
+                stoppedId = id;
+                return Task.FromResult<SessionOutcome>(null!);
+            },
+            _ => { });
+
+        await controller.OpenAsync();
+        Assert.NotNull(controller.Snapshot!.Paused);
+
+        await controller.StartNewAsync();
+
+        Assert.Equal(paused.Id, stoppedId);
+        Assert.Null(controller.Snapshot!.Active);
+        Assert.Null(controller.Error);
+    }
+
     private static TodaySnapshot EmptySnapshot(SessionRecord? running = null, SessionDurations? durations = null) =>
         new(new DateOnly(2026, 9, 15), TimeZoneInfo.Utc, TestSessions.Anchor,
             new DateTimeOffset(2026, 9, 16, 0, 0, 0, TimeSpan.Zero), [], running, durations);

@@ -34,31 +34,39 @@ public sealed class SessionRecovery
     private async Task<SessionRecoveryResult> FinishAsync(bool isStartup, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        SessionRecord? running = await _sessions.GetRunningAsync(cancellationToken).ConfigureAwait(false);
+        SessionRecord? active = await _sessions.GetActiveAsync(cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
-        if (running is null)
+        if (active is null)
         {
             return SessionRecoveryResult.NoActiveSession();
         }
 
-        running.Validate();
+        if (active.Status == SessionStatus.Paused)
+        {
+            // PRESERVE PAUSED SESSION ACROSS RESTART AND SHUTDOWN!
+            return SessionRecoveryResult.StillPaused(active);
+        }
+
+        // Running session recovery:
+        active.Validate();
         DateTimeOffset now = _time.GetUtcNow().ToUniversalTime();
-        bool completed = now >= running.PlannedEndAt;
+        bool completed = now >= active.PlannedEndAt;
         DateTimeOffset endedAt = completed
-            ? running.PlannedEndAt
-            : isStartup || now < running.StartedAt ? running.StartedAt : now;
-        SessionRecord finished = running with
+            ? active.PlannedEndAt
+            : isStartup || now < active.StartedAt ? active.StartedAt : now;
+        SessionRecord finished = active with
         {
             Status = completed ? SessionStatus.Completed : SessionStatus.Interrupted,
             EndedAt = endedAt,
+            PausedAt = null,
         };
 
         cancellationToken.ThrowIfCancellationRequested();
-        if (!await _sessions.TryUpdateAsync(running, finished, cancellationToken).ConfigureAwait(false))
+        if (!await _sessions.TryUpdateAsync(active, finished, cancellationToken).ConfigureAwait(false))
         {
             // Never retry against a newer row or session: this operation refers to exactly the
             // record it observed. A competing terminal result must not be reclassified.
-            return SessionRecoveryResult.Conflict(running);
+            return SessionRecoveryResult.Conflict(active);
         }
 
         // No post-commit cancellation check. Preserve the repository's successful outcome.

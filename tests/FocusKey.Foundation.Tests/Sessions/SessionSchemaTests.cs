@@ -22,7 +22,7 @@ public sealed class SessionSchemaTests
         Assert.True(store.Initialization.DatabaseFileCreated);
         Assert.Equal(0, store.Initialization.SchemaVersionBefore);
         Assert.Equal(SchemaMigrations.TargetVersion, store.Initialization.SchemaVersionAfter);
-        Assert.Equal(8, SchemaMigrations.TargetVersion);
+        Assert.Equal(10, SchemaMigrations.TargetVersion);
         Assert.Equal(Enumerable.Range(1, SchemaMigrations.TargetVersion), store.Initialization.AppliedMigrations);
         Assert.Equal(1, store.ScalarRaw<long>(
             "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'sessions';"));
@@ -34,7 +34,7 @@ public sealed class SessionSchemaTests
         using var store = new SessionStore();
 
         Assert.Equal(1, store.ScalarRaw<long>(
-            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'ux_sessions_single_running';"));
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'ux_sessions_single_active';"));
         Assert.Equal(1, store.ScalarRaw<long>(
             "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'ix_sessions_started_at_utc';"));
     }
@@ -229,12 +229,17 @@ public sealed class SessionSchemaTests
         string? startedAt = null,
         object? plannedSeconds = null,
         string? endedAt = null,
-        string? createdAt = null) =>
+        string? createdAt = null,
+        string? resumedAt = null,
+        object? accumulatedSeconds = null,
+        string? pausedAt = null) =>
         store.ExecuteRaw(
             """
             INSERT INTO sessions (
-                id, type, status, started_at_utc, planned_duration_seconds, ended_at_utc, created_at_utc)
-            VALUES ($id, $type, $status, $startedAt, $plannedSeconds, $endedAt, $createdAt);
+                id, type, status, started_at_utc, planned_duration_seconds, ended_at_utc, created_at_utc,
+                resumed_at_utc, accumulated_active_seconds, paused_at_utc)
+            VALUES ($id, $type, $status, $startedAt, $plannedSeconds, $endedAt, $createdAt,
+                $resumedAt, $accumulatedSeconds, $pausedAt);
             """,
             ("$id", id ?? SessionId.New().ToText()),
             ("$type", type),
@@ -242,7 +247,10 @@ public sealed class SessionSchemaTests
             ("$startedAt", startedAt ?? UtcTimestamp.Format(TestSessions.Anchor)),
             ("$plannedSeconds", plannedSeconds ?? 1800L),
             ("$endedAt", endedAt ?? (object)DBNull.Value),
-            ("$createdAt", createdAt ?? UtcTimestamp.Format(TestSessions.Anchor)));
+            ("$createdAt", createdAt ?? UtcTimestamp.Format(TestSessions.Anchor)),
+            ("$resumedAt", resumedAt ?? startedAt ?? UtcTimestamp.Format(TestSessions.Anchor)),
+            ("$accumulatedSeconds", accumulatedSeconds ?? 0L),
+            ("$pausedAt", pausedAt ?? (object)DBNull.Value));
 
     private static void CreatePhase0Database(string databaseFile)
     {

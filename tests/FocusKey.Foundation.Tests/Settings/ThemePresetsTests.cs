@@ -237,6 +237,16 @@ public sealed class ThemePresetsTests
                 INSERT INTO schema_migrations VALUES (3, 'application_settings', '2026-09-01T00:00:00.0000000Z');
                 PRAGMA user_version = 3;
 
+                CREATE TABLE IF NOT EXISTS sessions (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    type TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    started_at_utc TEXT NOT NULL,
+                    planned_duration_seconds INTEGER NOT NULL,
+                    ended_at_utc TEXT,
+                    created_at_utc TEXT NOT NULL
+                );
+
                 CREATE TABLE IF NOT EXISTS application_settings (
                     singleton INTEGER NOT NULL PRIMARY KEY,
                     work_duration_seconds INTEGER NOT NULL,

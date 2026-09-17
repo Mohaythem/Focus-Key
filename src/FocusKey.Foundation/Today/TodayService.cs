@@ -3,10 +3,13 @@ using FocusKey.Foundation.Sessions;
 namespace FocusKey.Foundation.Today;
 
 public sealed record TodaySnapshot(DateOnly Date, TimeZoneInfo TimeZone, DateTimeOffset ObservedAt,
-    DateTimeOffset NextDayAt, IReadOnlyList<SessionRecord> Sessions, SessionRecord? Running,
+    DateTimeOffset NextDayAt, IReadOnlyList<SessionRecord> Sessions, SessionRecord? Active,
     SessionDurations? Durations = null)
 {
     public SessionDurations Durations { get; init; } = Durations ?? SessionDurations.Default;
+    public SessionRecord? Active { get; init; } = Active;
+    public SessionRecord? Running => Active?.Status == SessionStatus.Running ? Active : null;
+    public SessionRecord? Paused => Active?.Status == SessionStatus.Paused ? Active : null;
     public int CompletedWorkCount => Sessions.Count(s => s.Type == SessionType.Work && s.Status == SessionStatus.Completed);
     public int CompletedBreakCount => Sessions.Count(s => s.Type == SessionType.Break && s.Status == SessionStatus.Completed);
     public TimeSpan WorkTime => CreditedTime(SessionType.Work);
@@ -15,7 +18,7 @@ public sealed record TodaySnapshot(DateOnly Date, TimeZoneInfo TimeZone, DateTim
         100.0 * Sessions.Count(s => s.Status == SessionStatus.Completed) / Sessions.Count;
 
     private TimeSpan CreditedTime(SessionType type) => TimeSpan.FromTicks(Sessions
-        .Where(s => s.Type == type && s.Status != SessionStatus.Running)
+        .Where(s => s.Type == type && s.Status != SessionStatus.Running && s.Status != SessionStatus.Paused)
         .Aggregate(0L, (total, session) => checked(total + session.EffectiveDuration.Ticks)));
 }
 
@@ -60,11 +63,11 @@ public sealed class TodayService
             nominal.AddDays(1).AddHours(14), cancellationToken).ConfigureAwait(false);
         var rows = candidates.Where(s => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(s.StartedAt, zone).DateTime) == date)
             .OrderBy(s => s.StartedAt).ThenBy(s => s.Id.ToText()).ToArray();
-        SessionRecord? running = await _repository.GetRunningAsync(cancellationToken).ConfigureAwait(false);
+        SessionRecord? active = await _repository.GetActiveAsync(cancellationToken).ConfigureAwait(false);
         SessionDurations durations = _durationProvider is not null
             ? await _durationProvider.GetDurationsAsync(cancellationToken).ConfigureAwait(false)
             : SessionDurations.Default;
-        return new(date, zone, now, NextDay(date, zone), Array.AsReadOnly(rows), running, durations);
+        return new(date, zone, now, NextDay(date, zone), Array.AsReadOnly(rows), active, durations);
     }
 
     public static DateTimeOffset NextDay(DateOnly date, TimeZoneInfo zone)

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Runtime.InteropServices;
 using FocusKey.Foundation.Overlay;
 using FocusKey.Foundation.Sessions;
@@ -90,6 +91,8 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
 
     public event Action<SessionType>? SelectionRequested;
     public event Action? StartRequested;
+    public event Action? PauseRequested;
+    public event Action? StartNewRequested;
     public event Action? StopRequested;
     public event Action? DismissRequested;
 
@@ -163,29 +166,39 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
 
     public void Render(QuickOverlayState state)
     {
-        bool changedMode = (_state.Active is null) != (state.Active is null);
-        if (_state.Active?.Id != state.Active?.Id || _state.IsBusy != state.IsBusy || _state.CanStart != state.CanStart)
-            _trace?.Invoke(state.Active is { } observed
+        bool wasActive = _state.Active is not null;
+        bool hasActive = state.Active is not null;
+        bool isPaused = state.Active is { Status: SessionStatus.Paused };
+        bool changedMode = wasActive != hasActive;
+        if (_state.Active?.Id != state.Active?.Id || _state.IsBusy != state.IsBusy || _state.CanStart != state.CanStart || _state.Active?.Status != state.Active?.Status)
+            _trace?.Invoke(state.Active is { Status: SessionStatus.Running } observed
                 ? $"Quick overlay state: {observed.Type} timer; id={observed.Id}; plannedEnd={observed.PlannedEndAt:O}; busy={state.IsBusy}."
+                : state.Active is { Status: SessionStatus.Paused } paused
+                ? $"Quick overlay state: {paused.Type} paused; id={paused.Id}; remaining={paused.PlannedDuration - paused.AccumulatedActiveDuration}; busy={state.IsBusy}."
                 : $"Quick overlay state: selection; ready={state.CanStart}; busy={state.IsBusy}.");
         _state = state;
-        bool active = state.Active is not null;
-        Surface.Padding = active ? new Thickness(24, 24, 24, 20) : new Thickness(24);
-        IdleHeader.Visibility = active ? Visibility.Collapsed : Visibility.Visible;
-        SelectionCards.Visibility = active ? Visibility.Collapsed : Visibility.Visible;
-        StartButton.Visibility = active ? Visibility.Collapsed : Visibility.Visible;
-        KeyboardHints.Visibility = active ? Visibility.Collapsed : Visibility.Visible;
-        ActiveCard.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
+        Surface.Padding = hasActive ? new Thickness(24, 24, 24, 20) : new Thickness(24);
+        IdleHeader.Visibility = hasActive ? Visibility.Collapsed : Visibility.Visible;
+        SelectionCards.Visibility = hasActive ? Visibility.Collapsed : Visibility.Visible;
+        StartButton.Visibility = hasActive ? Visibility.Collapsed : Visibility.Visible;
+        KeyboardHints.Visibility = hasActive ? Visibility.Collapsed : Visibility.Visible;
+        ActiveCard.Visibility = hasActive ? Visibility.Visible : Visibility.Collapsed;
 
-        StopButton.IsEnabled = active && !state.IsBusy;
-        StopButton.Content = state.IsBusy ? "Please wait…" : "Stop Session";
+        PauseButton.IsEnabled = hasActive && !state.IsBusy;
+        PauseButton.Content = state.IsBusy ? "Please wait…" : isPaused ? "Continue" : "Pause";
+        AutomationProperties.SetName(PauseButton, isPaused ? "Continue Session" : "Pause Session");
+
+        StartNewButton.Visibility = isPaused ? Visibility.Visible : Visibility.Collapsed;
+        StartNewButton.IsEnabled = isPaused && !state.IsBusy;
+        StartNewButton.Content = "Start New";
+        AutomationProperties.SetName(StartNewButton, "Start New Session");
 
         bool isHighContrast = new Windows.UI.ViewManagement.AccessibilitySettings().HighContrast;
         bool isDark = IsDarkTheme();
         if (state.Active is { } session)
         {
             var sessionColor = session.Type == SessionType.Work ? _colors.Work : _colors.Break;
-            ActiveType.Text = session.Type == SessionType.Work ? "WORK SESSION" : "BREAK SESSION";
+            ActiveType.Text = session.Type == SessionType.Work ? (isPaused ? "WORK SESSION (PAUSED)" : "WORK SESSION") : (isPaused ? "BREAK SESSION (PAUSED)" : "BREAK SESSION");
 
             if (isHighContrast)
             {
@@ -195,9 +208,12 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
                 ProgressTrack.Background = Presentation.ThemeBrush("FkBorder", Surface);
                 ActiveType.Foreground = Presentation.ThemeBrush("FkForeground", Surface);
                 ActiveRemaining.Foreground = Presentation.ThemeBrush("FkForeground", Surface);
-                StopButton.Background = Presentation.ThemeBrush("FkSurface2", Surface);
-                StopButton.BorderBrush = Presentation.ThemeBrush("FkBorder", Surface);
-                StopButton.Foreground = Presentation.ThemeBrush("FkForeground", Surface);
+                PauseButton.Background = Presentation.ThemeBrush("FkSurface2", Surface);
+                PauseButton.BorderBrush = Presentation.ThemeBrush("FkBorder", Surface);
+                PauseButton.Foreground = Presentation.ThemeBrush("FkForeground", Surface);
+                StartNewButton.Background = Presentation.ThemeBrush("FkSurface2", Surface);
+                StartNewButton.BorderBrush = Presentation.ThemeBrush("FkBorder", Surface);
+                StartNewButton.Foreground = Presentation.ThemeBrush("FkForeground", Surface);
                 if (Surface.BorderBrush is SolidColorBrush hcBorder)
                     ApplyDwmBorder(ToColorRef(hcBorder.Color));
             }
@@ -212,9 +228,21 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
                 var activeTextColor = SessionColors.Foreground(ToHexColor(activeSurfaceColor));
                 ActiveType.Foreground = SessionColorBrush.Create(activeTextColor);
                 ActiveRemaining.Foreground = SessionColorBrush.Create(activeTextColor);
-                StopButton.Background = Presentation.ThemeBrush("FkSurface2", Surface);
-                StopButton.BorderBrush = SessionColorBrush.CreateAlpha(sessionColor, 0.40);
-                StopButton.Foreground = Presentation.ThemeBrush("FkSecondary", Surface);
+                if (isPaused)
+                {
+                    PauseButton.Background = SessionColorBrush.Create(sessionColor);
+                    PauseButton.BorderBrush = SessionColorBrush.Create(sessionColor);
+                    PauseButton.Foreground = SessionColorBrush.Create(SessionColors.Foreground(sessionColor));
+                    StartNewButton.Background = Presentation.ThemeBrush("FkSurface2", Surface);
+                    StartNewButton.BorderBrush = SessionColorBrush.CreateAlpha(sessionColor, 0.40);
+                    StartNewButton.Foreground = Presentation.ThemeBrush("FkSecondary", Surface);
+                }
+                else
+                {
+                    PauseButton.Background = Presentation.ThemeBrush("FkSurface2", Surface);
+                    PauseButton.BorderBrush = SessionColorBrush.CreateAlpha(sessionColor, 0.40);
+                    PauseButton.Foreground = Presentation.ThemeBrush("FkSecondary", Surface);
+                }
                 ApplyDwmBorder(ToColorRef(sessionColor));
             }
             else
@@ -226,9 +254,12 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
                 ActiveRemaining.Foreground = SessionColorBrush.Create(activeTextColor);
                 ProgressBar.Background = SessionColorBrush.Create(activeTextColor);
                 ProgressTrack.Background = SessionColorBrush.CreateAlpha(activeTextColor, 0.25);
-                StopButton.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 255, 255));
-                StopButton.BorderBrush = SessionColorBrush.CreateAlpha(activeTextColor, 0.35);
-                StopButton.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 20, 20, 20));
+                PauseButton.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 255, 255));
+                PauseButton.BorderBrush = SessionColorBrush.CreateAlpha(activeTextColor, 0.35);
+                PauseButton.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 20, 20, 20));
+                StartNewButton.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 255, 255));
+                StartNewButton.BorderBrush = SessionColorBrush.CreateAlpha(activeTextColor, 0.35);
+                StartNewButton.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 20, 20, 20));
                 ApplyDwmBorder(ToColorRef(sessionColor));
             }
         }
@@ -249,23 +280,30 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
                 Surface.ClearValue(Control.BackgroundProperty);
                 Surface.ClearValue(Control.BorderBrushProperty);
             }
-            StopButton.ClearValue(Control.BackgroundProperty);
-            StopButton.ClearValue(Control.BorderBrushProperty);
-            StopButton.ClearValue(Control.ForegroundProperty);
+            PauseButton.ClearValue(Control.BackgroundProperty);
+            PauseButton.ClearValue(Control.BorderBrushProperty);
+            PauseButton.ClearValue(Control.ForegroundProperty);
+            StartNewButton.ClearValue(Control.BackgroundProperty);
+            StartNewButton.ClearValue(Control.BorderBrushProperty);
+            StartNewButton.ClearValue(Control.ForegroundProperty);
             ProgressTrack.ClearValue(Border.BackgroundProperty);
         }
 
         RenderCountdown();
+
         WorkDuration.Text = QuickOverlayDurationFormatter.Format(state.Durations?.Work);
         BreakDuration.Text = QuickOverlayDurationFormatter.Format(state.Durations?.Break);
         AutomationProperties.SetName(WorkCard, $"Work, {WorkDuration.Text}");
         AutomationProperties.SetName(BreakCard, $"Break, {BreakDuration.Text}");
+
         PaintCard(WorkCard, WorkLabel, WorkDuration, WorkDot, state.Selected == SessionType.Work, _colors.Work, isDark);
         PaintCard(BreakCard, BreakLabel, BreakDuration, BreakDot, state.Selected == SessionType.Break, _colors.Break, isDark);
-        // Keep focusable cards available for navigation while their controller ignores selection
-        // during loading/saving or an existing session. Start is explicitly disabled.
+
         StartButton.IsEnabled = state.CanStart && !state.IsBusy;
         StartButton.Content = state.IsBusy ? "Please wait…" : "Start";
+        AutomationProperties.SetName(StartButton, $"Start {state.Selected}");
+        if (StartKeyHint is not null) StartKeyHint.Text = "Start";
+
         var startColor = state.Selected == SessionType.Work ? _colors.Work : _colors.Break;
         StartButton.Background = SessionColorBrush.Create(startColor);
         StartButton.Foreground = SessionColorBrush.Create(SessionColors.Foreground(startColor));
@@ -276,7 +314,7 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
         if (_visible && changedMode)
         {
             FocusSelection();
-            AnimateMode(state.Active is null ? SelectionCards : ActiveCard);
+            AnimateMode(hasActive ? ActiveCard : SelectionCards);
         }
     }
 
@@ -356,7 +394,7 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
     }
 
     private void FocusSelection() =>
-        (_state.Active is not null ? StopButton : _state.Selected == SessionType.Work ? WorkCard : BreakCard).Focus(FocusState.Keyboard);
+        (_state.Active is not null ? PauseButton : _state.Selected == SessionType.Work ? WorkCard : BreakCard).Focus(FocusState.Keyboard);
 
     private void ResizeAndCenter()
     {
@@ -397,6 +435,12 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
     private void OnWorkClicked(object sender, RoutedEventArgs args) => SelectionRequested?.Invoke(SessionType.Work);
     private void OnBreakClicked(object sender, RoutedEventArgs args) => SelectionRequested?.Invoke(SessionType.Break);
     private void OnStartClicked(object sender, RoutedEventArgs args) => StartRequested?.Invoke();
+    private void OnPauseClicked(object sender, RoutedEventArgs args)
+    {
+        if (_state.Active is { Status: SessionStatus.Paused }) StartRequested?.Invoke();
+        else PauseRequested?.Invoke();
+    }
+    private void OnStartNewClicked(object sender, RoutedEventArgs args) => StartNewRequested?.Invoke();
     private void OnStopClicked(object sender, RoutedEventArgs args) => StopRequested?.Invoke();
 
     private void OnPreviewKeyDown(object sender, KeyRoutedEventArgs args)
@@ -418,7 +462,7 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
                 // Handle once at the preview stage, avoiding an additional native Button click.
                 args.Handled = true;
                 if (args.KeyStatus.WasKeyDown) break;
-                if (_state.Active is not null) StopRequested?.Invoke();
+                if (_state.Active is { Status: SessionStatus.Running }) PauseRequested?.Invoke();
                 else StartRequested?.Invoke();
                 break;
         }

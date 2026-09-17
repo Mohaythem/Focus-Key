@@ -40,6 +40,9 @@ internal sealed class EngineTestRepository : ISessionRepository
         return written;
     }
 
+    public Task<SessionRecord?> GetActiveAsync(CancellationToken cancellationToken = default) =>
+        FailReads ? Task.FromException<SessionRecord?>(new InvalidOperationException("test read failure")) : _inner.GetActiveAsync(cancellationToken);
+
     public Task<SessionRecord?> GetRunningAsync(CancellationToken cancellationToken = default) =>
         FailReads ? Task.FromException<SessionRecord?>(new InvalidOperationException("test read failure")) : _inner.GetRunningAsync(cancellationToken);
 

@@ -43,6 +43,12 @@ public interface ISessionRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Reads the single active session (Running or Paused), or null when none is stored.
+    /// Storage guarantees there can never be more than one.
+    /// </summary>
+    Task<SessionRecord?> GetActiveAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Reads the single Running session, or null when none is stored. Storage guarantees there can
     /// never be more than one.
     /// </summary>

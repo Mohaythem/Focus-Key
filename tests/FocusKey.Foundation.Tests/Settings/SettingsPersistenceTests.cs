@@ -25,9 +25,15 @@ public sealed class SettingsPersistenceTests
         string file = Path.Combine(temp.Path, "focus_key.db");
         var connections = new SqliteConnectionFactory(file);
         CreateSchemaTwo(connections);
-        var sessions = new SqliteSessionRepository(connections);
         SessionRecord expected = TestSessions.Finished(SessionStatus.Completed);
-        await sessions.AddAsync(expected);
+        using (var connection = connections.OpenConnection())
+        {
+            Execute(connection, $"""
+                INSERT INTO sessions (id, type, status, started_at_utc, planned_duration_seconds, ended_at_utc, created_at_utc)
+                VALUES ('{expected.Id.ToText()}', 'work', 'completed', '{UtcTimestamp.Format(expected.StartedAt)}', {expected.PlannedDuration.Ticks / TimeSpan.TicksPerSecond}, '{UtcTimestamp.Format(expected.EndedAt!.Value)}', '{UtcTimestamp.Format(expected.CreatedAt)}');
+                """);
+        }
+        var sessions = new SqliteSessionRepository(connections);
 
         DatabaseInitializationResult result = new DatabaseBootstrapper(connections).Initialize();
 
@@ -56,6 +62,33 @@ public sealed class SettingsPersistenceTests
         var reopened = new SqliteSettingsRepository(new SqliteConnectionFactory(fixture.File));
         Assert.Equal(changed, await reopened.LoadAsync());
         Assert.Equal(1, fixture.Scalar<long>("SELECT COUNT(*) FROM application_settings;"));
+    }
+
+    [Fact]
+    public async Task SqliteSettingsRepository_SavesAndLoads_MainWindowShortcut()
+    {
+        using var fixture = new Fixture();
+        var custom = GlobalShortcut.Parse("Ctrl + Shift + O");
+        var changed = ApplicationSettings.Default with { MainWindowShortcut = custom };
+        await fixture.Repository.SaveAsync(changed);
+
+        var reopened = new SqliteSettingsRepository(new SqliteConnectionFactory(fixture.File));
+        ApplicationSettings loaded = await reopened.LoadAsync();
+        Assert.Equal(custom, loaded.MainWindowShortcut);
+        Assert.Equal("Ctrl + Shift + O", loaded.MainWindowShortcut.ToString());
+    }
+
+    [Fact]
+    public void ApplicationSettings_Validation_RejectsIdenticalGlobalAndMainWindowShortcuts()
+    {
+        var shortcut = GlobalShortcut.Parse("Shift + F3");
+        var invalid = ApplicationSettings.Default with
+        {
+            GlobalShortcut = shortcut,
+            MainWindowShortcut = shortcut,
+        };
+        var ex = Assert.Throws<ArgumentException>(() => invalid.Validate());
+        Assert.Contains("identical", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

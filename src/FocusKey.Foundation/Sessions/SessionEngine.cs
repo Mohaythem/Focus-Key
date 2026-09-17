@@ -68,12 +68,12 @@ public sealed class SessionEngine
 
         try
         {
-            SessionRecord? running = await _sessions.GetRunningAsync(cancellationToken)
+            SessionRecord? active = await _sessions.GetActiveAsync(cancellationToken)
                 .ConfigureAwait(false);
 
-            if (running is not null)
+            if (active is not null)
             {
-                throw new ActiveSessionAlreadyExistsException(running.Id);
+                throw new ActiveSessionAlreadyExistsException(active.Id);
             }
 
             SessionDurations durations = await _durationProvider.GetDurationsAsync(cancellationToken)
@@ -87,7 +87,10 @@ public sealed class SessionEngine
                 Type = type,
                 Status = SessionStatus.Running,
                 StartedAt = now,
+                ResumedAt = now,
                 PlannedDuration = duration,
+                AccumulatedActiveDuration = TimeSpan.Zero,
+                PausedAt = null,
                 EndedAt = null,
                 CreatedAt = now,
             };
@@ -105,21 +108,106 @@ public sealed class SessionEngine
     }
 
     /// <summary>
-    /// Describes the running session as it stands now, or null when nothing is running.
+    /// Describes the active session as it stands now, or null when nothing is active.
     /// Observation never writes: a session whose planned end has passed is reported as such and left
     /// running until <see cref="CompleteIfDueAsync"/> is called.
     /// </summary>
     public async Task<SessionSnapshot?> GetActiveAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        SessionRecord? running = await _sessions.GetRunningAsync(cancellationToken)
+        SessionRecord? active = await _sessions.GetActiveAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        return running is null ? null : SessionSnapshot.For(running, _time.GetUtcNow());
+        return active is null ? null : SessionSnapshot.For(active, _time.GetUtcNow());
+    }
+
+    public Task<SessionOutcome> PauseAsync(CancellationToken cancellationToken = default) =>
+        PauseCoreAsync(null, cancellationToken);
+
+    public Task<SessionOutcome> PauseAsync(SessionId expectedId, CancellationToken cancellationToken = default) =>
+        PauseCoreAsync(expectedId, cancellationToken);
+
+    private async Task<SessionOutcome> PauseCoreAsync(SessionId? expectedId, CancellationToken cancellationToken)
+    {
+        await _lifecycle.WaitAsync(cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            SessionRecord? active = await _sessions.GetActiveAsync(cancellationToken).ConfigureAwait(false);
+            if (active is null) return SessionOutcome.NoActiveSession();
+            if (expectedId is { } expected && expected != active.Id) return SessionOutcome.Conflict(active);
+            if (active.Status == SessionStatus.Paused) return SessionOutcome.Paused(active);
+            if (active.Status != SessionStatus.Running) return SessionOutcome.Conflict(active);
+
+            DateTimeOffset now = _time.GetUtcNow();
+            if (now >= active.PlannedEndAt) return await CompleteAsync(active, cancellationToken).ConfigureAwait(false);
+
+            DateTimeOffset pausedAt = now < active.ResumedAt ? active.ResumedAt : now;
+            TimeSpan legDuration = pausedAt - active.ResumedAt;
+            if (legDuration < TimeSpan.Zero) legDuration = TimeSpan.Zero;
+            TimeSpan remainingCap = active.PlannedDuration - active.AccumulatedActiveDuration;
+            if (legDuration > remainingCap) legDuration = remainingCap;
+            TimeSpan newAccumulated = active.AccumulatedActiveDuration + legDuration;
+            // Truncate to whole seconds for storage invariant
+            newAccumulated = TimeSpan.FromSeconds((long)newAccumulated.TotalSeconds);
+
+            SessionRecord paused = active with
+            {
+                Status = SessionStatus.Paused,
+                AccumulatedActiveDuration = newAccumulated,
+                PausedAt = pausedAt,
+            };
+
+            cancellationToken.ThrowIfCancellationRequested();
+            return await _sessions.TryUpdateAsync(active, paused, cancellationToken).ConfigureAwait(false)
+                ? SessionOutcome.Paused(paused)
+                : SessionOutcome.Conflict(active);
+        }
+        finally
+        {
+            _lifecycle.Release();
+        }
+    }
+
+    public Task<SessionOutcome> ContinueAsync(CancellationToken cancellationToken = default) =>
+        ContinueCoreAsync(null, cancellationToken);
+
+    public Task<SessionOutcome> ContinueAsync(SessionId expectedId, CancellationToken cancellationToken = default) =>
+        ContinueCoreAsync(expectedId, cancellationToken);
+
+    private async Task<SessionOutcome> ContinueCoreAsync(SessionId? expectedId, CancellationToken cancellationToken)
+    {
+        await _lifecycle.WaitAsync(cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            SessionRecord? active = await _sessions.GetActiveAsync(cancellationToken).ConfigureAwait(false);
+            if (active is null) return SessionOutcome.NoActiveSession();
+            if (expectedId is { } expected && expected != active.Id) return SessionOutcome.Conflict(active);
+            if (active.Status == SessionStatus.Running) return SessionOutcome.StillRunning(active);
+            if (active.Status != SessionStatus.Paused) return SessionOutcome.Conflict(active);
+
+            DateTimeOffset now = _time.GetUtcNow();
+            SessionRecord continued = active with
+            {
+                Status = SessionStatus.Running,
+                ResumedAt = now,
+                PausedAt = null,
+            };
+
+            cancellationToken.ThrowIfCancellationRequested();
+            return await _sessions.TryUpdateAsync(active, continued, cancellationToken).ConfigureAwait(false)
+                ? SessionOutcome.Continued(continued)
+                : SessionOutcome.Conflict(active);
+        }
+        finally
+        {
+            _lifecycle.Release();
+        }
     }
 
     /// <summary>
-    /// Ends the running session. Before its planned end this stops it; at or after its planned end
+    /// Ends the running or paused session. Before its planned end this stops it; at or after its planned end
     /// the session has in fact finished, so it completes instead — with the planned end as its end
     /// timestamp, not the moment Stop was called.
     /// </summary>
@@ -141,37 +229,48 @@ public sealed class SessionEngine
 
         try
         {
-            SessionRecord? running = await _sessions.GetRunningAsync(cancellationToken)
+            SessionRecord? active = await _sessions.GetActiveAsync(cancellationToken)
                 .ConfigureAwait(false);
 
-            if (running is null)
+            if (active is null)
             {
                 return SessionOutcome.NoActiveSession();
             }
 
-            if (expectedId is { } expected && expected != running.Id)
-                return SessionOutcome.Conflict(running);
+            if (expectedId is { } expected && expected != active.Id)
+                return SessionOutcome.Conflict(active);
 
             DateTimeOffset now = _time.GetUtcNow();
-
-            if (now >= running.PlannedEndAt)
+            DateTimeOffset endedAt;
+            DateTimeOffset resumedAt = active.ResumedAt;
+            if (active.Status == SessionStatus.Paused)
             {
-                return await CompleteAsync(running, cancellationToken).ConfigureAwait(false);
+                endedAt = active.PausedAt ?? now;
+                resumedAt = endedAt;
+            }
+            else
+            {
+                if (now >= active.PlannedEndAt)
+                {
+                    return await CompleteAsync(active, cancellationToken).ConfigureAwait(false);
+                }
+
+                // A clock that moved backwards must not produce a record that ends before it started.
+                endedAt = now < active.StartedAt ? active.StartedAt : now;
             }
 
-            // A clock that moved backwards must not produce a record that ends before it started.
-            DateTimeOffset endedAt = now < running.StartedAt ? running.StartedAt : now;
-
-            SessionRecord stopped = running with
+            SessionRecord stopped = active with
             {
                 Status = SessionStatus.Stopped,
+                ResumedAt = resumedAt,
                 EndedAt = endedAt,
+                PausedAt = null,
             };
 
             cancellationToken.ThrowIfCancellationRequested();
-            return await _sessions.TryUpdateAsync(running, stopped, cancellationToken).ConfigureAwait(false)
+            return await _sessions.TryUpdateAsync(active, stopped, cancellationToken).ConfigureAwait(false)
                 ? SessionOutcome.Stopped(stopped)
-                : SessionOutcome.Conflict(running);
+                : SessionOutcome.Conflict(active);
         }
         finally
         {
@@ -180,14 +279,15 @@ public sealed class SessionEngine
     }
 
     /// <summary>
-    /// Completes the running session if its planned end has arrived, and does nothing otherwise.
+    /// Completes the active session if its planned end has arrived, and does nothing otherwise.
     /// Safe to call as often as a caller likes: once a session is completed it is no longer running,
     /// so a second call finds nothing to do and no session can complete twice.
     /// </summary>
     /// <returns>
     /// <see cref="SessionOutcomeKind.NoActiveSession"/>,
     /// <see cref="SessionOutcomeKind.StillRunning"/>, <see cref="SessionOutcomeKind.Completed"/>,
-    /// or <see cref="SessionOutcomeKind.Conflict"/> when another writer changed the observed session.
+    /// <see cref="SessionOutcomeKind.Paused"/>, or <see cref="SessionOutcomeKind.Conflict"/>
+    /// when another writer changed the observed session.
     /// </returns>
     public async Task<SessionOutcome> CompleteIfDueAsync(CancellationToken cancellationToken = default)
     {
@@ -195,20 +295,25 @@ public sealed class SessionEngine
 
         try
         {
-            SessionRecord? running = await _sessions.GetRunningAsync(cancellationToken)
+            SessionRecord? active = await _sessions.GetActiveAsync(cancellationToken)
                 .ConfigureAwait(false);
 
-            if (running is null)
+            if (active is null)
             {
                 return SessionOutcome.NoActiveSession();
             }
 
-            if (_time.GetUtcNow() < running.PlannedEndAt)
+            if (active.Status == SessionStatus.Paused)
             {
-                return SessionOutcome.StillRunning(running);
+                return SessionOutcome.Paused(active);
             }
 
-            return await CompleteAsync(running, cancellationToken).ConfigureAwait(false);
+            if (_time.GetUtcNow() < active.PlannedEndAt)
+            {
+                return SessionOutcome.StillRunning(active);
+            }
+
+            return await CompleteAsync(active, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -228,6 +333,7 @@ public sealed class SessionEngine
         {
             Status = SessionStatus.Completed,
             EndedAt = running.PlannedEndAt,
+            PausedAt = null,
         };
 
         cancellationToken.ThrowIfCancellationRequested();

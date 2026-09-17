@@ -176,5 +176,64 @@ public static class SchemaMigrations
             Sql: """
                 ALTER TABLE application_settings ADD COLUMN global_shortcut TEXT NOT NULL DEFAULT 'Shift + F3';
                 """),
+
+        new SchemaMigration(
+            Version: 9,
+            Name: "session_pause",
+            Sql: """
+                CREATE TABLE sessions_new (
+                    id                          TEXT    NOT NULL PRIMARY KEY,
+                    type                        TEXT    NOT NULL,
+                    status                      TEXT    NOT NULL,
+                    started_at_utc              TEXT    NOT NULL,
+                    planned_duration_seconds    INTEGER NOT NULL,
+                    ended_at_utc                TEXT,
+                    created_at_utc              TEXT    NOT NULL,
+                    resumed_at_utc              TEXT    NOT NULL,
+                    accumulated_active_seconds  INTEGER NOT NULL DEFAULT 0,
+                    paused_at_utc               TEXT,
+
+                    CHECK (length(id) = 36),
+                    CHECK (type IN ('work', 'break')),
+                    CHECK (status IN ('running', 'paused', 'completed', 'stopped', 'interrupted')),
+                    CHECK (planned_duration_seconds > 0),
+                    CHECK (length(started_at_utc) = 28),
+                    CHECK (length(created_at_utc) = 28),
+                    CHECK (length(resumed_at_utc) = 28),
+                    CHECK (ended_at_utc IS NULL OR length(ended_at_utc) = 28),
+                    CHECK (paused_at_utc IS NULL OR length(paused_at_utc) = 28),
+                    CHECK (accumulated_active_seconds >= 0),
+
+                    CHECK ((status IN ('running', 'paused')) = (ended_at_utc IS NULL)),
+                    CHECK ((status = 'paused') = (paused_at_utc IS NOT NULL)),
+                    CHECK (ended_at_utc IS NULL OR ended_at_utc >= started_at_utc),
+                    CHECK (paused_at_utc IS NULL OR paused_at_utc >= resumed_at_utc)
+                ) STRICT;
+
+                INSERT INTO sessions_new (
+                    id, type, status, started_at_utc, planned_duration_seconds, ended_at_utc,
+                    created_at_utc, resumed_at_utc, accumulated_active_seconds, paused_at_utc)
+                SELECT
+                    id, type, status, started_at_utc, planned_duration_seconds, ended_at_utc,
+                    created_at_utc, started_at_utc, 0, NULL
+                FROM sessions;
+
+                DROP TABLE sessions;
+                ALTER TABLE sessions_new RENAME TO sessions;
+
+                CREATE UNIQUE INDEX ux_sessions_single_active
+                    ON sessions (status)
+                    WHERE status IN ('running', 'paused');
+
+                CREATE INDEX ix_sessions_started_at_utc
+                    ON sessions (started_at_utc);
+                """),
+
+        new SchemaMigration(
+            Version: 10,
+            Name: "main_window_shortcut",
+            Sql: """
+                ALTER TABLE application_settings ADD COLUMN main_window_shortcut TEXT NOT NULL DEFAULT 'Shift + F4';
+                """),
     ];
 }

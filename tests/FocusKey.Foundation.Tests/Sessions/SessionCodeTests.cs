@@ -67,6 +67,7 @@ public sealed class SessionStatusTextTests
 
     [Theory]
     [InlineData(SessionStatus.Running)]
+    [InlineData(SessionStatus.Paused)]
     [InlineData(SessionStatus.Completed)]
     [InlineData(SessionStatus.Stopped)]
     [InlineData(SessionStatus.Interrupted)]
@@ -81,7 +82,6 @@ public sealed class SessionStatusTextTests
     [InlineData("Running")]
     [InlineData("RUNNING")]
     [InlineData("2")]
-    [InlineData("paused")]
     [InlineData("cancelled")]
     [InlineData("finished")]
     public void TryParse_RefusesUnknownText(string? text)

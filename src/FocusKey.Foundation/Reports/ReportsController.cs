@@ -9,6 +9,7 @@ public sealed class ReportsController(Func<ReportPeriod, DateOnly, CancellationT
     private bool _followCurrent = true;
     public ReportPeriod Period { get; private set; } = ReportPeriod.Weekly;
     public DateOnly Date { get; private set; } = currentDate();
+    public DateOnly CurrentDate() => currentDate();
     public ReportsSnapshot? Snapshot { get; private set; }
     public bool IsRefreshing { get; private set; }
     public string? Error { get; private set; }
@@ -19,6 +20,8 @@ public sealed class ReportsController(Func<ReportPeriod, DateOnly, CancellationT
     public Task SelectAsync(ReportPeriod period, DateOnly date)
     {
         if (_disposed) return Task.CompletedTask;
+        if (period == ReportPeriod.Yearly && date.Year > currentDate().Year)
+            date = new DateOnly(currentDate().Year, Math.Min(date.Month, 12), Math.Min(date.Day, 28));
         ReportRange.For(period, date);
         Period = period; Date = date; _followCurrent = false;
         return RefreshAsync();
@@ -28,9 +31,18 @@ public sealed class ReportsController(Func<ReportPeriod, DateOnly, CancellationT
     {
         if (direction is not (-1 or 1)) throw new ArgumentOutOfRangeException(nameof(direction));
         DateOnly next;
-        try { next = Period == ReportPeriod.Monthly ? Date.AddMonths(direction) : Date.AddDays(direction * 7); }
+        try
+        {
+            next = Period switch
+            {
+                ReportPeriod.Monthly => Date.AddMonths(direction),
+                ReportPeriod.Yearly => Date.AddYears(direction),
+                _ => Date.AddDays(direction * 7)
+            };
+        }
         catch (ArgumentOutOfRangeException) { return Task.CompletedTask; }
         if (next < ReportRange.MinimumDate || next > ReportRange.MaximumDate) return Task.CompletedTask;
+        if (direction > 0 && Period == ReportPeriod.Yearly && next.Year > currentDate().Year) return Task.CompletedTask;
         return SelectAsync(Period, next);
     }
     public async Task RefreshAsync()

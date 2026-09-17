@@ -3,7 +3,7 @@ using FocusKey.Foundation.Sessions;
 
 namespace FocusKey.Foundation.Reports;
 
-public enum ReportPeriod { Weekly, Monthly }
+public enum ReportPeriod { Weekly, Monthly, Yearly }
 
 public sealed record ReportRange(DateOnly Start, DateOnly End)
 {
@@ -17,6 +17,7 @@ public sealed record ReportRange(DateOnly Start, DateOnly End)
         {
             ReportPeriod.Weekly => new(date.AddDays(-6), date.AddDays(1)),
             ReportPeriod.Monthly => new(new(date.Year, date.Month, 1), new DateOnly(date.Year, date.Month, 1).AddMonths(1)),
+            ReportPeriod.Yearly => new(new(date.Year, 1, 1), new DateOnly(date.Year + 1, 1, 1)),
             _ => throw new ArgumentOutOfRangeException(nameof(period))
         };
     }
@@ -45,6 +46,8 @@ public sealed record ReportTotals(int Started, int WorkStarted, int BreakStarted
             rows.Count(s => s.Status == SessionStatus.Stopped), rows.Count(s => s.Status == SessionStatus.Interrupted),
             rows.Count(s => s.Status == SessionStatus.Running), Duration(SessionType.Work), Duration(SessionType.Break));
     }
+
+    public static readonly ReportTotals Empty = From([]);
 }
 
 public sealed record ReportBucket(string Label, ReportTotals Totals);
@@ -53,7 +56,9 @@ public sealed record ReportsSnapshot(ReportPeriod Period, ReportRange Range, Tim
     DateTimeOffset ObservedAt, ReportTotals Totals, IReadOnlyList<ReportBucket> Trend,
     IReadOnlyList<FocusPeriod> LeadingFocusPeriods, ReportRange ComparisonWeek,
     TimeSpan WeekFocus, TimeSpan PreviousWeekFocus, StreakStatistics? Streaks = null,
-    TimeSpan? PreviousPeriodFocus = null)
+    TimeSpan? PreviousPeriodFocus = null,
+    bool IsYearEligible = false,
+    DateOnly? EarliestHistoryDate = null)
 {
     public StreakStatistics Streaks { get; init; } = Streaks ?? StreakStatistics.Zero;
     public TimeSpan WeekDifference => WeekFocus - PreviousWeekFocus;
@@ -103,6 +108,30 @@ public sealed class ReportsService
         return Math.Max(stepHours, ceiling);
     }
 
+    /// <summary>
+    /// Computes an appropriate grid step size in hours for yearly charts based on max monthly focus.
+    /// Produces 4 to 6 legible grid intervals regardless of whether focus volume is light or heavy.
+    /// </summary>
+    public static int ComputeYearlyStepHours(double maxSeconds)
+    {
+        double maxHours = maxSeconds / 3600.0;
+        if (maxHours <= 50) return 10;
+        if (maxHours <= 120) return 20;
+        if (maxHours <= 250) return 50;
+        return 100;
+    }
+
+    /// <summary>
+    /// Determines if Yearly reports are available. Requires at least one full calendar year
+    /// of history (from the earliest recorded native session or imported focus date up to today).
+    /// </summary>
+    public static bool IsYearEligible(DateOnly? earliestDate, DateOnly today)
+    {
+        if (earliestDate is null) return false;
+        if (earliestDate.Value > today) return false;
+        return earliestDate.Value.AddYears(1) <= today;
+    }
+
     public DateOnly CurrentDate() => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(_time.GetUtcNow(), _zone()).DateTime);
 
     public async Task<ReportsSnapshot> ReadAsync(ReportPeriod period, DateOnly date, CancellationToken cancellationToken = default)
@@ -111,9 +140,19 @@ public sealed class ReportsService
         var range = ReportRange.For(period, date);
         var week = ReportRange.For(ReportPeriod.Weekly, date);
         var previous = new ReportRange(week.Start.AddDays(-7), week.Start);
-        var prevPeriodStart = period == ReportPeriod.Monthly
-            ? (range.Start > new DateOnly(1, 2, 1) ? range.Start.AddMonths(-1) : range.Start)
-            : previous.Start;
+        DateOnly prevPeriodStart;
+        if (period == ReportPeriod.Yearly)
+        {
+            prevPeriodStart = range.Start > new DateOnly(2, 1, 1) ? range.Start.AddYears(-1) : range.Start;
+        }
+        else if (period == ReportPeriod.Monthly)
+        {
+            prevPeriodStart = range.Start > new DateOnly(1, 2, 1) ? range.Start.AddMonths(-1) : range.Start;
+        }
+        else
+        {
+            prevPeriodStart = previous.Start;
+        }
         var prevPeriodRange = new ReportRange(prevPeriodStart, range.Start);
 
         var from = range.Start < prevPeriodStart ? range.Start : prevPeriodStart;
@@ -150,7 +189,7 @@ public sealed class ReportsService
                 buckets.Add(new(day.ToString("yyyy-MM-dd"), nativeBucket with { FocusTime = nativeBucket.FocusTime + dayHistoryTime }));
             }
         }
-        else
+        else if (period == ReportPeriod.Monthly)
         {
             for (var start = range.Start; start < range.End;)
             {
@@ -161,6 +200,18 @@ public sealed class ReportsService
                 var sliceHistoryTime = rangeHistory.Where(h => slice.Contains(h.Date)).Aggregate(TimeSpan.Zero, (acc, h) => acc + h.Duration);
                 buckets.Add(new($"{start:yyyy-MM-dd} – {end.AddDays(-1):yyyy-MM-dd}", nativeBucket with { FocusTime = nativeBucket.FocusTime + sliceHistoryTime }));
                 start = end;
+            }
+        }
+        else // Yearly: 12 monthly buckets across the calendar year (Jan through Dec)
+        {
+            for (int m = 1; m <= 12; m++)
+            {
+                var monthStart = new DateOnly(range.Start.Year, m, 1);
+                var monthEnd = monthStart.AddMonths(1);
+                var slice = new ReportRange(monthStart, monthEnd);
+                var nativeBucket = ReportTotals.From(selected.Where(s => slice.Contains(DateOnly.FromDateTime(s.Local.DateTime))).Select(s => s.Session));
+                var sliceHistoryTime = rangeHistory.Where(h => slice.Contains(h.Date)).Aggregate(TimeSpan.Zero, (acc, h) => acc + h.Duration);
+                buckets.Add(new(monthStart.ToString("yyyy-MM"), nativeBucket with { FocusTime = nativeBucket.FocusTime + sliceHistoryTime }));
             }
         }
 
@@ -179,7 +230,7 @@ public sealed class ReportsService
         TimeSpan previousWeekFocus = RangeTime(previous);
         TimeSpan previousPeriodFocus = period == ReportPeriod.Weekly ? previousWeekFocus : RangeTime(prevPeriodRange);
 
-        // 3. Streak statistics combining native completed sessions and imported focus days (hours > 0)
+        // 3. Streak statistics & Year eligibility across native sessions and imported focus days (hours > 0)
         var allRecords = await _repository.GetStartedBetweenAsync(
             DateTimeOffset.MinValue,
             DateTimeOffset.MaxValue,
@@ -190,8 +241,26 @@ public sealed class ReportsService
         var qualifyingDates = allHistory.Where(h => h.Duration > TimeSpan.Zero || h.SourceHours > 0).Select(h => h.Date).Distinct();
         var streaks = StreakCalculator.Calculate(allRecords, qualifyingDates, CurrentDate(), zone);
 
+        // Derive earliest history date across native sessions and imported historical data
+        DateOnly? earliestNative = allRecords.Count > 0
+            ? allRecords.Select(s => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(s.StartedAt, zone).DateTime)).Min()
+            : null;
+        DateOnly? earliestHistorical = allHistory.Count > 0
+            ? allHistory.Where(h => h.Duration > TimeSpan.Zero || h.SourceHours > 0).Select(h => (DateOnly?)h.Date).Min()
+            : null;
+
+        DateOnly? earliestDate = (earliestNative, earliestHistorical) switch
+        {
+            ({ } n, { } h) => n < h ? n : h,
+            ({ } n, null) => n,
+            (null, { } h) => h,
+            _ => null
+        };
+
+        bool isYearEligible = IsYearEligible(earliestDate, CurrentDate());
+
         cancellationToken.ThrowIfCancellationRequested();
         return new(period, range, zone, now, totals, buckets.AsReadOnly(), Array.AsReadOnly(leading),
-            week, weekFocus, previousWeekFocus, streaks, previousPeriodFocus);
+            week, weekFocus, previousWeekFocus, streaks, previousPeriodFocus, isYearEligible, earliestDate);
     }
 }

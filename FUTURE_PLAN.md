@@ -14,29 +14,46 @@ This document serves as the persistent repository-level source of truth for all 
 
 ## Active Work (Current Roadmap Task)
 
-*(None currently in progress. Ready for next approved roadmap item.)*
+*None currently active. Ready for next prioritized roadmap item.*
 
 ---
 
 ## Approved Pending Work
 
-### 1. Yearly Reports View
-- Add a Yearly Reports view that remains hidden until the user has accumulated one full year of app usage and session history.
-- Automatically expose the view once the one-year threshold is reached, providing long-term productivity and focus retrospectives without cluttering the interface for new users.
-
-### 2. Window Close (X) Choice Dialog
+### 1. Window Close (X) Choice Dialog
 - When the title bar window close (`X`) button is pressed, present a clear user choice between hiding Focus Key (background shell / system tray) and fully quitting the application.
 
-### 3. Adaptive Navigation & Sidebar Geometry
+### 2. Adaptive Navigation & Sidebar Geometry
 - Make the sidebar, navigation geometry, and icon presentation adapt more naturally and fluidly across window size changes and responsive tiers.
 
-### 4. Today Active Timer Hero & Lifecycle Actions
+### 3. Today Active Timer Hero & Lifecycle Actions
 - Refine the Today page so the active timer presents as a substantially stronger visual hero.
 - Ensure clear, prominent Start / Continue / Stop actions appropriate to the active session state.
 
 ---
 
 ## Completed Work
+
+### Yearly Reports (Completed: September 2026)
+Added a real Yearly Reports experience that integrates into the Reports desktop dashboard.
+- **Availability & Eligibility**:
+  - Week and Month remain normally available.
+  - Year remains completely hidden until >= 1 year of usable Focus Key history has accumulated (`earliestDate.AddYears(1) <= today`).
+  - Eligibility is derived directly from persisted native sessions and imported historical focus dates, surviving restarts without arbitrary UI flags.
+  - Ineligible users see only `[ Week | Month ]` without visual clutter or disabled buttons.
+- **Yearly Visualization (Jan → Dec)**:
+  - 12 monthly bars (Jan → Dec) representing real accumulated focus duration.
+  - Tailored geometry, responsive bar scaling, and dynamic Y-axis intervals (10h, 20h, 50h, 100h) producing 4 to 6 legible grid lines.
+  - Compact duration labels formatted above bars (`FormatYearlyBarDuration`) and bold emphasis on the current month column.
+- **Yearly Summary Metrics**:
+  - Preserves standard Focus Key metrics: Focus Time, Work Sessions, Completion Rate.
+  - Native sessions provide session counts and completion rates; imported history contributes strictly to Focus Time without fabricating fake sessions or distorting completion rate.
+- **Yearly Contextual Insights**:
+  - Truthful observations: strongest focus month (e.g. "August (58h 00m)"), active months consistency (e.g. "9 of 9 months", with monthly average), current streak, work sessions finished, and previous-year comparison (`↑`/`↓`) *only* when prior-year data exists.
+- **Year Navigation**:
+  - Seamless navigation between eligible years (`<` and `>`), display of calendar year in header and subtitle, and prevention of navigating into future years (`_nextButton` disabled at current year).
+- **Responsive & Theme Verification**:
+  - Verified across Maximized, Restored (~1000x720), and Minimum (680x500) desktop sizes in Dark, Light, and High Contrast themes.
 
 ### Reports Redesign: Cohesive Desktop Dashboard (Completed: September 2026)
 Redesigned Reports as a cohesive desktop dashboard following the hierarchy:
@@ -46,6 +63,5 @@ Redesigned Reports as a cohesive desktop dashboard following the hierarchy:
 - **Secondary Insights Rail**: Composes ~25% width on wide windows; truthful contextual insights (period comparisons `↑`/`↓`, active streaks with best badge, strongest focus day/week, active days consistency); calm empty state for zero activity.
 - **Responsive Adaptation**: Cleanly reflows into stacked layout on narrower/restored viewports (< 860 DIP) with internal 2-column adaptation (>= 420 DIP).
 - **Theme-Aware Visualization**: Fully optimized for Dark, Light, and High Contrast themes using dedicated `ReportsPalette`.
-- **Yearly View Preparation**: Header segmented control prepared with `[ Week | Month | Year* ]` (disabled segment with tooltip).
 - **Cleanup**: Removed legacy `StreaksCard`, narrative `InsightCard`, and redundant copy.
 

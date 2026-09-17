@@ -32,6 +32,8 @@ internal sealed class ReportsView : UserControl, IDisposable
     private bool _rendering;
     private SessionColors _colors = SessionColors.From(ApplicationSettings.Default);
     private Contrast _contrast = Contrast.Standard;
+    private Button? _nextButton;
+    private bool? _lastBuiltYearEligible;
     internal void ApplyColors(SessionColors colors) { _colors = colors; Render(); }
 
     internal ReportsView(ReportsService service, Action<Exception> report)
@@ -49,8 +51,8 @@ internal sealed class ReportsView : UserControl, IDisposable
         _date.MinDate = DateValue(ReportRange.MinimumDate); _date.MaxDate = DateValue(ReportRange.MaximumDate);
         AutomationProperties.SetName(_date, "Date in reporting period");
 
-        // Build segmented period selector per reference
-        BuildPeriodSelector();
+        // Build segmented period selector (Year segment hidden initially until eligibility confirmed)
+        BuildPeriodSelector(false);
 
         var panel = new StackPanel { Spacing = 16, HorizontalAlignment = HorizontalAlignment.Stretch };
 
@@ -91,7 +93,8 @@ internal sealed class ReportsView : UserControl, IDisposable
         };
         navRow.Children.Add(NavButton(new FontIcon { Glyph = "\uE76B", FontSize = 12 }, () => _reports.MoveAsync(-1), "Previous period", "Previous period"));
         navRow.Children.Add(_date);
-        navRow.Children.Add(NavButton(new FontIcon { Glyph = "\uE76C", FontSize = 12 }, () => _reports.MoveAsync(1), "Next period", "Next period"));
+        _nextButton = NavButton(new FontIcon { Glyph = "\uE76C", FontSize = 12 }, () => _reports.MoveAsync(1), "Next period", "Next period");
+        navRow.Children.Add(_nextButton);
         navRow.Children.Add(NavButton("Current", _reports.CurrentAsync, "Current period", "Current period"));
         navRow.Children.Add(NavButton(new FontIcon { Glyph = "\uE72C", FontSize = 12 }, _reports.RefreshAsync, "Refresh reports", "Refresh"));
         Grid.SetColumn(navRow, 1);
@@ -122,7 +125,7 @@ internal sealed class ReportsView : UserControl, IDisposable
         Render();
     }
 
-    private void BuildPeriodSelector()
+    private void BuildPeriodSelector(bool isYearEligible)
     {
         _periodSelector.Children.Clear();
         var border = new Border
@@ -132,9 +135,22 @@ internal sealed class ReportsView : UserControl, IDisposable
         var stack = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2 };
         foreach (var period in Enum.GetValues<ReportPeriod>())
         {
+            if (period == ReportPeriod.Yearly && !isYearEligible)
+            {
+                continue; // Do not display Year button if user has < 1 year history
+            }
+
+            string label = period switch
+            {
+                ReportPeriod.Weekly => "Week",
+                ReportPeriod.Monthly => "Month",
+                ReportPeriod.Yearly => "Year",
+                _ => period.ToString()
+            };
+
             var btn = new Button
             {
-                Content = period == ReportPeriod.Weekly ? "Week" : "Month",
+                Content = label,
                 Tag = period,
                 Style = (Style)Application.Current.Resources["FkSegmentInactive"],
             };
@@ -147,21 +163,9 @@ internal sealed class ReportsView : UserControl, IDisposable
             stack.Children.Add(btn);
         }
 
-        // Year* segment prepared for future Yearly view
-        var yearBtn = new Button
-        {
-            Content = "Year*",
-            Tag = "Year",
-            IsEnabled = false,
-            Opacity = 0.45,
-            Style = (Style)Application.Current.Resources["FkSegmentInactive"],
-        };
-        ToolTipService.SetToolTip(yearBtn, "Yearly reports unlock after 1 year of usage");
-        AutomationProperties.SetName(yearBtn, "Yearly reports (unlocks after 1 year)");
-        stack.Children.Add(yearBtn);
-
         border.Child = stack;
         _periodSelector.Children.Add(border);
+        _lastBuiltYearEligible = isYearEligible;
     }
 
     private void UpdatePeriodHighlight()
@@ -173,20 +177,21 @@ internal sealed class ReportsView : UserControl, IDisposable
         var inactiveStyle = (Style)Application.Current.Resources["FkSegmentInactive"];
         foreach (var child in stack.Children)
         {
-            if (child is Button btn)
+            if (child is Button btn && btn.Tag is ReportPeriod p)
             {
-                if (btn.Tag is ReportPeriod p)
-                {
-                    bool active = p == _reports.Period;
-                    btn.Style = active ? activeStyle : inactiveStyle;
-                }
-                else
-                {
-                    btn.Style = inactiveStyle;
-                    btn.Opacity = 0.45;
-                }
+                bool active = p == _reports.Period;
+                btn.Style = active ? activeStyle : inactiveStyle;
+                btn.Opacity = 1.0;
             }
         }
+    }
+
+    private void UpdateNavigationState()
+    {
+        if (_nextButton is null) return;
+        bool isNextDisabled = _reports.Period == ReportPeriod.Yearly && _reports.Date.Year >= _reports.CurrentDate().Year;
+        _nextButton.IsEnabled = !isNextDisabled;
+        _nextButton.Opacity = isNextDisabled ? 0.4 : 1.0;
     }
 
     internal Task OpenAsync() => _reports.OpenAsync(); internal void Hide() => _reports.Hide(); internal Task RefreshAsync() => _reports.RefreshAsync(); public void Dispose() => _reports.Dispose();
@@ -203,7 +208,12 @@ internal sealed class ReportsView : UserControl, IDisposable
         {
             _rendering = true;
             _date.Date = DateValue(_reports.Date);
+            if (_reports.Snapshot is { } snap && snap.IsYearEligible != _lastBuiltYearEligible)
+            {
+                BuildPeriodSelector(snap.IsYearEligible);
+            }
             UpdatePeriodHighlight();
+            UpdateNavigationState();
             _rendering = false;
             _status.Text = _reports.IsRefreshing ? "Loading reports…" : _reports.Error ?? string.Empty;
             _results.Children.Clear();
@@ -219,7 +229,9 @@ internal sealed class ReportsView : UserControl, IDisposable
             var totals = snapshot.Totals;
 
             // Date range subtitle in subheader
-            string rangeText = ReportsFormatting.FormatDateRange(snapshot.Range.Start, snapshot.Range.End.AddDays(-1));
+            string rangeText = snapshot.Period == ReportPeriod.Yearly
+                ? $"Calendar Year {snapshot.Range.Start.Year}  ·  Jan 1 – Dec 31"
+                : ReportsFormatting.FormatDateRange(snapshot.Range.Start, snapshot.Range.End.AddDays(-1));
             _dateSubtitle.Text = $"{rangeText}  ·  {snapshot.TimeZone.DisplayName}";
 
             // 3-column metric tiles matching design hierarchy: Summary -> Main Chart -> Useful Insights
@@ -364,9 +376,20 @@ internal sealed class ReportsView : UserControl, IDisposable
             // 1. Period comparison
             var curPeriod = snapshot.Totals.FocusTime;
             var prevPeriod = snapshot.PreviousPeriodDuration;
-            string periodName = snapshot.Period == ReportPeriod.Weekly ? "last week" : "last month";
+            string periodName = snapshot.Period switch
+            {
+                ReportPeriod.Weekly => "last week",
+                ReportPeriod.Monthly => "last month",
+                ReportPeriod.Yearly => "last year",
+                _ => "previous period"
+            };
 
-            if (prevPeriod > TimeSpan.Zero || curPeriod > TimeSpan.Zero)
+            // Only show comparison for Yearly when prior-year data exists
+            bool showComparison = snapshot.Period == ReportPeriod.Yearly
+                ? (prevPeriod is { } pp && pp > TimeSpan.Zero)
+                : (prevPeriod > TimeSpan.Zero || curPeriod > TimeSpan.Zero);
+
+            if (showComparison)
             {
                 var diff = snapshot.PeriodDifference;
                 string diffValue;
@@ -400,7 +423,7 @@ internal sealed class ReportsView : UserControl, IDisposable
                 : null;
             items.Add(CreateInsightItem(streakValue, streakLabel, streakSub));
 
-            // 3. Strongest day / week
+            // 3. Strongest day / week / month
             if (snapshot.Trend.Count > 0)
             {
                 var topBucket = snapshot.Trend.OrderByDescending(b => b.Totals.FocusTime).FirstOrDefault();
@@ -414,6 +437,12 @@ internal sealed class ReportsView : UserControl, IDisposable
                     {
                         strongestValue = ReportsFormatting.FormatDayOfWeekAbbrev(topDate);
                         strongestLabel = $"Strongest day ({ReportsFormatting.FormatDuration(topBucket.Totals.FocusTime)})";
+                    }
+                    else if (snapshot.Period == ReportPeriod.Yearly &&
+                        DateOnly.TryParseExact(topBucket.Label + "-01", "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var topMonth))
+                    {
+                        strongestValue = ReportsFormatting.FormatYearMonthLong(topMonth.Month);
+                        strongestLabel = $"Strongest month ({ReportsFormatting.FormatDuration(topBucket.Totals.FocusTime)})";
                     }
                     else
                     {
@@ -430,7 +459,7 @@ internal sealed class ReportsView : UserControl, IDisposable
                 }
             }
 
-            // 4. Consistency / active days
+            // 4. Consistency / active days or months
             if (snapshot.Period == ReportPeriod.Weekly)
             {
                 int activeDays = snapshot.Trend.Count(b => b.Totals.FocusTime > TimeSpan.Zero);
@@ -441,6 +470,28 @@ internal sealed class ReportsView : UserControl, IDisposable
                     TimeSpan dailyAvg = TimeSpan.FromTicks(snapshot.Totals.FocusTime.Ticks / 7);
                     string activeSub = $"Daily avg: {ReportsFormatting.FormatDuration(dailyAvg)}";
                     items.Add(CreateInsightItem(activeValue, activeLabel, activeSub));
+                }
+            }
+            else if (snapshot.Period == ReportPeriod.Yearly)
+            {
+                int activeMonths = snapshot.Trend.Count(b => b.Totals.FocusTime > TimeSpan.Zero);
+                if (activeMonths > 0)
+                {
+                    int elapsedMonths = snapshot.Range.Start.Year == _reports.CurrentDate().Year
+                        ? _reports.CurrentDate().Month
+                        : 12;
+                    string activeValue = $"{activeMonths} of {elapsedMonths} {(elapsedMonths == 1 ? "month" : "months")}";
+                    string activeLabel = "Active focus months";
+                    TimeSpan monthlyAvg = TimeSpan.FromTicks(snapshot.Totals.FocusTime.Ticks / Math.Max(1, elapsedMonths));
+                    string activeSub = $"Monthly avg: {ReportsFormatting.FormatDuration(monthlyAvg)}";
+                    items.Add(CreateInsightItem(activeValue, activeLabel, activeSub));
+                }
+
+                if (snapshot.Totals.CompletedWork > 0)
+                {
+                    string sessionValue = $"{snapshot.Totals.CompletedWork} completed";
+                    string sessionLabel = "Work sessions finished";
+                    items.Add(CreateInsightItem(sessionValue, sessionLabel));
                 }
             }
             else
@@ -569,9 +620,13 @@ internal sealed class ReportsView : UserControl, IDisposable
         title.FontWeight = FontWeights.SemiBold;
         titleStack.Children.Add(title);
 
-        string subtitleText = snapshot.Period == ReportPeriod.Weekly
-            ? "Last 7 days (today on the right)"
-            : "Weekly breakdown for the selected month";
+        string subtitleText = snapshot.Period switch
+        {
+            ReportPeriod.Weekly => "Last 7 days (today on the right)",
+            ReportPeriod.Monthly => "Weekly breakdown for the selected month",
+            ReportPeriod.Yearly => $"Monthly breakdown for {snapshot.Range.Start.Year}",
+            _ => string.Empty
+        };
         var subtitle = Presentation.DimText(subtitleText, 11);
         titleStack.Children.Add(subtitle);
         header.Children.Add(titleStack);
@@ -584,7 +639,7 @@ internal sealed class ReportsView : UserControl, IDisposable
 
         body.Children.Add(header);
 
-        var chart = new ReportsChart(snapshot.Trend, snapshot.Period, palette);
+        var chart = new ReportsChart(snapshot.Trend, snapshot.Period, palette, _reports.CurrentDate());
         AutomationProperties.SetName(chart, "Focus activity trend chart");
         body.Children.Add(chart);
 

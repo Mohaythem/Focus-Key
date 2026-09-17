@@ -67,6 +67,13 @@ public static class ReportsFormatting
             return $"{datePart}\nFocus Time: {focusStr}\nBreak Time: {breakStr}";
         }
 
+        if (period == ReportPeriod.Yearly &&
+            DateOnly.TryParseExact(bucket.Label + "-01", "yyyy-MM-dd", Culture, DateTimeStyles.None, out var monthDate))
+        {
+            string datePart = monthDate.ToString("MMMM yyyy", Culture);
+            return $"{datePart}\nFocus Time: {focusStr}\nBreak Time: {breakStr}";
+        }
+
         return $"{bucket.Label}\nFocus Time: {focusStr}\nBreak Time: {breakStr}";
     }
 
@@ -81,6 +88,31 @@ public static class ReportsFormatting
     /// <summary>Formats monthly week column labels (e.g. "W1", "W2").</summary>
     public static string FormatMonthWeek(int weekIndex) =>
         string.Create(Culture, $"W{weekIndex}");
+
+    /// <summary>Formats 3-letter month abbreviation for Yearly chart columns (e.g. "Jan", "Feb").</summary>
+    public static string FormatYearMonth(int month) =>
+        new DateTime(2026, Math.Clamp(month, 1, 12), 1).ToString("MMM", Culture);
+
+    /// <summary>Formats full month name (e.g. "January" or "January 2026").</summary>
+    public static string FormatYearMonthLong(int month, int? year = null)
+    {
+        int clamped = Math.Clamp(month, 1, 12);
+        return year.HasValue
+            ? new DateTime(year.Value, clamped, 1).ToString("MMMM yyyy", Culture)
+            : new DateTime(2026, clamped, 1).ToString("MMMM", Culture);
+    }
+
+    /// <summary>Formats duration labels placed above Yearly chart bars (e.g. "124h", "5h 30m", "45m").</summary>
+    public static string FormatYearlyBarDuration(TimeSpan duration)
+    {
+        if (duration <= TimeSpan.Zero) return string.Empty;
+        int hours = (int)duration.TotalHours;
+        int minutes = duration.Minutes;
+        if (hours >= 10) return string.Create(Culture, $"{hours}h");
+        if (hours > 0 && minutes > 0) return string.Create(Culture, $"{hours}h {minutes}m");
+        if (hours > 0) return string.Create(Culture, $"{hours}h");
+        return string.Create(Culture, $"{Math.Max(1, minutes)}m");
+    }
 
     /// <summary>Formats streak count values (e.g. "1 day", "3 days").</summary>
     public static string FormatStreak(int days) =>

@@ -9,12 +9,13 @@ namespace FocusKey.Foundation.Tests.Reports;
 public sealed class ReportsRollingWeeklyChartTests
 {
     [Fact]
-    public void ReportPeriod_HasOnlyWeeklyAndMonthly_DailyIsEliminated()
+    public void ReportPeriod_HasWeeklyMonthlyAndYearly()
     {
         var periods = Enum.GetValues<ReportPeriod>();
-        Assert.Equal(2, periods.Length);
+        Assert.Equal(3, periods.Length);
         Assert.Contains(ReportPeriod.Weekly, periods);
         Assert.Contains(ReportPeriod.Monthly, periods);
+        Assert.Contains(ReportPeriod.Yearly, periods);
     }
 
     [Fact]

@@ -21,7 +21,7 @@ internal sealed class ReportsChart : Grid
     private const double PlotAreaHeight = 300;
     private const double TotalPlotHeight = TopHeadroom + PlotAreaHeight; // 330 DIP
 
-    internal ReportsChart(IReadOnlyList<ReportBucket> trend, ReportPeriod period, ReportsPalette palette)
+    internal ReportsChart(IReadOnlyList<ReportBucket> trend, ReportPeriod period, ReportsPalette palette, DateOnly? currentDate = null)
     {
         Language = "en-US";
         FlowDirection = FlowDirection.LeftToRight;
@@ -32,8 +32,13 @@ internal sealed class ReportsChart : Grid
         RowDefinitions.Add(new RowDefinition { Height = new GridLength(TotalPlotHeight) });
         RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-        int stepHours = period == ReportPeriod.Monthly ? 10 : 5;
         double effectiveMax = trend.Count == 0 ? 0 : trend.Max(b => b.Totals.FocusTime.TotalSeconds);
+        int stepHours = period switch
+        {
+            ReportPeriod.Yearly => ReportsService.ComputeYearlyStepHours(effectiveMax),
+            ReportPeriod.Monthly => 10,
+            _ => 5
+        };
         int ceilingHours = ReportsService.ComputeCeilingHours(effectiveMax, stepHours);
 
         bool isDark = palette.IsDark;
@@ -149,14 +154,16 @@ internal sealed class ReportsChart : Grid
                 HorizontalAlignment = HorizontalAlignment.Center
             };
 
-            string durationText = ReportsFormatting.FormatBarDuration(bucket.Totals.FocusTime);
+            string durationText = period == ReportPeriod.Yearly
+                ? ReportsFormatting.FormatYearlyBarDuration(bucket.Totals.FocusTime)
+                : ReportsFormatting.FormatBarDuration(bucket.Totals.FocusTime);
             if (!string.IsNullOrEmpty(durationText))
             {
                 var durationLabel = new TextBlock
                 {
                     Text = durationText,
                     Style = Application.Current?.Resources["FkText"] as Style,
-                    FontSize = 11,
+                    FontSize = period == ReportPeriod.Yearly ? 10 : 11,
                     FontFamily = new FontFamily("Consolas"),
                     FontWeight = FontWeights.SemiBold,
                     Foreground = fgBrush,
@@ -176,7 +183,7 @@ internal sealed class ReportsChart : Grid
                 var bar = new Border
                 {
                     Height = barHeight,
-                    Width = 44, // Dynamically adjusted on SizeChanged
+                    Width = period == ReportPeriod.Yearly ? 28 : 44, // Dynamically adjusted on SizeChanged
                     Background = SessionColorBrush.Create(palette.Work),
                     CornerRadius = new CornerRadius(4, 4, 0, 0),
                     HorizontalAlignment = HorizontalAlignment.Center,
@@ -233,10 +240,21 @@ internal sealed class ReportsChart : Grid
                     vLines[c].X2 = x;
                 }
 
-                // Update bar widths: ~72% for Weekly, ~58% for Monthly, clamped comfortably
-                double fillRatio = period == ReportPeriod.Monthly ? 0.58 : 0.72;
-                double maxBarWidth = period == ReportPeriod.Monthly ? 128 : 116;
-                double dynamicBarWidth = Math.Clamp(Math.Floor(colW * fillRatio), 24, maxBarWidth);
+                // Update bar widths: ~72% for Weekly, ~58% for Monthly, ~65% for Yearly, clamped comfortably
+                double fillRatio = period switch
+                {
+                    ReportPeriod.Yearly => 0.65,
+                    ReportPeriod.Monthly => 0.58,
+                    _ => 0.72
+                };
+                double maxBarWidth = period switch
+                {
+                    ReportPeriod.Yearly => 64,
+                    ReportPeriod.Monthly => 128,
+                    _ => 116
+                };
+                double minBarWidth = period == ReportPeriod.Yearly ? 14 : 24;
+                double dynamicBarWidth = Math.Clamp(Math.Floor(colW * fillRatio), minBarWidth, maxBarWidth);
                 foreach (var bar in barBorders)
                 {
                     bar.Width = dynamicBarWidth;
@@ -292,6 +310,29 @@ internal sealed class ReportsChart : Grid
                 };
                 labelStack.Children.Add(dateText);
                 labelStack.Children.Add(dayText);
+            }
+            else if (period == ReportPeriod.Yearly)
+            {
+                bool isCurrentMonth = false;
+                if (DateOnly.TryParseExact(bucket.Label + "-01", "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var monthDate))
+                {
+                    isCurrentMonth = currentDate.HasValue &&
+                        monthDate.Year == currentDate.Value.Year &&
+                        monthDate.Month == currentDate.Value.Month;
+                }
+
+                var monthText = new TextBlock
+                {
+                    Text = ReportsFormatting.FormatYearMonth(i + 1),
+                    FontSize = 11,
+                    FontWeight = isCurrentMonth ? FontWeights.SemiBold : FontWeights.Normal,
+                    Foreground = isCurrentMonth ? fgBrush : secBrush,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Language = "en-US",
+                    FlowDirection = FlowDirection.LeftToRight,
+                    TextReadingOrder = TextReadingOrder.UseFlowDirection
+                };
+                labelStack.Children.Add(monthText);
             }
             else
             {

@@ -1,28 +1,32 @@
 # Focus Key — Project Progress & State Checkpoint
 
 ## Current Goal
-Settings + Quick Overlay Final Refinement completed and verified.
+Today + Quick Overlay Final Acceptance Polish completed, verified, and ready for user acceptance.
 
 ## Current Checkpoint
-Settings and Quick Overlay final refinements are 100% implemented, tested, and visually verified:
-- **Quick Overlay Visual Refinement**:
-  - Consistent compact window shell (480 DIP width, ~280–340 DIP height) across Idle, Running, and Paused states.
-  - Idle state launcher: Work & Break selection cards using configured durations from Settings, subtle semantic accents, primary `[ Start ]` action.
-  - Running state: Dominant 52 DIP timer typography in Consolas font, 6 DIP semantic progress bar, primary `[ Pause ]` (elevated) and secondary `[ Stop ]` (neutral) actions.
-  - Paused state: Frozen timer, primary `[ Continue ]` (elevated), `[ Start New ]` (neutral), and `[ Stop ]` actions.
-  - Light mode consistency matching Carbon Studio tokens and contrast standards.
-  - Esc key dismisses Overlay across all states without stopping the session; small Close (`×`) button in quiet draggable header.
-- **Draggable Quick Overlay & Position Persistence**:
-  - Movable by mouse via header region (native Win32 `ReleaseCapture` + `SendMessage WM_NCLBUTTONDOWN HTCAPTION`).
-  - Persist last valid screen position to SQLite settings repository (`overlay_position_x`, `overlay_position_y`, Migration 11).
-  - Multi-monitor and off-screen recovery: DPI-aware clamping against available monitor work areas (`OverlayPositionHelper.ClampToWorkAreas`) ensuring an always-reachable header.
-  - Default first opening centered on foreground/active monitor (`OverlayPositionHelper.CalculateInitialCenter`).
-  - Position stability: Window does not jump/recenter across Idle → Running → Paused → Continue → Start New state transitions.
-- **Settings Page Refinements**:
-  - Two clean shortcut rows inside `SHORTCUTS` section (`Quick Overlay`, `Open Focus Key`) with conflict detection, duplicate prevention, and rollback.
-  - `QUICK OVERLAY` section with `Reset position` button (clears custom coordinates back to default centered behavior).
-  - `TIME FORMAT` section: User-selectable 12-hour (`9:05 AM`) / 24-hour (`09:05`) clock format preference applied consistently to wall-clock timestamps (Today Activity, session history) via `TodayFormatting.FormatClockTime` while preserving countdown durations.
-  - Fixed live theme-refresh issues when toggling Dark ↔ Light in Settings so all shortcut, position, and selector controls update dynamically without stale brushes or restart (`SettingsView.RefreshVisuals`).
+Today and Quick Overlay final acceptance refinements are 100% implemented, tested, and visually verified:
+- **Running Session UI**:
+  - Today Hero displays `[ Pause ]` only (centered, clean breathing room).
+  - Quick Overlay displays `[ Pause ]` only.
+  - Visible `[ Stop ]` button completely removed from both Running surfaces.
+- **Paused Session UI**:
+  - Exactly two actions: `[ Continue ]` (primary elevated) and `[ Start New ]` (secondary neutral) side-by-side.
+  - Visible `[ Stop ]` button completely removed from both Paused surfaces.
+  - `Continue`: Resumes existing session timer.
+  - `Start New`: Finalizes/stops the paused session with actual elapsed active duration and returns the same surface to the Idle launcher.
+- **Session Finalization Architecture**:
+  - Underlying Stop/session-finalization architecture, engine APIs, repository methods, and data integrity rules are strictly preserved.
+- **Today Top-Row Geometry & Idle Launcher Polish**:
+  - Reduced vertical footprint of both Today Hero and Today Summary cards (~310 DIP height on wide/maximized desktop) eliminating empty bottom dead space while keeping Hero and Summary equal-height siblings.
+  - Centered Today Idle Work & Break cards (260×88 DIP tiles with top-left dot/mode and bottom duration) with centered `[ Start ]` button below.
+  - Refined Today Summary into a balanced, compact 2×2 metric grid with subtle divider lines.
+- **Quick Overlay Geometry & Proportions**:
+  - Compact horizontal desktop flyout (560 DIP width, ~240–250 DIP height).
+  - Persistent `FOCUS KEY` header branding with draggable header and close/shortcut buttons.
+  - Subheader in active modes shows `• WORK/BREAK SESSION` (left) ... `PAUSED`/`RUNNING` (right).
+  - Stretched Work and Break selection cards in Idle mode with top-left dot and right-aligned duration.
+  - Large 52 DIP Consolas countdown timer, 6 DIP progress track, centered action buttons, and keyboard hints (`[↵] Continue/Pause`, `[Esc] Close`).
+  - Native Win32 dragging, SQLite position persistence, and multi-monitor clamping.
 - **Automated Tests**: 781/781 unit tests passing (`dotnet test`), 0 failed, 0 skipped.
 - **Build**: 0 Warning(s), 0 Error(s) (`dotnet build -c Release`).
 
@@ -40,12 +44,13 @@ Settings and Quick Overlay final refinements are 100% implemented, tested, and v
 - **Stage 5b (Reports Acceptance Refinement & Temporary Preview)**: Balanced streaks group, zero metric repetition, comprehensive consistency metrics across all periods, and temporary `FOCUSKEY_YEARLY_PREVIEW` override.
 - **Stage 6 (Today Final Hero Redesign)**: Maximized 3-tier desktop composition (2/3 Hero + 1/3 Summary + full-width Activity), unified zero-layout-jump hero surface, dominant 80 DIP typography, semantic Pause/Continue/Start New/Stop actions, responsive 3-breakpoint scaling.
 - **Stage 6b (Reports Insights Vertical Composition + Today Summary Polish + Yearly Preview Verification)**: Proportional 4-zone grid distribution in Reports Insights rail, 72%/28% ratio, polished Today Summary 2x2 grid with horizontal divider, and full-year synthetic dataset verification.
-- **Stage 7 (Settings + Quick Overlay Final Refinement)**: Draggable Quick Overlay with multi-monitor clamping and SQLite position persistence, 480 DIP unified shell across Idle/Running/Paused states, Settings live theme refresh, dual shortcuts with collision prevention, 12/24-hour time format preference in Today activity.
+- **Stage 7 (Settings + Quick Overlay Final Refinement)**: Draggable Quick Overlay with multi-monitor clamping and SQLite position persistence, unified shell across Idle/Running/Paused states, Settings live theme refresh, dual shortcuts with collision prevention, 12/24-hour time format preference in Today activity.
+- **Stage 8 (Today + Quick Overlay Final Acceptance Polish)**: Removed visible Stop button from Running (Pause only) and Paused (Continue + Start New side-by-side) states across Today and Quick Overlay; ~310 DIP top row Today geometry with centered Idle cards and 2x2 metric grid; 560 DIP horizontal Quick Overlay desktop flyout with stretched selection tiles, persistent header, and clear subheader.
 
 ## Remaining Work
-- **Stage 8: Approved Pending Items from FUTURE_PLAN.md**
+- **Stage 9: Approved Pending Items from FUTURE_PLAN.md**
   - Item 1: Window Close (X) Choice Dialog (hide to background tray vs. quit).
-- **Stage 9: Final Consistency QA & Windows Packaging**
+- **Stage 10: Final Consistency QA & Windows Packaging**
   - Full-surface visual regression audit (Maximized, Restored, Minimum; Dark, Light, High Contrast).
   - Package clean standalone Release installer (`FocusKeySetup.exe`).
 

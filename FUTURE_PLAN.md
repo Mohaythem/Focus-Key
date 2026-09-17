@@ -14,7 +14,7 @@ This document serves as the persistent repository-level source of truth for all 
 
 ## Active Work (Current Roadmap Task)
 
-*None active. Awaiting user visual acceptance and next goal.*
+*None currently active. Awaiting user acceptance of the Today + Quick Overlay Final Acceptance Polish milestone.*
 
 ---
 
@@ -27,26 +27,39 @@ This document serves as the persistent repository-level source of truth for all 
 
 ## Implemented Work Awaiting Final User Acceptance
 
+### Today + Quick Overlay Final Acceptance Polish (Implemented — Awaiting Final User Acceptance)
+Final visual and interaction acceptance refinement across Today and Quick Overlay:
+1. **Running Session UI**:
+   - Today Hero displays `[ Pause ]` only (centered, clean breathing room).
+   - Quick Overlay displays `[ Pause ]` only.
+   - The visible `[ Stop ]` button is removed from both Running surfaces.
+2. **Paused Session UI**:
+   - Displays `[ Continue ]` (primary) and `[ Start New ]` (secondary) only.
+   - No visible `[ Stop ]` action.
+   - `Continue`: Resumes existing session timer.
+   - `Start New`: Finalizes/stops the paused session with actual elapsed active duration and returns the same surface to the Idle launcher.
+3. **Session Architecture Preservation**:
+   - The underlying Stop/session-finalization architecture, engine APIs, repository methods, and data integrity rules are strictly preserved.
+4. **Today Top-Row Geometry & Idle Launcher Polish**:
+   - Reduced vertical footprint of both Today Hero and Today Summary cards (~310 DIP height on wide/maximized desktop) eliminating empty bottom dead space while keeping Hero and Summary equal-height siblings.
+   - Centered Today Idle Work & Break cards (260×88 DIP tiles with top-left dot/mode and bottom duration) with centered `[ Start ]` button below.
+   - Refined Today Summary into a balanced, compact 2×2 metric grid with subtle divider lines.
+5. **Quick Overlay Geometry & Proportions**:
+   - Compact horizontal desktop flyout (560 DIP width, ~240–250 DIP height).
+   - Persistent `FOCUS KEY` header branding with draggable header and close/shortcut buttons.
+   - Subheader in active modes shows `• WORK/BREAK SESSION` (left) ... `PAUSED`/`RUNNING` (right).
+   - Stretched Work and Break selection cards in Idle mode with top-left dot and right-aligned duration.
+   - Large 52 DIP Consolas countdown timer, 6 DIP progress track, centered action buttons, and keyboard hints (`[↵] Continue/Pause`, `[Esc] Close`).
+   - Native Win32 dragging, SQLite position persistence, and multi-monitor clamping.
+
+---
+
+## Implemented Work Awaiting Final User Acceptance
+
 ### Settings + Quick Overlay Final Refinement (Implemented — Awaiting Final User Acceptance)
 Completed the Settings and Quick Overlay experience into a unified native Windows 11 utility:
-- **Quick Overlay Visual Refinement**:
-  - Consistent compact window shell (480 DIP width, ~280–340 DIP height) across Idle, Running, and Paused states.
-  - Idle state launcher: Work & Break selection cards using configured durations from Settings, subtle semantic accents, primary `[ Start ]` action.
-  - Running state: Dominant 52 DIP timer typography in Consolas font, 6 DIP semantic progress bar, primary `[ Pause ]` (elevated) and secondary `[ Stop ]` (neutral) actions.
-  - Paused state: Frozen timer, primary `[ Continue ]` (elevated), `[ Start New ]` (neutral), and `[ Stop ]` actions.
-  - Light mode consistency matching Carbon Studio tokens and contrast standards.
-  - Esc key dismisses Overlay across all states without stopping the session; small Close (`×`) button in quiet draggable header.
-- **Draggable Quick Overlay & Position Persistence**:
-  - Movable by mouse via header region (native Win32 `ReleaseCapture` + `SendMessage WM_NCLBUTTONDOWN HTCAPTION`).
-  - Persist last valid screen position to SQLite settings repository (`overlay_position_x`, `overlay_position_y`, Migration 11).
-  - Multi-monitor and off-screen recovery: DPI-aware clamping against available monitor work areas (`OverlayPositionHelper.ClampToWorkAreas`) ensuring an always-reachable header.
-  - Default first opening centered on foreground/active monitor (`OverlayPositionHelper.CalculateInitialCenter`).
-  - Position stability: Window does not jump/recenter across Idle → Running → Paused → Continue → Start New state transitions.
-- **Settings Page Refinements**:
-  - Two clean shortcut rows inside `SHORTCUTS` section (`Quick Overlay`, `Open Focus Key`) with conflict detection, duplicate prevention, and rollback.
-  - `QUICK OVERLAY` section with `Reset position` button (clears custom coordinates back to default centered behavior).
-  - `TIME FORMAT` section: User-selectable 12-hour (`9:05 AM`) / 24-hour (`09:05`) clock format preference applied consistently to wall-clock timestamps (Today Activity, session history) via `TodayFormatting.FormatClockTime` while preserving countdown durations.
-  - Fixed live theme-refresh issues when toggling Dark ↔ Light in Settings so all shortcut, position, and selector controls update dynamically without stale brushes or restart (`SettingsView.RefreshVisuals`).
+- **Quick Overlay Visual Refinement**: Draggable shell, multi-monitor clamping, SQLite position persistence.
+- **Settings Page Refinements**: `SHORTCUTS` section (Quick Overlay & Open Focus Key with collision detection), `QUICK OVERLAY` section with Reset position, `TIME FORMAT` (12h/24h) preference in Today Activity, and live theme brush refresh on dark/light switch.
 
 ---
 
@@ -64,27 +77,10 @@ Completed the Settings and Quick Overlay experience into a unified native Window
 
 ### Today Final Hero Redesign (Implemented — Awaiting User Acceptance)
 Redesigned the Today page into a deliberate maximized-desktop composition where the active timer/session area is the clear visual hero:
-- **3-Tier Visual Composition**:
-  1. Header: Quiet "Today" page title + date subtitle without motivational clutter.
-  2. Main Row: Session Hero (~2/3 horizontal width) + Today Summary (~1/3 horizontal width) with ~20-24 DIP separation on maximized desktop (1240 DIP max-width).
-  3. Activity Section: Full-width "TODAY'S ACTIVITY" table below with compact desktop rows and clean empty state.
-- **Shared Session Hero Surface (~380 DIP min height on wide)**:
-  - **Running State**: `WORK SESSION` / `BREAK SESSION` label with colored active dot, `RUNNING` status badge, dominant 80 DIP countdown typography + `remaining` subtext, thin 6 DIP semantic progress bar, `[ Pause ]` (primary elevated) and `[ Stop ]` (secondary neutral) action buttons.
-  - **Paused State**: Same physical hero region, `PAUSED` status badge, frozen countdown + `paused` subtext, progress bar, `[ Continue ]` (primary elevated) and `[ Start New ]` (secondary neutral) action buttons.
-  - **Idle State**: Same physical hero region, `START A SESSION` label, `Ready when you are` prompt, substantial Work & Break selector cards using actual configured durations and restrained semantic accents (no solid saturated backgrounds), `[ Start ]` action button.
-- **Today Summary Surface**:
-  - Single coherent card with a 2 × 2 internal metric grid (Focus Time, Work Sessions, Break Time, Completion Rate) with Consolas 28 SemiBold values.
-- **Adaptive Breakpoints**:
-  - Wide (>= 860 DIP available / >= 1100 DIP window): Hero (2/3) + Summary (1/3) side-by-side, Activity full width below, 80 DIP timer font.
-  - Medium / Restored (< 860 DIP available): Hero full width, Summary below Hero (2x2 grid), Activity below Summary, 68 DIP timer font.
-  - Narrow (< 580 DIP available): Single vertical column flow with 56 DIP timer font, no clipping or horizontal overflow.
-
-
-### Reports Acceptance Refinement & Temporary Yearly Preview (Implemented — Under Acceptance)
-- Streaks presentation redesigned into a 2-column group with balanced Current and Longest Streak metrics (no emojis).
-- Redundant session count metrics removed from the insights rail across all periods.
-- Symmetrical 4-item consistency and average metrics across Weekly, Monthly, and Yearly.
-- Temporary `FOCUSKEY_YEARLY_PREVIEW=1` override added for pre-1-year visual inspection (to be removed after user visual acceptance).
+- **3-Tier Visual Composition**: Quiet Header + Session Hero + Today Summary + Full-width Activity.
+- **Shared Session Hero Surface**: Unified surface for Running, Paused, and Idle states.
+- **Today Summary Surface**: Single coherent card with a 2 × 2 internal metric grid.
+- **Adaptive Breakpoints**: Wide (>= 860 DIP), Medium / Restored (< 860 DIP), Narrow (< 580 DIP).
 
 ---
 
@@ -92,30 +88,11 @@ Redesigned the Today page into a deliberate maximized-desktop composition where 
 
 ### Yearly Reports (Implemented — Under Acceptance Refinement)
 Added a real Yearly Reports experience that integrates into the Reports desktop dashboard.
-- **Availability & Eligibility**:
-  - Week and Month remain normally available.
-  - Year remains completely hidden until >= 1 year of usable Focus Key history has accumulated (`earliestDate.AddYears(1) <= today`).
-  - Eligibility is derived directly from persisted native sessions and imported historical focus dates, surviving restarts without arbitrary UI flags.
-  - Ineligible users see only `[ Week | Month ]` without visual clutter or disabled buttons.
-- **Yearly Visualization (Jan → Dec)**:
-  - 12 monthly bars (Jan → Dec) representing real accumulated focus duration.
-  - Tailored geometry, responsive bar scaling, and dynamic Y-axis intervals (10h, 20h, 50h, 100h) producing 4 to 6 legible grid lines.
-  - Compact duration labels formatted above bars (`FormatYearlyBarDuration`) and bold emphasis on the current month column.
-- **Yearly Summary Metrics**:
-  - Preserves standard Focus Key metrics: Focus Time, Work Sessions, Completion Rate.
-  - Native sessions provide session counts and completion rates; imported history contributes strictly to Focus Time without fabricating fake sessions or distorting completion rate.
-- **Yearly Contextual Insights**:
-  - Truthful observations: strongest focus month (e.g. "August (58h 00m)"), active months consistency (e.g. "9 of 9 months", with monthly average), and previous-year comparison (`↑`/`↓`) *only* when prior-year data exists.
-- **Year Navigation**:
-  - Seamless navigation between eligible years (`<` and `>`), display of calendar year in header and subtitle, and prevention of navigating into future years (`_nextButton` disabled at current year).
+- **Availability & Eligibility**: Hidden until >= 1 year of history (`earliestDate.AddYears(1) <= today`).
+- **Yearly Visualization (Jan → Dec)**: 12 monthly bars, dynamic intervals, compact duration labels.
+- **Yearly Summary Metrics & Insights**: Strongest month, active months consistency, prior-year comparison.
+- **Year Navigation**: Seamless navigation between eligible years, prevention of navigating into future years.
 
 ### Reports Redesign: Cohesive Desktop Dashboard (Implemented — Under Acceptance Refinement)
 Redesigned Reports as a cohesive desktop dashboard following the hierarchy:
 **Summary → Main Chart → Useful Insights**.
-- **Summary Metrics (Top Row)**: 3 compact primary cards: Focus Time, Work Sessions, and Completion Rate.
-- **Dominant Main Chart Hero**: Composes ~75% width on wide/maximized viewports; 5-hour grid interval for Weekly, 10-hour grid interval for Monthly; dynamic Y-axis scaling, substantial bars with rounded tops and exact duration labels.
-- **Secondary Insights Rail**: Composes ~25% width on wide windows; truthful contextual insights (period comparisons `↑`/`↓`, active streaks, strongest focus day/week, active days consistency); calm empty state for zero activity.
-- **Responsive Adaptation**: Cleanly reflows into stacked layout on narrower/restored viewports (< 860 DIP) with internal 2-column adaptation (>= 420 DIP).
-- **Theme-Aware Visualization**: Fully optimized for Dark, Light, and High Contrast themes using dedicated `ReportsPalette`.
-- **Cleanup**: Removed legacy `StreaksCard`, narrative `InsightCard`, and redundant copy.
-

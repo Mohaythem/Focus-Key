@@ -160,7 +160,7 @@
   <Style x:Key="FkOverlayCard" TargetType="Button">
     <Setter Property="Padding" Value="20,18"/>
     <Setter Property="CornerRadius" Value="{StaticResource FkControlRadius}"/>
-    <Setter Property="HorizontalContentAlignment" Value="Left"/>
+    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
     <Setter Property="VerticalContentAlignment" Value="Center"/>
     <Setter Property="HorizontalAlignment" Value="Stretch"/>
     <Setter Property="BorderThickness" Value="1"/>

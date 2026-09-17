@@ -285,9 +285,14 @@ public sealed partial class MainWindow : Window
                             Grid.SetRow(TodaySummaryCard, 0);
                             Grid.SetColumnSpan(TodaySummaryCard, 1);
 
-                            SessionHeroCard.MinHeight = 380;
-                            TodaySummaryCard.MinHeight = 380;
+                            SessionHeroCard.MinHeight = 310;
+                            TodaySummaryCard.MinHeight = 310;
                             if (RunningText is not null) RunningText.FontSize = 80;
+                            if (WorkChoiceCard is not null && BreakChoiceCard is not null)
+                            {
+                                WorkChoiceCard.Width = 260;
+                                BreakChoiceCard.Width = 260;
+                            }
                         }
                         else
                         {
@@ -304,9 +309,15 @@ public sealed partial class MainWindow : Window
                             Grid.SetRow(TodaySummaryCard, 1);
                             Grid.SetColumnSpan(TodaySummaryCard, 2);
 
-                            SessionHeroCard.MinHeight = 320;
+                            SessionHeroCard.MinHeight = 280;
                             TodaySummaryCard.MinHeight = 0;
                             if (RunningText is not null) RunningText.FontSize = available < 580 ? 56 : 68;
+                            if (WorkChoiceCard is not null && BreakChoiceCard is not null)
+                            {
+                                double cardW = available < 580 ? Math.Max(130, (available - 70) / 2) : 240;
+                                WorkChoiceCard.Width = cardW;
+                                BreakChoiceCard.Width = cardW;
+                            }
                         }
                     }
                 }
@@ -586,12 +597,7 @@ public sealed partial class MainWindow : Window
             PauseButton.BorderThickness = new Thickness(1);
             PauseButton.Foreground = Presentation.ThemeBrush("FkForeground", isDark);
 
-            StopButton.Visibility = Visibility.Visible;
-            StopButton.IsEnabled = canAct;
-            StopButton.Background = Presentation.ThemeBrush("FkSurface2", isDark);
-            StopButton.BorderBrush = Presentation.ThemeBrush("FkBorder", isDark);
-            StopButton.BorderThickness = new Thickness(1);
-            StopButton.Foreground = Presentation.ThemeBrush("FkSecondary", isDark);
+            StopButton.Visibility = Visibility.Collapsed;
         }
 
         if (stateChanged)

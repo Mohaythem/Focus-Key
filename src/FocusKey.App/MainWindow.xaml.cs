@@ -11,6 +11,7 @@ using Microsoft.UI.Xaml;
 using Windows.Graphics;
 using Windows.UI.ViewManagement;
 using FocusKey.Shell;
+using FocusKey.Foundation.Shell;
 using WinRT.Interop;
 using Microsoft.UI.Xaml.Media.Animation;
 
@@ -247,6 +248,54 @@ public sealed partial class MainWindow : Window
     private async void OnStartNewClick(object sender, RoutedEventArgs args) => await _today.StartNewAsync();
     private async void OnStopClick(object sender, RoutedEventArgs args) => await _today.StopAsync();
     private void OnExitClick(object sender, RoutedEventArgs args) => ExitRequested?.Invoke();
+
+    private bool _isShowingCloseDialog;
+
+    internal async Task<WindowCloseAction> ShowCloseDecisionDialogAsync()
+    {
+        if (_isShowingCloseDialog) return WindowCloseAction.Cancel;
+        if (this.Content?.XamlRoot is null) return WindowCloseAction.Hide;
+
+        _isShowingCloseDialog = true;
+        try
+        {
+            ElementTheme targetTheme = _appearance switch
+            {
+                Appearance.Dark => ElementTheme.Dark,
+                Appearance.Light => ElementTheme.Light,
+                _ => (this.Content as FrameworkElement)?.ActualTheme ?? ElementTheme.Default
+            };
+
+            var dialog = new ContentDialog
+            {
+                Title = "Close Focus Key?",
+                Content = "Hide Focus Key to keep it running in the system tray, or quit the app completely.",
+                PrimaryButtonText = "Hide Focus Key",
+                SecondaryButtonText = "Quit Focus Key",
+                CloseButtonText = "Cancel",
+                DefaultButton = ContentDialogButton.Primary,
+                RequestedTheme = targetTheme,
+                XamlRoot = this.Content.XamlRoot
+            };
+
+            ContentDialogResult result = await dialog.ShowAsync();
+            return result switch
+            {
+                ContentDialogResult.Primary => WindowCloseAction.Hide,
+                ContentDialogResult.Secondary => WindowCloseAction.Quit,
+                _ => WindowCloseAction.Cancel
+            };
+        }
+        catch (Exception exception)
+        {
+            _startupReport?.Invoke(exception);
+            return WindowCloseAction.Cancel;
+        }
+        finally
+        {
+            _isShowingCloseDialog = false;
+        }
+    }
 
     private void UpdatePageWidths()
     {

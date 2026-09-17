@@ -14,18 +14,43 @@ This document serves as the persistent repository-level source of truth for all 
 
 ## Active Work (Current Roadmap Task)
 
-*None currently active. Awaiting user acceptance of the Today + Quick Overlay Final Acceptance Polish milestone.*
+*None currently active. Awaiting user acceptance of the Window Close Experience milestone.*
 
 ---
 
 ## Approved Pending Work
 
-### 1. Window Close (X) Choice Dialog
-- When the title bar window close (`X`) button is pressed, present a clear user choice between hiding Focus Key (background shell / system tray) and fully quitting the application.
+*None currently pending.*
 
 ---
 
 ## Implemented Work Awaiting Final User Acceptance
+
+### Window Close Experience: Hide or Quit (Implemented — Awaiting Final User Acceptance)
+Implemented native Windows 11 close decision modal when closing the main window:
+1. **Trigger & Presentation**:
+   - Intercept main-window native title bar Close (`X`) button and `WM_CLOSE`.
+   - Present a native WinUI modal decision surface (`ContentDialog`) over `MainWindow`.
+   - Title: `Close Focus Key?`
+   - Body: `Hide Focus Key to keep it running in the system tray, or quit the app completely.`
+   - Primary action: `[ Hide Focus Key ]` (accent elevated)
+   - Secondary action: `[ Quit Focus Key ]` (neutral/distinct)
+   - `Esc` or `Cancel` button: Dismisses dialog and leaves `MainWindow` open.
+2. **Distinct Window Behaviors**:
+   - **Minimize**: Direct hide-to-tray with no dialog (existing behavior strictly preserved).
+   - **Close (X)**: Presents the Hide or Quit decision dialog.
+   - **Tray Exit**: Performs canonical graceful shutdown directly with no dialog.
+   - **Quick Overlay Close/Esc**: Dismisses/hides overlay only without affecting main window.
+   - **Focus Loss**: Normal OS focus behavior (does not hide).
+3. **Hide vs. Quit Semantics**:
+   - **Hide Focus Key**: Hides `MainWindow` from desktop and taskbar, keeps process and tray icon alive, preserves running/paused sessions, global shortcuts (`Shift + F3`, `Shift + F4`), and Quick Overlay. Restores seamlessly via tray or `Shift + F4`.
+   - **Quit Focus Key**: Reuses canonical tray-exit application shutdown path, tearing down hotkeys, tray icon, timers, and persisting active/paused sessions under established recovery rules.
+4. **Safety & Reentrancy**:
+   - Single dialog guard preventing duplicate dialog instances on rapid clicks or duplicate `WM_CLOSE` messages.
+   - Distinction between user-initiated native `X` close and intentional application exit to prevent shutdown recursion (`_allowClose`).
+5. **Visual Styling & Themes**:
+   - Fluent / Carbon Studio styling matching application tokens.
+   - Full Dark, Light, and High Contrast support via explicit `RequestedTheme` on `ContentDialog`.
 
 ### Today + Quick Overlay Final Acceptance Polish (Implemented — Awaiting Final User Acceptance)
 Final visual and interaction acceptance refinement across Today and Quick Overlay:

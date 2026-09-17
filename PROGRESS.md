@@ -1,34 +1,34 @@
 # Focus Key — Project Progress & State Checkpoint
 
 ## Current Goal
-Today + Quick Overlay Final Acceptance Polish completed, verified, and ready for user acceptance.
+Window Close Experience: Hide or Quit completed, verified, and ready for user acceptance.
 
 ## Current Checkpoint
-Today and Quick Overlay final acceptance refinements are 100% implemented, tested, and visually verified:
-- **Running Session UI**:
-  - Today Hero displays `[ Pause ]` only (centered, clean breathing room).
-  - Quick Overlay displays `[ Pause ]` only.
-  - Visible `[ Stop ]` button completely removed from both Running surfaces.
-- **Paused Session UI**:
-  - Exactly two actions: `[ Continue ]` (primary elevated) and `[ Start New ]` (secondary neutral) side-by-side.
-  - Visible `[ Stop ]` button completely removed from both Paused surfaces.
-  - `Continue`: Resumes existing session timer.
-  - `Start New`: Finalizes/stops the paused session with actual elapsed active duration and returns the same surface to the Idle launcher.
-- **Session Finalization Architecture**:
-  - Underlying Stop/session-finalization architecture, engine APIs, repository methods, and data integrity rules are strictly preserved.
-- **Today Top-Row Geometry & Idle Launcher Polish**:
-  - Reduced vertical footprint of both Today Hero and Today Summary cards (~310 DIP height on wide/maximized desktop) eliminating empty bottom dead space while keeping Hero and Summary equal-height siblings.
-  - Centered Today Idle Work & Break cards (260×88 DIP tiles with top-left dot/mode and bottom duration) with centered `[ Start ]` button below.
-  - Refined Today Summary into a balanced, compact 2×2 metric grid with subtle divider lines.
-- **Quick Overlay Geometry & Proportions**:
-  - Compact horizontal desktop flyout (560 DIP width, ~240–250 DIP height).
-  - Persistent `FOCUS KEY` header branding with draggable header and close/shortcut buttons.
-  - Subheader in active modes shows `• WORK/BREAK SESSION` (left) ... `PAUSED`/`RUNNING` (right).
-  - Stretched Work and Break selection cards in Idle mode with top-left dot and right-aligned duration.
-  - Large 52 DIP Consolas countdown timer, 6 DIP progress track, centered action buttons, and keyboard hints (`[↵] Continue/Pause`, `[Esc] Close`).
-  - Native Win32 dragging, SQLite position persistence, and multi-monitor clamping.
-- **Automated Tests**: 781/781 unit tests passing (`dotnet test`), 0 failed, 0 skipped.
+Window Close Experience (Hide vs. Quit decision modal) is 100% implemented, tested, and visually verified:
+- **Main Window Close (X) Modal**:
+  - Native WinUI 3 `ContentDialog` presented over `MainWindow` on title bar `X` click or `WM_CLOSE`.
+  - Title: `Close Focus Key?`
+  - Body: `Hide Focus Key to keep it running in the system tray, or quit the app completely.`
+  - Primary button: `[ Hide Focus Key ]` (accent elevated default action).
+  - Secondary button: `[ Quit Focus Key ]` (neutral distinct action).
+  - Cancel button: `[ Cancel ]` (neutral close action, dismisses dialog on Esc/click).
+  - Theme synchronization: Explicit `RequestedTheme` ensures clean Dark, Light, and High Contrast rendering.
+- **Distinct Window Behaviors**:
+  - **Minimize**: Direct hide-to-tray with NO dialog (existing behavior preserved).
+  - **Close (X)**: Presents the Hide or Quit decision dialog.
+  - **Tray Exit & Sidebar Exit**: Direct canonical graceful exit with NO dialog.
+  - **Quick Overlay Close/Esc**: Dismisses overlay only without opening main close dialog.
+  - **Focus Loss**: Standard OS focus behavior (does not hide).
+- **Hide vs. Quit Semantics**:
+  - **Hide Focus Key**: Hides `MainWindow` from desktop and taskbar, keeps process and tray icon alive, preserves running/paused sessions, global shortcuts (`Shift + F3`, `Shift + F4`), and Quick Overlay. Restores smoothly via tray or `Shift + F4`.
+  - **Quit Focus Key**: Reuses canonical tray-exit application shutdown path (`_shell.ExitAsync()`), tearing down hotkeys, tray icon, timers, and persisting active/paused sessions under established recovery rules.
+- **Safety & Reentrancy**:
+  - `_isCloseDialogShowing` single-dialog guard prevents duplicate dialogs on rapid clicks or duplicate `WM_CLOSE` messages.
+  - `_allowClose` flag prevents recursive close calls during intentional application shutdown.
+- **Automated Tests**: 786/786 unit tests passing (`dotnet test`), 0 failed, 0 skipped.
 - **Build**: 0 Warning(s), 0 Error(s) (`dotnet build -c Release`).
+- **Visual Captures Inspected**: Maximized Dark, Restored Dark, Maximized Light, Running Work Dark, Paused Work Dark.
+- **Functional Runtime Scenarios Verified**: All 10 scenarios (A through J) tested and confirmed.
 
 ## Completed Work
 - **Visual & UX Audit**: Comprehensive desktop/full-screen audit documented in `VISUAL_AUDIT.md`.
@@ -46,10 +46,9 @@ Today and Quick Overlay final acceptance refinements are 100% implemented, teste
 - **Stage 6b (Reports Insights Vertical Composition + Today Summary Polish + Yearly Preview Verification)**: Proportional 4-zone grid distribution in Reports Insights rail, 72%/28% ratio, polished Today Summary 2x2 grid with horizontal divider, and full-year synthetic dataset verification.
 - **Stage 7 (Settings + Quick Overlay Final Refinement)**: Draggable Quick Overlay with multi-monitor clamping and SQLite position persistence, unified shell across Idle/Running/Paused states, Settings live theme refresh, dual shortcuts with collision prevention, 12/24-hour time format preference in Today activity.
 - **Stage 8 (Today + Quick Overlay Final Acceptance Polish)**: Removed visible Stop button from Running (Pause only) and Paused (Continue + Start New side-by-side) states across Today and Quick Overlay; ~310 DIP top row Today geometry with centered Idle cards and 2x2 metric grid; 560 DIP horizontal Quick Overlay desktop flyout with stretched selection tiles, persistent header, and clear subheader.
+- **Stage 9 (Window Close Experience: Hide or Quit)**: Modal `ContentDialog` on main window close with clear `Hide Focus Key` (primary) vs. `Quit Focus Key` (secondary) choice; single-dialog reentrancy protection; canonical shutdown reuse; direct minimize preservation; running/paused session preservation.
 
 ## Remaining Work
-- **Stage 9: Approved Pending Items from FUTURE_PLAN.md**
-  - Item 1: Window Close (X) Choice Dialog (hide to background tray vs. quit).
 - **Stage 10: Final Consistency QA & Windows Packaging**
   - Full-surface visual regression audit (Maximized, Restored, Minimum; Dark, Light, High Contrast).
   - Package clean standalone Release installer (`FocusKeySetup.exe`).

@@ -152,7 +152,9 @@ public partial class App : Application
         }
     }
 
-    private void OnAppWindowClosing(AppWindow sender, AppWindowClosingEventArgs args)
+    private bool _isCloseDialogShowing;
+
+    private async void OnAppWindowClosing(AppWindow sender, AppWindowClosingEventArgs args)
     {
         if (_allowClose)
         {
@@ -160,9 +162,43 @@ public partial class App : Application
         }
 
         args.Cancel = true;
-        _window?.HideToday();
-        sender.Hide();
-        _startup?.Logger.Info("Main window hidden; shell remains running.");
+
+        if (_window is null || _isCloseDialogShowing || !sender.IsVisible)
+        {
+            return;
+        }
+
+        _isCloseDialogShowing = true;
+        try
+        {
+            WindowCloseAction choice = await _window.ShowCloseDecisionDialogAsync();
+            switch (choice)
+            {
+                case WindowCloseAction.Hide:
+                    _window.HideToday();
+                    sender.Hide();
+                    _startup?.Logger.Info("Main window hidden by user choice; shell remains running.");
+                    break;
+
+                case WindowCloseAction.Quit:
+                    _startup?.Logger.Info("Application quit requested from main window close dialog.");
+                    OnExplicitExitRequested();
+                    break;
+
+                case WindowCloseAction.Cancel:
+                default:
+                    _startup?.Logger.Info("Main window close canceled by user.");
+                    break;
+            }
+        }
+        catch (Exception exception)
+        {
+            _startup?.Logger.Error("Error displaying close decision dialog.", exception);
+        }
+        finally
+        {
+            _isCloseDialogShowing = false;
+        }
     }
 
     private void OnAppWindowChanged(AppWindow sender, AppWindowChangedEventArgs args)

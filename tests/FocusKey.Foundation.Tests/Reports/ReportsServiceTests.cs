@@ -259,6 +259,23 @@ public sealed class ReportsServiceTests
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => service.ReadAsync(period, DateOnly.MaxValue));
     }
 
+    [Fact]
+    public async Task MonthlyComparisonReportsPreviousMonthFocusAndPeriodDifference()
+    {
+        using var store = new SessionStore();
+        // Session in August (previous month)
+        await store.Repository.AddAsync(Finished(new DateTimeOffset(2026, 8, 15, 10, 0, 0, TimeSpan.Zero), SessionType.Work, SessionStatus.Completed, 60));
+        // Session in September (current month)
+        await store.Repository.AddAsync(Finished(new DateTimeOffset(2026, 9, 10, 10, 0, 0, TimeSpan.Zero), SessionType.Work, SessionStatus.Completed, 100));
+
+        var service = Service(store, TimeZoneInfo.Utc);
+        var snapshot = await service.ReadAsync(ReportPeriod.Monthly, new DateOnly(2026, 9, 20));
+
+        Assert.Equal(TimeSpan.FromMinutes(100), snapshot.Totals.FocusTime);
+        Assert.Equal(TimeSpan.FromMinutes(60), snapshot.PreviousPeriodDuration);
+        Assert.Equal(TimeSpan.FromMinutes(40), snapshot.PeriodDifference);
+    }
+
     private static ReportsService Service(SessionStore store, TimeZoneInfo zone, TimeProvider? clock = null) => new(store.Repository, clock ?? new ManualTimeProvider(new DateTimeOffset(2026, 9, 15, 12, 0, 0, TimeSpan.Zero)), () => zone);
     private static TimeZoneInfo FixedZone(int hours) => TimeZoneInfo.CreateCustomTimeZone($"UTC{hours:+0;-0}", TimeSpan.FromHours(hours), "Test", "Test");
     private static SessionRecord Finished(DateTimeOffset start, SessionType type, SessionStatus status, int minutes) => TestSessions.Finished(status, startedAt: start, type: type, plannedDuration: TimeSpan.FromMinutes(minutes));

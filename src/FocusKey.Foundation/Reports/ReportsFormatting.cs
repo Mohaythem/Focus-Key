@@ -46,6 +46,10 @@ public static class ReportsFormatting
     public static string FormatDayOfWeekLong(DateOnly date) =>
         date.ToString("dddd", Culture);
 
+    /// <summary>Formats abbreviated weekday name for insight badges (e.g. "Tue", "Sun").</summary>
+    public static string FormatDayOfWeekAbbrev(DateOnly date) =>
+        date.ToString("ddd", Culture);
+
     /// <summary>Formats tooltip header date line (e.g. "Sep 6 (Sun)").</summary>
     public static string FormatTooltipDate(DateOnly date) =>
         date.ToString("MMM d (ddd)", Culture);

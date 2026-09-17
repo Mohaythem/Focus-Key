@@ -36,6 +36,10 @@ internal sealed class ReportsChart : Grid
         double effectiveMax = trend.Count == 0 ? 0 : trend.Max(b => b.Totals.FocusTime.TotalSeconds);
         int ceilingHours = ReportsService.ComputeCeilingHours(effectiveMax, stepHours);
 
+        bool isDark = palette.IsDark;
+        var fgBrush = Presentation.ThemeBrush("FkForeground", isDark);
+        var secBrush = Presentation.ThemeBrush("FkSecondary", isDark);
+
         // 1. Y-Axis column (Column 0): ticks from 0h up to ceilingHours in stepHours steps
         var axisCanvas = new Canvas
         {
@@ -51,9 +55,10 @@ internal sealed class ReportsChart : Grid
             var label = new TextBlock
             {
                 Text = ReportsFormatting.FormatAxisHour(h),
+                Style = Application.Current?.Resources["FkMutedText"] as Style,
                 FontSize = 11,
                 FontWeight = FontWeights.Normal,
-                Foreground = Presentation.ThemeBrush("FkSecondary", this),
+                Foreground = secBrush,
                 Width = 40,
                 TextAlignment = TextAlignment.Right,
                 Language = "en-US",
@@ -77,7 +82,7 @@ internal sealed class ReportsChart : Grid
 
         var hLines = new List<Line>();
         var vLines = new List<Line>();
-        var gridStroke = Presentation.ThemeBrush("FkSecondary", this);
+        var gridStroke = secBrush;
         const double gridOpacity = 0.38;
 
         // Horizontal lines at each stepHours tick
@@ -150,10 +155,11 @@ internal sealed class ReportsChart : Grid
                 var durationLabel = new TextBlock
                 {
                     Text = durationText,
+                    Style = Application.Current?.Resources["FkText"] as Style,
                     FontSize = 11,
                     FontFamily = new FontFamily("Consolas"),
                     FontWeight = FontWeights.SemiBold,
-                    Foreground = Presentation.ThemeBrush("FkForeground", this),
+                    Foreground = fgBrush,
                     HorizontalAlignment = HorizontalAlignment.Center,
                     Language = "en-US",
                     FlowDirection = FlowDirection.LeftToRight,
@@ -197,6 +203,7 @@ internal sealed class ReportsChart : Grid
         if (effectiveMax <= 0)
         {
             var emptyNotice = Presentation.DimText("No focus activity recorded for this period", 12);
+            emptyNotice.Foreground = secBrush;
             emptyNotice.HorizontalAlignment = HorizontalAlignment.Center;
             emptyNotice.VerticalAlignment = VerticalAlignment.Center;
             emptyNotice.Margin = new Thickness(0, TopHeadroom, 0, 0);
@@ -266,7 +273,7 @@ internal sealed class ReportsChart : Grid
                     Text = ReportsFormatting.FormatDayDate(day),
                     FontSize = 11,
                     FontWeight = isRightmost ? FontWeights.SemiBold : FontWeights.Normal,
-                    Foreground = Presentation.ThemeBrush(isRightmost ? "FkForeground" : "FkSecondary", this),
+                    Foreground = isRightmost ? fgBrush : secBrush,
                     HorizontalAlignment = HorizontalAlignment.Center,
                     Language = "en-US",
                     FlowDirection = FlowDirection.LeftToRight,
@@ -277,7 +284,7 @@ internal sealed class ReportsChart : Grid
                     Text = ReportsFormatting.FormatDayOfWeek(day),
                     FontSize = 10,
                     FontWeight = isRightmost ? FontWeights.SemiBold : FontWeights.Normal,
-                    Foreground = Presentation.ThemeBrush(isRightmost ? "FkForeground" : "FkSecondary", this),
+                    Foreground = isRightmost ? fgBrush : secBrush,
                     HorizontalAlignment = HorizontalAlignment.Center,
                     Language = "en-US",
                     FlowDirection = FlowDirection.LeftToRight,
@@ -294,7 +301,7 @@ internal sealed class ReportsChart : Grid
                     Text = ReportsFormatting.FormatMonthWeek(i + 1),
                     FontSize = 11,
                     FontWeight = isRightmost ? FontWeights.SemiBold : FontWeights.Normal,
-                    Foreground = Presentation.ThemeBrush(isRightmost ? "FkForeground" : "FkSecondary", this),
+                    Foreground = isRightmost ? fgBrush : secBrush,
                     HorizontalAlignment = HorizontalAlignment.Center,
                     Language = "en-US",
                     FlowDirection = FlowDirection.LeftToRight,

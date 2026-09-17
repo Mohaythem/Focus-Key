@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Text;
 
 namespace FocusKey;
 
@@ -133,7 +134,7 @@ internal sealed class ReportsView : UserControl, IDisposable
         {
             var btn = new Button
             {
-                Content = period.ToString(),
+                Content = period == ReportPeriod.Weekly ? "Week" : "Month",
                 Tag = period,
                 Style = (Style)Application.Current.Resources["FkSegmentInactive"],
             };
@@ -145,6 +146,20 @@ internal sealed class ReportsView : UserControl, IDisposable
             };
             stack.Children.Add(btn);
         }
+
+        // Year* segment prepared for future Yearly view
+        var yearBtn = new Button
+        {
+            Content = "Year*",
+            Tag = "Year",
+            IsEnabled = false,
+            Opacity = 0.45,
+            Style = (Style)Application.Current.Resources["FkSegmentInactive"],
+        };
+        ToolTipService.SetToolTip(yearBtn, "Yearly reports unlock after 1 year of usage");
+        AutomationProperties.SetName(yearBtn, "Yearly reports (unlocks after 1 year)");
+        stack.Children.Add(yearBtn);
+
         border.Child = stack;
         _periodSelector.Children.Add(border);
     }
@@ -156,10 +171,21 @@ internal sealed class ReportsView : UserControl, IDisposable
         var stack = (StackPanel)border.Child;
         var activeStyle = (Style)Application.Current.Resources["FkSegmentActive"];
         var inactiveStyle = (Style)Application.Current.Resources["FkSegmentInactive"];
-        foreach (Button btn in stack.Children.Cast<Button>())
+        foreach (var child in stack.Children)
         {
-            bool active = btn.Tag is ReportPeriod p && p == _reports.Period;
-            btn.Style = active ? activeStyle : inactiveStyle;
+            if (child is Button btn)
+            {
+                if (btn.Tag is ReportPeriod p)
+                {
+                    bool active = p == _reports.Period;
+                    btn.Style = active ? activeStyle : inactiveStyle;
+                }
+                else
+                {
+                    btn.Style = inactiveStyle;
+                    btn.Opacity = 0.45;
+                }
+            }
         }
     }
 
@@ -196,11 +222,11 @@ internal sealed class ReportsView : UserControl, IDisposable
             string rangeText = ReportsFormatting.FormatDateRange(snapshot.Range.Start, snapshot.Range.End.AddDays(-1));
             _dateSubtitle.Text = $"{rangeText}  ·  {snapshot.TimeZone.DisplayName}";
 
-            // 3-column metric tiles matching Figma layout
+            // 3-column metric tiles matching design hierarchy: Summary -> Main Chart -> Useful Insights
             var metrics = new Grid { ColumnSpacing = 8 };
             for (var i = 0; i < 3; i++) metrics.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            var (card1, val1) = Metric("Focus Time", ReportsFormatting.FormatDuration(totals.FocusTime), "work sessions", 0);
-            var (card2, val2) = Metric("Break Time", ReportsFormatting.FormatDuration(totals.BreakTime), "break sessions", 1);
+            var (card1, val1) = Metric("Focus Time", ReportsFormatting.FormatDuration(totals.FocusTime), "total focus", 0);
+            var (card2, val2) = Metric("Work Sessions", totals.CompletedWork.ToString(CultureInfo.InvariantCulture), totals.WorkStarted > totals.CompletedWork ? $"{totals.WorkStarted} started" : "completed", 1);
             var (card3, val3) = Metric("Completion Rate", totals.CompletionRate is { } rate ? ReportsFormatting.FormatRate(rate) : "—", "sessions finished", 2);
             metrics.Children.Add(card1);
             metrics.Children.Add(card2);
@@ -220,8 +246,8 @@ internal sealed class ReportsView : UserControl, IDisposable
             _results.Children.Add(metrics);
 
             // Responsive main content below metrics:
-            // Wide (>= 900 DIP): Side-by-side (73% Focus Activity chart / 27% secondary right rail with Streaks & Insight)
-            // Restored / narrow (< 900 DIP): Graceful collapse into stacked composition
+            // Wide (>= 860 DIP): Dominant Chart Hero (~75%) + Secondary Insights Rail (~25%)
+            // Restored / narrow (< 860 DIP): Natural reflow into stacked composition
             var contentGrid = new Grid
             {
                 HorizontalAlignment = HorizontalAlignment.Stretch,
@@ -230,20 +256,16 @@ internal sealed class ReportsView : UserControl, IDisposable
             };
 
             var chart = ChartCard(snapshot);
-            var sideRail = SideRailCard(snapshot);
-            var stackedStreaks = StreaksCard(snapshot.Streaks);
-            var stackedInsight = InsightCard(snapshot);
+            var insightsRail = InsightsRailCard(snapshot);
 
             contentGrid.Children.Add(chart);
-            contentGrid.Children.Add(sideRail);
-            contentGrid.Children.Add(stackedStreaks);
-            contentGrid.Children.Add(stackedInsight);
+            contentGrid.Children.Add(insightsRail);
 
             bool? lastWide = null;
             Action updateLayout = () =>
             {
                 double width = contentGrid.ActualWidth;
-                bool isWide = width <= 0 || width >= 900;
+                bool isWide = width <= 0 || width >= 860;
                 if (lastWide == isWide) return;
                 lastWide = isWide;
 
@@ -252,23 +274,20 @@ internal sealed class ReportsView : UserControl, IDisposable
 
                 if (isWide)
                 {
-                    // Wide desktop side-by-side mode (~73% chart, ~27% secondary rail)
+                    // Dominant chart hero (~75%) + Insights rail (~25%)
                     contentGrid.ColumnSpacing = 12;
                     contentGrid.RowSpacing = 0;
-                    contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(73, GridUnitType.Star) });
-                    contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(27, GridUnitType.Star) });
+                    contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(75, GridUnitType.Star) });
+                    contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(25, GridUnitType.Star) });
                     contentGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
                     Grid.SetColumn(chart, 0);
                     Grid.SetRow(chart, 0);
-                    chart.Visibility = Visibility.Visible;
+                    Grid.SetColumnSpan(chart, 1);
 
-                    Grid.SetColumn(sideRail, 1);
-                    Grid.SetRow(sideRail, 0);
-                    sideRail.Visibility = Visibility.Visible;
-
-                    stackedStreaks.Visibility = Visibility.Collapsed;
-                    stackedInsight.Visibility = Visibility.Collapsed;
+                    Grid.SetColumn(insightsRail, 1);
+                    Grid.SetRow(insightsRail, 0);
+                    Grid.SetColumnSpan(insightsRail, 1);
                 }
                 else
                 {
@@ -278,21 +297,14 @@ internal sealed class ReportsView : UserControl, IDisposable
                     contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                     contentGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
                     contentGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                    contentGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
                     Grid.SetColumn(chart, 0);
                     Grid.SetRow(chart, 0);
-                    chart.Visibility = Visibility.Visible;
+                    Grid.SetColumnSpan(chart, 1);
 
-                    Grid.SetColumn(stackedStreaks, 0);
-                    Grid.SetRow(stackedStreaks, 1);
-                    stackedStreaks.Visibility = Visibility.Visible;
-
-                    Grid.SetColumn(stackedInsight, 0);
-                    Grid.SetRow(stackedInsight, 2);
-                    stackedInsight.Visibility = Visibility.Visible;
-
-                    sideRail.Visibility = Visibility.Collapsed;
+                    Grid.SetColumn(insightsRail, 0);
+                    Grid.SetRow(insightsRail, 1);
+                    Grid.SetColumnSpan(insightsRail, 1);
                 }
             };
 
@@ -307,131 +319,215 @@ internal sealed class ReportsView : UserControl, IDisposable
         }
     }
 
-    private FrameworkElement SideRailCard(ReportsSnapshot snapshot)
+    private FrameworkElement InsightsRailCard(ReportsSnapshot snapshot)
     {
-        var grid = new Grid
+        var mainGrid = new Grid
         {
             HorizontalAlignment = HorizontalAlignment.Stretch,
             VerticalAlignment = VerticalAlignment.Stretch
         };
-        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // 0: Current Streak
-        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // 1: Divider 1
-        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // 2: Longest Streak
-        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // 3: Divider 2
-        grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // 4: Insight
 
-        // 1. Current Streak
-        var curPanel = new StackPanel { Spacing = 6, Margin = new Thickness(0, 4, 0, 8) };
-        var curHeader = Presentation.DimText("CURRENT STREAK", 11);
-        if (Application.Current?.Resources["FkSectionText"] is Style secStyle1) curHeader.Style = secStyle1;
-        curPanel.Children.Add(curHeader);
+        var contentHost = new Grid { HorizontalAlignment = HorizontalAlignment.Stretch };
+        mainGrid.Children.Add(contentHost);
 
-        var curValue = new TextBlock
+        void RebuildInsights(double actualWidth)
         {
-            Text = ReportsFormatting.FormatStreak(snapshot.Streaks.CurrentStreak),
-            FontSize = 26,
-            FontFamily = new FontFamily("Consolas"),
-            FontWeight = Microsoft.UI.Text.FontWeights.Normal,
-            Language = "en-US",
-            FlowDirection = FlowDirection.LeftToRight,
-            TextReadingOrder = TextReadingOrder.UseFlowDirection,
-            Margin = new Thickness(0, 1, 0, 0)
-        };
-        if (Application.Current?.Resources["FkMetricValueText"] is Style metricStyle1)
-        {
-            curValue.Style = metricStyle1;
-            curValue.FontSize = 26;
-            curValue.Margin = new Thickness(0, 1, 0, 0);
+            contentHost.Children.Clear();
+            contentHost.ColumnDefinitions.Clear();
+            contentHost.RowDefinitions.Clear();
+
+            var outerPanel = new StackPanel { Spacing = 0, HorizontalAlignment = HorizontalAlignment.Stretch };
+
+            // Header: "INSIGHTS"
+            var header = Presentation.DimText("INSIGHTS", 11);
+            if (Application.Current?.Resources["FkSectionText"] is Style secStyle) header.Style = secStyle;
+            header.Margin = new Thickness(0, 2, 0, 14);
+            outerPanel.Children.Add(header);
+
+            if (snapshot.Totals.Started == 0 && snapshot.Totals.FocusTime == TimeSpan.Zero)
+            {
+                var emptyPanel = new StackPanel { Spacing = 6, Margin = new Thickness(0, 4, 0, 0) };
+                var emptyTitle = Presentation.Text("No session activity", 13);
+                emptyTitle.FontWeight = FontWeights.SemiBold;
+                var emptyDesc = Presentation.DimText("Focus time, streaks, peak days, and period comparisons will appear here once you record sessions.", 11);
+                emptyDesc.TextWrapping = TextWrapping.Wrap;
+                emptyDesc.LineHeight = 18;
+                emptyPanel.Children.Add(emptyTitle);
+                emptyPanel.Children.Add(emptyDesc);
+                outerPanel.Children.Add(emptyPanel);
+                contentHost.Children.Add(outerPanel);
+                return;
+            }
+
+            var items = new List<UIElement>();
+
+            // 1. Period comparison
+            var curPeriod = snapshot.Totals.FocusTime;
+            var prevPeriod = snapshot.PreviousPeriodDuration;
+            string periodName = snapshot.Period == ReportPeriod.Weekly ? "last week" : "last month";
+
+            if (prevPeriod > TimeSpan.Zero || curPeriod > TimeSpan.Zero)
+            {
+                var diff = snapshot.PeriodDifference;
+                string diffValue;
+                string diffLabel;
+
+                if (diff > TimeSpan.Zero)
+                {
+                    diffValue = $"↑ {ReportsFormatting.FormatDuration(diff)}";
+                    diffLabel = $"More focus than {periodName}";
+                }
+                else if (diff < TimeSpan.Zero)
+                {
+                    diffValue = $"↓ {ReportsFormatting.FormatDuration(diff.Duration())}";
+                    diffLabel = $"Less focus than {periodName}";
+                }
+                else
+                {
+                    diffValue = "= 0m";
+                    diffLabel = $"Same focus as {periodName}";
+                }
+
+                items.Add(CreateInsightItem(diffValue, diffLabel));
+            }
+
+            // 2. Streak
+            int currentStreak = snapshot.Streaks.CurrentStreak;
+            string streakValue = $"🔥 {currentStreak} {(currentStreak == 1 ? "day" : "days")}";
+            string streakLabel = "Current streak";
+            string? streakSub = snapshot.Streaks.LongestStreak > currentStreak
+                ? $"Best: {snapshot.Streaks.LongestStreak} days"
+                : null;
+            items.Add(CreateInsightItem(streakValue, streakLabel, streakSub));
+
+            // 3. Strongest day / week
+            if (snapshot.Trend.Count > 0)
+            {
+                var topBucket = snapshot.Trend.OrderByDescending(b => b.Totals.FocusTime).FirstOrDefault();
+                if (topBucket != null && topBucket.Totals.FocusTime > TimeSpan.Zero)
+                {
+                    string strongestValue;
+                    string strongestLabel;
+
+                    if (snapshot.Period == ReportPeriod.Weekly &&
+                        DateOnly.TryParseExact(topBucket.Label, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var topDate))
+                    {
+                        strongestValue = ReportsFormatting.FormatDayOfWeekAbbrev(topDate);
+                        strongestLabel = $"Strongest day ({ReportsFormatting.FormatDuration(topBucket.Totals.FocusTime)})";
+                    }
+                    else
+                    {
+                        int weekIndex = 1;
+                        for (int b = 0; b < snapshot.Trend.Count; b++)
+                        {
+                            if (snapshot.Trend[b] == topBucket) { weekIndex = b + 1; break; }
+                        }
+                        strongestValue = $"Week {weekIndex}";
+                        strongestLabel = $"Strongest week ({ReportsFormatting.FormatDuration(topBucket.Totals.FocusTime)})";
+                    }
+
+                    items.Add(CreateInsightItem(strongestValue, strongestLabel));
+                }
+            }
+
+            // 4. Consistency / active days
+            if (snapshot.Period == ReportPeriod.Weekly)
+            {
+                int activeDays = snapshot.Trend.Count(b => b.Totals.FocusTime > TimeSpan.Zero);
+                if (activeDays > 0)
+                {
+                    string activeValue = $"{activeDays} of 7 days";
+                    string activeLabel = "Active focus days";
+                    TimeSpan dailyAvg = TimeSpan.FromTicks(snapshot.Totals.FocusTime.Ticks / 7);
+                    string activeSub = $"Daily avg: {ReportsFormatting.FormatDuration(dailyAvg)}";
+                    items.Add(CreateInsightItem(activeValue, activeLabel, activeSub));
+                }
+            }
+            else
+            {
+                if (snapshot.Totals.CompletedWork > 0)
+                {
+                    string sessionValue = $"{snapshot.Totals.CompletedWork} completed";
+                    string sessionLabel = "Work sessions finished";
+                    items.Add(CreateInsightItem(sessionValue, sessionLabel));
+                }
+            }
+
+            bool twoColumns = actualWidth >= 420;
+            if (twoColumns && items.Count > 1)
+            {
+                // Wide stacked layout: 2 columns
+                var itemsGrid = new Grid { ColumnSpacing = 24, RowSpacing = 16 };
+                itemsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                itemsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+                for (int i = 0; i < items.Count; i++)
+                {
+                    int row = i / 2;
+                    int col = i % 2;
+                    while (itemsGrid.RowDefinitions.Count <= row)
+                        itemsGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+                    Grid.SetRow((FrameworkElement)items[i], row);
+                    Grid.SetColumn((FrameworkElement)items[i], col);
+                    itemsGrid.Children.Add(items[i]);
+                }
+                outerPanel.Children.Add(itemsGrid);
+            }
+            else
+            {
+                // Single column vertical layout (in side rail or narrow stacked)
+                var itemsStack = new StackPanel { Spacing = 0 };
+                for (int i = 0; i < items.Count; i++)
+                {
+                    if (i > 0)
+                    {
+                        var div = new Border
+                        {
+                            Style = Application.Current?.Resources["FkChartGridLine"] as Style,
+                            Margin = new Thickness(0, 12, 0, 12)
+                        };
+                        itemsStack.Children.Add(div);
+                    }
+                    itemsStack.Children.Add(items[i]);
+                }
+                outerPanel.Children.Add(itemsStack);
+            }
+
+            contentHost.Children.Add(outerPanel);
         }
-        curPanel.Children.Add(curValue);
-        AutomationProperties.SetName(curPanel, $"Current Streak, {curValue.Text}");
-        Grid.SetRow(curPanel, 0);
-        grid.Children.Add(curPanel);
 
-        // Divider 1
-        var div1 = new Border
+        double lastWidth = -1;
+        mainGrid.SizeChanged += (_, args) =>
         {
-            Height = 1,
-            Background = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", this),
-            Margin = new Thickness(0, 16, 0, 16)
+            double w = args.NewSize.Width;
+            if (w <= 0) return;
+            bool wasTwo = lastWidth >= 420;
+            bool isTwo = w >= 420;
+            if (lastWidth < 0 || wasTwo != isTwo)
+            {
+                lastWidth = w;
+                RebuildInsights(w);
+            }
         };
-        Grid.SetRow(div1, 1);
-        grid.Children.Add(div1);
 
-        // 2. Longest Streak
-        var longPanel = new StackPanel { Spacing = 6, Margin = new Thickness(0, 8, 0, 8) };
-        var longHeader = Presentation.DimText("LONGEST STREAK", 11);
-        if (Application.Current?.Resources["FkSectionText"] is Style secStyle2) longHeader.Style = secStyle2;
-        longPanel.Children.Add(longHeader);
+        RebuildInsights(0);
 
-        var longValue = new TextBlock
-        {
-            Text = ReportsFormatting.FormatStreak(snapshot.Streaks.LongestStreak),
-            FontSize = 26,
-            FontFamily = new FontFamily("Consolas"),
-            FontWeight = Microsoft.UI.Text.FontWeights.Normal,
-            Language = "en-US",
-            FlowDirection = FlowDirection.LeftToRight,
-            TextReadingOrder = TextReadingOrder.UseFlowDirection,
-            Margin = new Thickness(0, 1, 0, 0)
-        };
-        if (Application.Current?.Resources["FkMetricValueText"] is Style metricStyle2)
-        {
-            longValue.Style = metricStyle2;
-            longValue.FontSize = 26;
-            longValue.Margin = new Thickness(0, 1, 0, 0);
-        }
-        longPanel.Children.Add(longValue);
-        AutomationProperties.SetName(longPanel, $"Longest Streak, {longValue.Text}");
-        Grid.SetRow(longPanel, 2);
-        grid.Children.Add(longPanel);
-
-        // Divider 2
-        var div2 = new Border
-        {
-            Height = 1,
-            Background = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", this),
-            Margin = new Thickness(0, 16, 0, 16)
-        };
-        Grid.SetRow(div2, 3);
-        grid.Children.Add(div2);
-
-        // 3. Insight
-        var insightPanel = new StackPanel { Spacing = 8, Margin = new Thickness(0, 8, 0, 0), VerticalAlignment = VerticalAlignment.Top };
-        var insightHeader = Presentation.DimText("INSIGHT", 11);
-        if (Application.Current?.Resources["FkSectionText"] is Style secStyle3) insightHeader.Style = secStyle3;
-        insightPanel.Children.Add(insightHeader);
-
-        string insightText = GenerateInsightText(snapshot);
-        var insightContent = Presentation.Text(insightText, 12);
-        if (Application.Current?.Resources["FkMutedText"] is Style muted) insightContent.Style = muted;
-        insightContent.TextWrapping = TextWrapping.Wrap;
-        insightContent.LineHeight = 22;
-        insightPanel.Children.Add(insightContent);
-        Grid.SetRow(insightPanel, 4);
-        grid.Children.Add(insightPanel);
-
-        var card = Card(grid, 22);
-        card.Padding = new Thickness(24, 22, 24, 22);
+        var card = Card(mainGrid, 22);
+        card.Padding = new Thickness(22, 20, 22, 20);
         card.VerticalAlignment = VerticalAlignment.Stretch;
         return card;
     }
 
-    private FrameworkElement StreaksCard(StreakStatistics streaks)
+    private UIElement CreateInsightItem(string value, string label, string? subtext = null)
     {
-        var grid = new Grid { HorizontalAlignment = HorizontalAlignment.Stretch };
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-
-        // Left: Current Streak
-        var left = new StackPanel { Spacing = 2 };
-        var curValue = new TextBlock
+        var itemPanel = new StackPanel { Spacing = 2 };
+        var valBlock = new TextBlock
         {
-            Text = ReportsFormatting.FormatStreak(streaks.CurrentStreak),
+            Text = value,
             FontSize = 20,
             FontFamily = new FontFamily("Consolas"),
-            FontWeight = Microsoft.UI.Text.FontWeights.Normal,
+            FontWeight = FontWeights.SemiBold,
             Language = "en-US",
             FlowDirection = FlowDirection.LeftToRight,
             TextReadingOrder = TextReadingOrder.UseFlowDirection,
@@ -439,57 +535,24 @@ internal sealed class ReportsView : UserControl, IDisposable
         };
         if (Application.Current?.Resources["FkMetricValueText"] is Style metricStyle)
         {
-            curValue.Style = metricStyle;
-            curValue.FontSize = 20;
-            curValue.Margin = new Thickness(0, 0, 0, 2);
+            valBlock.Style = metricStyle;
+            valBlock.FontSize = 20;
+            valBlock.Margin = new Thickness(0, 0, 0, 2);
         }
-        left.Children.Add(curValue);
-        var curLabel = Presentation.Text("Current Streak", 12);
-        curLabel.FontWeight = Microsoft.UI.Text.FontWeights.Medium;
-        left.Children.Add(curLabel);
-        AutomationProperties.SetName(left, $"Current Streak, {curValue.Text}");
-        grid.Children.Add(left);
 
-        // Divider
-        var divider = new Border
-        {
-            Width = 1,
-            Background = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", this),
-            Margin = new Thickness(24, 4, 24, 4)
-        };
-        Grid.SetColumn(divider, 1);
-        grid.Children.Add(divider);
+        var labelBlock = Presentation.Text(label, 12);
+        labelBlock.FontWeight = FontWeights.Medium;
+        itemPanel.Children.Add(valBlock);
+        itemPanel.Children.Add(labelBlock);
 
-        // Right: Longest Streak
-        var right = new StackPanel { Spacing = 2 };
-        var longValue = new TextBlock
+        if (!string.IsNullOrEmpty(subtext))
         {
-            Text = ReportsFormatting.FormatStreak(streaks.LongestStreak),
-            FontSize = 20,
-            FontFamily = new FontFamily("Consolas"),
-            FontWeight = Microsoft.UI.Text.FontWeights.Normal,
-            Language = "en-US",
-            FlowDirection = FlowDirection.LeftToRight,
-            TextReadingOrder = TextReadingOrder.UseFlowDirection,
-            Margin = new Thickness(0, 0, 0, 2)
-        };
-        if (Application.Current?.Resources["FkMetricValueText"] is Style metricStyle2)
-        {
-            longValue.Style = metricStyle2;
-            longValue.FontSize = 20;
-            longValue.Margin = new Thickness(0, 0, 0, 2);
+            var subBlock = Presentation.DimText(subtext, 11);
+            itemPanel.Children.Add(subBlock);
         }
-        right.Children.Add(longValue);
-        var longLabel = Presentation.Text("Longest Streak", 12);
-        longLabel.FontWeight = Microsoft.UI.Text.FontWeights.Medium;
-        right.Children.Add(longLabel);
-        AutomationProperties.SetName(right, $"Longest Streak, {longValue.Text}");
-        Grid.SetColumn(right, 2);
-        grid.Children.Add(right);
 
-        var card = Card(grid, 20);
-        card.Padding = new Thickness(22, 18, 22, 18);
-        return card;
+        AutomationProperties.SetName(itemPanel, $"{label}, {value}");
+        return itemPanel;
     }
 
     private FrameworkElement ChartCard(ReportsSnapshot snapshot)
@@ -503,7 +566,7 @@ internal sealed class ReportsView : UserControl, IDisposable
 
         var titleStack = new StackPanel { Spacing = 2 };
         var title = Presentation.Text("Focus Activity", 15);
-        title.FontWeight = Microsoft.UI.Text.FontWeights.SemiBold;
+        title.FontWeight = FontWeights.SemiBold;
         titleStack.Children.Add(title);
 
         string subtitleText = snapshot.Period == ReportPeriod.Weekly
@@ -529,66 +592,6 @@ internal sealed class ReportsView : UserControl, IDisposable
         card2.Padding = new Thickness(24, 22, 24, 22);
         card2.VerticalAlignment = VerticalAlignment.Stretch;
         return card2;
-    }
-
-    private FrameworkElement InsightCard(ReportsSnapshot s)
-    {
-        var body = new StackPanel { Spacing = 6 };
-
-        var title = Presentation.DimText("INSIGHT");
-        title.Style = (Style)Application.Current.Resources["FkSectionText"];
-        body.Children.Add(title);
-
-        string insightText = GenerateInsightText(s);
-        var content = Presentation.Text(insightText, 12);
-        if (Application.Current?.Resources["FkMutedText"] is Style muted) content.Style = muted;
-        content.TextWrapping = TextWrapping.Wrap;
-        content.LineHeight = 20;
-        body.Children.Add(content);
-
-        var card = Card(body, 20);
-        card.Padding = new Thickness(24, 18, 24, 18);
-        return card;
-    }
-
-    private static string GenerateInsightText(ReportsSnapshot s)
-    {
-        if (s.Totals.Started == 0)
-            return "No sessions recorded in this period. Completed time and focus patterns will appear here once a session is recorded.";
-
-        if (s.Totals.Completed == 0 && s.Totals.FocusTime == TimeSpan.Zero)
-            return string.Create(CultureInfo.InvariantCulture,
-                $"{s.Totals.Started} {(s.Totals.Started == 1 ? "session was" : "sessions were")} started in this period, but none completed yet. Completed sessions will show patterns and comparisons here.");
-
-        if (s.Period == ReportPeriod.Weekly)
-        {
-            var topBucket = s.Trend.Count > 0 ? s.Trend.OrderByDescending(b => b.Totals.FocusTime).FirstOrDefault() : null;
-            string peakStr = "";
-            if (topBucket != null && topBucket.Totals.FocusTime > TimeSpan.Zero &&
-                DateOnly.TryParseExact(topBucket.Label, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var topDate))
-            {
-                string topDayName = ReportsFormatting.FormatDayOfWeekLong(topDate);
-                string topDuration = ReportsFormatting.FormatDuration(topBucket.Totals.FocusTime);
-                peakStr = $"Most of your focus time this week occurred on {topDayName} ({topDuration}). ";
-            }
-
-            TimeSpan dailyAvg = TimeSpan.FromTicks(s.Totals.FocusTime.Ticks / 7);
-            string diffStr = s.WeekDifference > TimeSpan.Zero
-                ? $" Up {ReportsFormatting.FormatDuration(s.WeekDifference)} compared to last week."
-                : s.WeekDifference < TimeSpan.Zero
-                    ? $" Down {ReportsFormatting.FormatDuration(s.WeekDifference.Duration())} compared to last week."
-                    : "";
-            return string.Create(CultureInfo.InvariantCulture,
-                $"{peakStr}Total focus: {ReportsFormatting.FormatDuration(s.Totals.FocusTime)} across 7 days (daily average: {ReportsFormatting.FormatDuration(dailyAvg)}).{diffStr}");
-        }
-
-        // Monthly
-        var monthlyTopBucket = s.Trend.Count > 0 ? s.Trend.OrderByDescending(b => b.Totals.FocusTime).FirstOrDefault() : null;
-        string topStr = monthlyTopBucket != null && monthlyTopBucket.Totals.FocusTime > TimeSpan.Zero
-            ? $"{monthlyTopBucket.Label} had your highest focus output ({ReportsFormatting.FormatDuration(monthlyTopBucket.Totals.FocusTime)}). "
-            : "";
-        return string.Create(CultureInfo.InvariantCulture,
-            $"{topStr}Total focus for the month: {ReportsFormatting.FormatDuration(s.Totals.FocusTime)} across {s.Totals.CompletedWork} completed sessions (completion rate {ReportsFormatting.FormatRate(s.Totals.CompletionRate ?? 0)}).");
     }
     private (Border Card, TextBlock Value) Metric(string label, string value, string sub, int column)
     {

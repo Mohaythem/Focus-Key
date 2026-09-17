@@ -52,10 +52,13 @@ public sealed record FocusPeriod(int StartHour, int CompletedWork);
 public sealed record ReportsSnapshot(ReportPeriod Period, ReportRange Range, TimeZoneInfo TimeZone,
     DateTimeOffset ObservedAt, ReportTotals Totals, IReadOnlyList<ReportBucket> Trend,
     IReadOnlyList<FocusPeriod> LeadingFocusPeriods, ReportRange ComparisonWeek,
-    TimeSpan WeekFocus, TimeSpan PreviousWeekFocus, StreakStatistics? Streaks = null)
+    TimeSpan WeekFocus, TimeSpan PreviousWeekFocus, StreakStatistics? Streaks = null,
+    TimeSpan? PreviousPeriodFocus = null)
 {
     public StreakStatistics Streaks { get; init; } = Streaks ?? StreakStatistics.Zero;
     public TimeSpan WeekDifference => WeekFocus - PreviousWeekFocus;
+    public TimeSpan PreviousPeriodDuration => PreviousPeriodFocus ?? (Period == ReportPeriod.Weekly ? PreviousWeekFocus : TimeSpan.Zero);
+    public TimeSpan PeriodDifference => Totals.FocusTime - PreviousPeriodDuration;
 }
 
 /// <summary>Read-only report projection; UTC storage, local start-date membership, no lifecycle writes.</summary>
@@ -108,7 +111,13 @@ public sealed class ReportsService
         var range = ReportRange.For(period, date);
         var week = ReportRange.For(ReportPeriod.Weekly, date);
         var previous = new ReportRange(week.Start.AddDays(-7), week.Start);
-        var from = range.Start < previous.Start ? range.Start : previous.Start;
+        var prevPeriodStart = period == ReportPeriod.Monthly
+            ? (range.Start > new DateOnly(1, 2, 1) ? range.Start.AddMonths(-1) : range.Start)
+            : previous.Start;
+        var prevPeriodRange = new ReportRange(prevPeriodStart, range.Start);
+
+        var from = range.Start < prevPeriodStart ? range.Start : prevPeriodStart;
+        if (from > previous.Start) from = previous.Start;
         var to = range.End > week.End ? range.End : week.End;
         TimeZoneInfo zone = _zone();
         DateTimeOffset now = _time.GetUtcNow();
@@ -159,12 +168,16 @@ public sealed class ReportsService
             .GroupBy(s => s.Local.Hour / 3 * 3).Select(g => new FocusPeriod(g.Key, g.Count())).ToArray();
         var leading = focus.Length == 0 ? [] : focus.Where(p => p.CompletedWork == focus.Max(f => f.CompletedWork)).OrderBy(p => p.StartHour).ToArray();
 
-        TimeSpan WeekTime(ReportRange span)
+        TimeSpan RangeTime(ReportRange span)
         {
             var native = ReportTotals.From(localized.Where(s => span.Contains(DateOnly.FromDateTime(s.Local.DateTime))).Select(s => s.Session)).FocusTime;
             var hist = historyRecords.Where(h => span.Contains(h.Date)).Aggregate(TimeSpan.Zero, (acc, h) => acc + h.Duration);
             return native + hist;
         }
+
+        TimeSpan weekFocus = RangeTime(week);
+        TimeSpan previousWeekFocus = RangeTime(previous);
+        TimeSpan previousPeriodFocus = period == ReportPeriod.Weekly ? previousWeekFocus : RangeTime(prevPeriodRange);
 
         // 3. Streak statistics combining native completed sessions and imported focus days (hours > 0)
         var allRecords = await _repository.GetStartedBetweenAsync(
@@ -179,6 +192,6 @@ public sealed class ReportsService
 
         cancellationToken.ThrowIfCancellationRequested();
         return new(period, range, zone, now, totals, buckets.AsReadOnly(), Array.AsReadOnly(leading),
-            week, WeekTime(week), WeekTime(previous), streaks);
+            week, weekFocus, previousWeekFocus, streaks, previousPeriodFocus);
     }
 }

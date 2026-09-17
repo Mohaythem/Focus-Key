@@ -14,17 +14,7 @@ This document serves as the persistent repository-level source of truth for all 
 
 ## Active Work (Current Roadmap Task)
 
-### Reports Acceptance Refinement & Temporary Yearly Preview (In Progress)
-Refining the Reports desktop dashboard and Yearly Reports experience for final user visual acceptance:
-- **Insights Rail Refinement**:
-  - Redesign streak presentation into a clear "Streaks" group with distinct, balanced statistics for **Current Streak** and **Longest Streak**.
-  - Remove redundant insights (such as repeating session counts already visible in summary metric cards above).
-  - Provide truthful, non-duplicative consistency metrics (e.g. active focus days/months with period averages where meaningful).
-  - Polish visual engineering: label/value hierarchy, dividers, vertical rhythm, spacing, native Fluent styling (remove emoji glyphs).
-- **Temporary Yearly Preview Override (`FOCUSKEY_YEARLY_PREVIEW=1`)**:
-  - Temporary development and testing aid allowing the user to inspect the Yearly Reports view with real partial-year data before accumulating one full calendar year.
-  - Keeps domain eligibility invariant and persisted data untouched.
-  - **Must be removed after final user visual acceptance.**
+*No active task currently in progress. All approved tasks implemented and awaiting final user acceptance.*
 
 ---
 
@@ -33,9 +23,33 @@ Refining the Reports desktop dashboard and Yearly Reports experience for final u
 ### 1. Window Close (X) Choice Dialog
 - When the title bar window close (`X`) button is pressed, present a clear user choice between hiding Focus Key (background shell / system tray) and fully quitting the application.
 
-### 2. Today Active Timer Hero & Lifecycle Actions
-- Refine the Today page so the active timer presents as a substantially stronger visual hero.
-- Ensure clear, prominent Start / Continue / Stop actions appropriate to the active session state.
+---
+
+## Implemented Work Awaiting Final User Acceptance
+
+### Today Final Hero Redesign (Implemented — Awaiting User Acceptance)
+Redesigned the Today page into a deliberate maximized-desktop composition where the active timer/session area is the clear visual hero:
+- **3-Tier Visual Composition**:
+  1. Header: Quiet "Today" page title + date subtitle without motivational clutter.
+  2. Main Row: Session Hero (~2/3 horizontal width) + Today Summary (~1/3 horizontal width) with ~20-24 DIP separation on maximized desktop (1240 DIP max-width).
+  3. Activity Section: Full-width "TODAY'S ACTIVITY" table below with compact desktop rows and clean empty state.
+- **Shared Session Hero Surface (~380 DIP min height on wide)**:
+  - **Running State**: `WORK SESSION` / `BREAK SESSION` label with colored active dot, `RUNNING` status badge, dominant 80 DIP countdown typography + `remaining` subtext, thin 6 DIP semantic progress bar, `[ Pause ]` (primary elevated) and `[ Stop ]` (secondary neutral) action buttons.
+  - **Paused State**: Same physical hero region, `PAUSED` status badge, frozen countdown + `paused` subtext, progress bar, `[ Continue ]` (primary elevated) and `[ Start New ]` (secondary neutral) action buttons.
+  - **Idle State**: Same physical hero region, `START A SESSION` label, `Ready when you are` prompt, substantial Work & Break selector cards using actual configured durations and restrained semantic accents (no solid saturated backgrounds), `[ Start ]` action button.
+- **Today Summary Surface**:
+  - Single coherent card with a 2 × 2 internal metric grid (Focus Time, Work Sessions, Break Time, Completion Rate) with Consolas 28 SemiBold values.
+- **Adaptive Breakpoints**:
+  - Wide (>= 860 DIP available / >= 1100 DIP window): Hero (2/3) + Summary (1/3) side-by-side, Activity full width below, 80 DIP timer font.
+  - Medium / Restored (< 860 DIP available): Hero full width, Summary below Hero (2x2 grid), Activity below Summary, 68 DIP timer font.
+  - Narrow (< 580 DIP available): Single vertical column flow with 56 DIP timer font, no clipping or horizontal overflow.
+
+
+### Reports Acceptance Refinement & Temporary Yearly Preview (Implemented — Under Acceptance)
+- Streaks presentation redesigned into a 2-column group with balanced Current and Longest Streak metrics (no emojis).
+- Redundant session count metrics removed from the insights rail across all periods.
+- Symmetrical 4-item consistency and average metrics across Weekly, Monthly, and Yearly.
+- Temporary `FOCUSKEY_YEARLY_PREVIEW=1` override added for pre-1-year visual inspection (to be removed after user visual acceptance).
 
 ---
 

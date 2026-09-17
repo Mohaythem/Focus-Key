@@ -32,11 +32,11 @@ public sealed partial class MainWindow : Window
     private bool _activityCollapsed = true;
     private bool _isWorkHovered;
     private bool _isBreakHovered;
+    private SessionType _selectedIdleType = SessionType.Work;
 
     internal void SetActivityCollapsed(bool collapsed)
     {
         _activityCollapsed = collapsed;
-        UpdateActivityVisuals();
     }
 
     internal void ApplyColors(SessionColors colors)
@@ -155,7 +155,6 @@ public sealed partial class MainWindow : Window
         _displayTimer.IsRepeating = false;
         _displayTimer.Tick += OnDisplayTick;
         Closed += (_, _) => { _visible = false; _displayTimer.Stop(); _today.Dispose(); _reports.Dispose(); };
-        UpdateActivityVisuals();
         Render();
         UpdateSidebarDimensions(MainSurface.ActualWidth > 0 ? MainSurface.ActualWidth : 880);
         UpdatePageWidths();
@@ -223,25 +222,23 @@ public sealed partial class MainWindow : Window
         await _settings.OpenAsync();
     }
     private async void OnRefreshClick(object sender, RoutedEventArgs args) => await _today.RefreshAsync();
-    private async void OnStartWorkClick(object sender, RoutedEventArgs args) => await _today.StartAsync(SessionType.Work);
-    private async void OnStartBreakClick(object sender, RoutedEventArgs args) => await _today.StartAsync(SessionType.Break);
-    private async void OnPauseClick(object sender, RoutedEventArgs args)
+    private void SelectIdleType(SessionType type)
     {
-        if (_today.Snapshot?.Paused is not null)
-            await _today.ContinueAsync();
-        else
-            await _today.PauseAsync();
+        _selectedIdleType = type;
+        PaintLauncherCards(IsCurrentThemeDark());
     }
+    private void OnWorkCardClick(object sender, RoutedEventArgs args) => SelectIdleType(SessionType.Work);
+    private void OnBreakCardClick(object sender, RoutedEventArgs args) => SelectIdleType(SessionType.Break);
+    private void OnWorkCardPointerPressed(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e) => SelectIdleType(SessionType.Work);
+    private void OnBreakCardPointerPressed(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e) => SelectIdleType(SessionType.Break);
+    private void OnWorkCardTapped(object sender, Microsoft.UI.Xaml.Input.TappedRoutedEventArgs e) => SelectIdleType(SessionType.Work);
+    private void OnBreakCardTapped(object sender, Microsoft.UI.Xaml.Input.TappedRoutedEventArgs e) => SelectIdleType(SessionType.Break);
+    private async void OnStartIdleClick(object sender, RoutedEventArgs args) => await _today.StartAsync(_selectedIdleType);
+    private async void OnPauseClick(object sender, RoutedEventArgs args) => await _today.PauseAsync();
+    private async void OnContinueClick(object sender, RoutedEventArgs args) => await _today.ContinueAsync();
     private async void OnStartNewClick(object sender, RoutedEventArgs args) => await _today.StartNewAsync();
+    private async void OnStopClick(object sender, RoutedEventArgs args) => await _today.StopAsync();
     private void OnExitClick(object sender, RoutedEventArgs args) => ExitRequested?.Invoke();
-
-    private void UpdateActivityVisuals()
-    {
-        if (ActivityChevron is not null)
-            ActivityChevron.Glyph = _activityCollapsed ? "\uE70D" : "\uE70E";
-        if (ActivityContentPanel is not null)
-            ActivityContentPanel.Visibility = _activityCollapsed ? Visibility.Collapsed : Visibility.Visible;
-    }
 
     private void UpdatePageWidths()
     {
@@ -253,26 +250,60 @@ public sealed partial class MainWindow : Window
             if (available > 0)
             {
                 if (TodayPanel is not null)
-                    TodayPanel.Width = Math.Min(880, available);
+                {
+                    TodayPanel.Width = Math.Min(1240, available);
+
+                    // Responsive layout for Today Hero + Summary
+                    // Wide (>= 860 DIP available / >= 1100 DIP window): side-by-side 2/3 + 1/3
+                    // Medium / Narrow (< 860 DIP available): Hero full width, Summary below Hero
+                    bool isWide = available >= 860;
+
+                    if (HeroColumnDef is not null && SummaryColumnDef is not null &&
+                        HeroRowDef is not null && SummaryRowDef is not null &&
+                        SessionHeroCard is not null && TodaySummaryCard is not null)
+                    {
+                        if (isWide)
+                        {
+                            HeroColumnDef.Width = new GridLength(2, GridUnitType.Star);
+                            SummaryColumnDef.Width = new GridLength(1, GridUnitType.Star);
+                            HeroRowDef.Height = GridLength.Auto;
+                            SummaryRowDef.Height = new GridLength(0);
+
+                            Grid.SetColumn(SessionHeroCard, 0);
+                            Grid.SetRow(SessionHeroCard, 0);
+                            Grid.SetColumnSpan(SessionHeroCard, 1);
+
+                            Grid.SetColumn(TodaySummaryCard, 1);
+                            Grid.SetRow(TodaySummaryCard, 0);
+                            Grid.SetColumnSpan(TodaySummaryCard, 1);
+
+                            SessionHeroCard.MinHeight = 380;
+                            TodaySummaryCard.MinHeight = 380;
+                            if (RunningText is not null) RunningText.FontSize = 80;
+                        }
+                        else
+                        {
+                            HeroColumnDef.Width = new GridLength(1, GridUnitType.Star);
+                            SummaryColumnDef.Width = new GridLength(0);
+                            HeroRowDef.Height = GridLength.Auto;
+                            SummaryRowDef.Height = GridLength.Auto;
+
+                            Grid.SetColumn(SessionHeroCard, 0);
+                            Grid.SetRow(SessionHeroCard, 0);
+                            Grid.SetColumnSpan(SessionHeroCard, 2);
+
+                            Grid.SetColumn(TodaySummaryCard, 0);
+                            Grid.SetRow(TodaySummaryCard, 1);
+                            Grid.SetColumnSpan(TodaySummaryCard, 2);
+
+                            SessionHeroCard.MinHeight = 320;
+                            TodaySummaryCard.MinHeight = 0;
+                            if (RunningText is not null) RunningText.FontSize = available < 580 ? 56 : 68;
+                        }
+                    }
+                }
                 if (ReportsHost is not null)
                     ReportsHost.Width = Math.Min(1220, available);
-            }
-        }
-    }
-
-    private async void OnToggleActivityClick(object sender, RoutedEventArgs args)
-    {
-        _activityCollapsed = !_activityCollapsed;
-        UpdateActivityVisuals();
-        if (_settingsService is not null)
-        {
-            try
-            {
-                await _settingsService.UpdateActivityCollapsedAsync(_activityCollapsed);
-            }
-            catch (Exception ex)
-            {
-                _startupReport?.Invoke(ex);
             }
         }
     }
@@ -310,49 +341,84 @@ public sealed partial class MainWindow : Window
 
     private void PaintLauncherCards(bool isDark)
     {
-        if (WorkChoiceCard is null || BreakChoiceCard is null) return;
+        if (WorkChoiceCard is null || BreakChoiceCard is null || StartIdleButton is null) return;
 
-        double workBgAlpha = _isWorkHovered ? (isDark ? 0.20 : 0.14) : (isDark ? 0.12 : 0.08);
-        double workBorderAlpha = _isWorkHovered ? (isDark ? 0.55 : 0.40) : (isDark ? 0.35 : 0.25);
-        WorkChoiceCard.Background = SessionColorBrush.CreateAlpha(_colors.Work, workBgAlpha);
-        WorkChoiceCard.BorderBrush = SessionColorBrush.CreateAlpha(_colors.Work, workBorderAlpha);
-        WorkChoiceDot.Fill = SessionColorBrush.Create(_colors.Work);
-        WorkChoiceMode.Foreground = Presentation.ThemeBrush("FkSecondary", isDark);
+        bool isWorkSelected = _selectedIdleType == SessionType.Work;
+        var selectedColor = isWorkSelected ? _colors.Work : _colors.Break;
 
-        StartWorkButton.Background = SessionColorBrush.CreateElevated(_colors.Work, isDark, _isWorkHovered);
-        StartWorkButton.BorderBrush = SessionColorBrush.CreateAlpha(_colors.Work, _isWorkHovered ? (isDark ? 0.85 : 0.75) : (isDark ? 0.55 : 0.45));
-        StartWorkButton.BorderThickness = new Thickness(1);
-        StartWorkButton.Foreground = Presentation.ThemeBrush("FkForeground", isDark);
+        // 1. Work Card
+        if (isWorkSelected)
+        {
+            double bgAlpha = _isWorkHovered ? (isDark ? 0.20 : 0.14) : (isDark ? 0.14 : 0.09);
+            double borderAlpha = _isWorkHovered ? (isDark ? 0.85 : 0.70) : (isDark ? 0.65 : 0.50);
+            WorkChoiceCard.Background = SessionColorBrush.CreateAlpha(_colors.Work, bgAlpha);
+            WorkChoiceCard.BorderBrush = SessionColorBrush.CreateAlpha(_colors.Work, borderAlpha);
+            WorkChoiceCard.BorderThickness = new Thickness(1.5);
+            WorkChoiceDot.Fill = SessionColorBrush.Create(_colors.Work);
+            WorkChoiceDot.Opacity = 1.0;
+            WorkChoiceMode.Foreground = Presentation.ThemeBrush("FkForeground", isDark);
+            WorkDurationNumber.Foreground = Presentation.ThemeBrush("FkForeground", isDark);
+        }
+        else
+        {
+            double bgAlpha = _isWorkHovered ? (isDark ? 0.08 : 0.04) : (isDark ? 0.03 : 0.015);
+            WorkChoiceCard.Background = SessionColorBrush.CreateAlpha(_colors.Work, bgAlpha);
+            WorkChoiceCard.BorderBrush = _isWorkHovered
+                ? SessionColorBrush.CreateAlpha(_colors.Work, isDark ? 0.40 : 0.30)
+                : Presentation.ThemeBrush("FkBorder", isDark);
+            WorkChoiceCard.BorderThickness = new Thickness(1.0);
+            WorkChoiceDot.Fill = SessionColorBrush.Create(_colors.Work);
+            WorkChoiceDot.Opacity = _isWorkHovered ? 0.75 : 0.40;
+            WorkChoiceMode.Foreground = Presentation.ThemeBrush("FkSecondary", isDark);
+            WorkDurationNumber.Foreground = Presentation.ThemeBrush("FkSecondary", isDark);
+        }
 
-        double breakBgAlpha = _isBreakHovered ? (isDark ? 0.20 : 0.14) : (isDark ? 0.12 : 0.08);
-        double breakBorderAlpha = _isBreakHovered ? (isDark ? 0.55 : 0.40) : (isDark ? 0.35 : 0.25);
-        BreakChoiceCard.Background = SessionColorBrush.CreateAlpha(_colors.Break, breakBgAlpha);
-        BreakChoiceCard.BorderBrush = SessionColorBrush.CreateAlpha(_colors.Break, breakBorderAlpha);
-        BreakChoiceDot.Fill = SessionColorBrush.Create(_colors.Break);
-        BreakChoiceMode.Foreground = Presentation.ThemeBrush("FkSecondary", isDark);
+        // 2. Break Card
+        if (!isWorkSelected)
+        {
+            double bgAlpha = _isBreakHovered ? (isDark ? 0.20 : 0.14) : (isDark ? 0.14 : 0.09);
+            double borderAlpha = _isBreakHovered ? (isDark ? 0.85 : 0.70) : (isDark ? 0.65 : 0.50);
+            BreakChoiceCard.Background = SessionColorBrush.CreateAlpha(_colors.Break, bgAlpha);
+            BreakChoiceCard.BorderBrush = SessionColorBrush.CreateAlpha(_colors.Break, borderAlpha);
+            BreakChoiceCard.BorderThickness = new Thickness(1.5);
+            BreakChoiceDot.Fill = SessionColorBrush.Create(_colors.Break);
+            BreakChoiceDot.Opacity = 1.0;
+            BreakChoiceMode.Foreground = Presentation.ThemeBrush("FkForeground", isDark);
+            BreakDurationNumber.Foreground = Presentation.ThemeBrush("FkForeground", isDark);
+        }
+        else
+        {
+            double bgAlpha = _isBreakHovered ? (isDark ? 0.08 : 0.04) : (isDark ? 0.03 : 0.015);
+            BreakChoiceCard.Background = SessionColorBrush.CreateAlpha(_colors.Break, bgAlpha);
+            BreakChoiceCard.BorderBrush = _isBreakHovered
+                ? SessionColorBrush.CreateAlpha(_colors.Break, isDark ? 0.40 : 0.30)
+                : Presentation.ThemeBrush("FkBorder", isDark);
+            BreakChoiceCard.BorderThickness = new Thickness(1.0);
+            BreakChoiceDot.Fill = SessionColorBrush.Create(_colors.Break);
+            BreakChoiceDot.Opacity = _isBreakHovered ? 0.75 : 0.40;
+            BreakChoiceMode.Foreground = Presentation.ThemeBrush("FkSecondary", isDark);
+            BreakDurationNumber.Foreground = Presentation.ThemeBrush("FkSecondary", isDark);
+        }
 
-        StartBreakButton.Background = SessionColorBrush.CreateElevated(_colors.Break, isDark, _isBreakHovered);
-        StartBreakButton.BorderBrush = SessionColorBrush.CreateAlpha(_colors.Break, _isBreakHovered ? (isDark ? 0.85 : 0.75) : (isDark ? 0.55 : 0.45));
-        StartBreakButton.BorderThickness = new Thickness(1);
-        StartBreakButton.Foreground = Presentation.ThemeBrush("FkForeground", isDark);
-
+        // 3. Durations
         var durations = _today.Snapshot?.Durations ?? SessionDurations.Default;
         var (workNum, workUnit) = TodayFormatting.FormatLauncherDurationParts(durations.Work);
         var (brkNum, brkUnit) = TodayFormatting.FormatLauncherDurationParts(durations.Break);
 
         WorkDurationNumber.Text = workNum;
         WorkDurationUnit.Text = workUnit;
-        StartWorkButton.Content = "Start";
-        AutomationProperties.SetName(StartWorkButton, "Start Work");
-
         BreakDurationNumber.Text = brkNum;
         BreakDurationUnit.Text = brkUnit;
-        StartBreakButton.Content = "Start";
-        AutomationProperties.SetName(StartBreakButton, "Start Break");
 
+        // 4. Start Button
         bool canStart = !_today.IsStarting && !_today.IsStopping && !_today.IsRefreshing && _today.Error is null;
-        StartWorkButton.IsEnabled = canStart;
-        StartBreakButton.IsEnabled = canStart;
+        StartIdleButton.Content = "Start";
+        StartIdleButton.Background = SessionColorBrush.CreateElevated(selectedColor, isDark, false);
+        StartIdleButton.BorderBrush = SessionColorBrush.CreateAlpha(selectedColor, isDark ? 0.70 : 0.50);
+        StartIdleButton.BorderThickness = new Thickness(1);
+        StartIdleButton.Foreground = Presentation.ThemeBrush("FkForeground", isDark);
+        StartIdleButton.IsEnabled = canStart;
+        AutomationProperties.SetName(StartIdleButton, isWorkSelected ? "Start Work Session" : "Start Break Session");
     }
 
     private void Render()
@@ -415,8 +481,9 @@ public sealed partial class MainWindow : Window
         bool hasActive = _today.Snapshot?.Active is not null;
 
         // Sidebar active indicator
-        ActiveIndicator.Visibility = hasActive ? Visibility.Visible : Visibility.Collapsed;
-        if (hasActive)
+        if (ActiveIndicator is not null)
+            ActiveIndicator.Visibility = hasActive ? Visibility.Visible : Visibility.Collapsed;
+        if (hasActive && ActiveDot is not null)
         {
             var indicatorColor = _today.Snapshot!.Active!.Type == SessionType.Work ? _colors.Work : _colors.Break;
             ActiveDot.Fill = SessionColorBrush.Create(indicatorColor);
@@ -427,16 +494,18 @@ public sealed partial class MainWindow : Window
         _lastHasRunning = hasActive;
         _hasRenderedRunning = true;
 
+        if (SessionHeroCard is null || ActiveContent is null || IdleContent is null) return;
+
+        bool isDark = IsCurrentThemeDark();
+
         if (_today.Snapshot?.Active is not { } active)
         {
             ActiveContent.Visibility = Visibility.Collapsed;
             IdleContent.Visibility = Visibility.Visible;
-            CurrentCard.ClearValue(Border.BackgroundProperty);
-            CurrentCard.ClearValue(Border.BorderBrushProperty);
-            CurrentCard.Padding = new Thickness(28, 24, 28, 24);
-            CurrentCard.MinHeight = 180;
+            SessionHeroCard.ClearValue(Border.BackgroundProperty);
+            SessionHeroCard.ClearValue(Border.BorderBrushProperty);
 
-            PaintLauncherCards(IsCurrentThemeDark());
+            PaintLauncherCards(isDark);
 
             if (stateChanged)
             {
@@ -451,24 +520,24 @@ public sealed partial class MainWindow : Window
         var snapshot = SessionSnapshot.For(active, DateTimeOffset.UtcNow);
         var remaining = TimeSpan.FromSeconds(Math.Ceiling(snapshot.Remaining.TotalSeconds));
         var color = active.Type == SessionType.Work ? _colors.Work : _colors.Break;
-        bool isDark = IsCurrentThemeDark();
         bool isPaused = active.Status == SessionStatus.Paused;
 
-        CurrentCard.Background = SessionColorBrush.CreateTint(color, isDark, 0.06);
-        CurrentCard.BorderBrush = SessionColorBrush.CreateSemanticBorder(color, 0.40);
-        CurrentCard.Padding = new Thickness(28, 24, 28, 24);
-        CurrentCard.MinHeight = 180;
+        SessionHeroCard.Background = SessionColorBrush.CreateTint(color, isDark, 0.06);
+        SessionHeroCard.BorderBrush = SessionColorBrush.CreateSemanticBorder(color, 0.40);
 
         ActiveTypeDot.Fill = SessionColorBrush.Create(color);
         CurrentHeading.Text = active.Type == SessionType.Work ? "WORK SESSION" : "BREAK SESSION";
         CurrentHeading.Foreground = Presentation.ThemeBrush("FkSecondary", isDark);
 
+        ActiveStatusBadge.Text = isPaused ? "PAUSED" : "RUNNING";
+        ActiveStatusBadge.Foreground = isPaused ? Presentation.ThemeBrush("FkSecondary", isDark) : SessionColorBrush.Create(color);
+
         RunningText.Text = isPaused
             ? string.Create(CultureInfo.InvariantCulture, $"{(long)remaining.TotalMinutes:00}:{remaining.Seconds:00}")
-            : snapshot.HasReachedPlannedEnd ? "00:00" : string.Create(CultureInfo.InvariantCulture, $"{(long)remaining.TotalMinutes:00}:{remaining.Seconds:00}");
+            : (snapshot.HasReachedPlannedEnd ? "00:00" : string.Create(CultureInfo.InvariantCulture, $"{(long)remaining.TotalMinutes:00}:{remaining.Seconds:00}"));
         RunningText.Foreground = Presentation.ThemeBrush("FkForeground", isDark);
 
-        RunningHint.Text = isPaused ? "Paused" : snapshot.HasReachedPlannedEnd ? "Finishing…" : "Remaining";
+        RunningHint.Text = isPaused ? "paused" : (snapshot.HasReachedPlannedEnd ? "finishing…" : "remaining");
         RunningHint.Foreground = Presentation.ThemeBrush("FkSecondary", isDark);
 
         SessionProgress.Value = Math.Clamp(100 * snapshot.Elapsed.TotalSeconds / snapshot.PlannedDuration.TotalSeconds, 0.0, 100.0);
@@ -478,25 +547,44 @@ public sealed partial class MainWindow : Window
 
         bool canAct = !_today.IsRefreshing && !_today.IsStopping && !_today.IsStarting && _today.Error is null;
 
-        PauseButton.Content = isPaused ? "Continue" : "Pause";
-        PauseButton.Background = isPaused
-            ? SessionColorBrush.CreateElevated(color, isDark, false)
-            : Presentation.ThemeBrush("FkSurface2", isDark);
-        PauseButton.BorderBrush = isPaused
-            ? SessionColorBrush.CreateAlpha(color, isDark ? 0.70 : 0.50)
-            : Presentation.ThemeBrush("CardStrokeColorDefaultBrush", CurrentCard);
-        PauseButton.Foreground = isPaused
-            ? Presentation.ThemeBrush("FkForeground", isDark)
-            : Presentation.ThemeBrush("FkSecondary", isDark);
-        PauseButton.Visibility = Visibility.Visible;
-        PauseButton.IsEnabled = canAct;
-        AutomationProperties.SetName(PauseButton, isPaused ? "Continue Session" : "Pause Session");
+        if (isPaused)
+        {
+            PauseButton.Visibility = Visibility.Collapsed;
+            StopButton.Visibility = Visibility.Collapsed;
 
-        StartNewButton.Visibility = isPaused ? Visibility.Visible : Visibility.Collapsed;
-        StartNewButton.IsEnabled = canAct;
-        StartNewButton.Background = Presentation.ThemeBrush("FkSurface2", isDark);
-        StartNewButton.BorderBrush = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", CurrentCard);
-        StartNewButton.Foreground = Presentation.ThemeBrush("FkSecondary", isDark);
+            ContinueButton.Visibility = Visibility.Visible;
+            ContinueButton.IsEnabled = canAct;
+            ContinueButton.Background = SessionColorBrush.CreateElevated(color, isDark, false);
+            ContinueButton.BorderBrush = SessionColorBrush.CreateAlpha(color, isDark ? 0.70 : 0.50);
+            ContinueButton.BorderThickness = new Thickness(1);
+            ContinueButton.Foreground = Presentation.ThemeBrush("FkForeground", isDark);
+
+            StartNewButton.Visibility = Visibility.Visible;
+            StartNewButton.IsEnabled = canAct;
+            StartNewButton.Background = Presentation.ThemeBrush("FkSurface2", isDark);
+            StartNewButton.BorderBrush = Presentation.ThemeBrush("FkBorder", isDark);
+            StartNewButton.BorderThickness = new Thickness(1);
+            StartNewButton.Foreground = Presentation.ThemeBrush("FkSecondary", isDark);
+        }
+        else
+        {
+            ContinueButton.Visibility = Visibility.Collapsed;
+            StartNewButton.Visibility = Visibility.Collapsed;
+
+            PauseButton.Visibility = Visibility.Visible;
+            PauseButton.IsEnabled = canAct;
+            PauseButton.Background = SessionColorBrush.CreateElevated(color, isDark, false);
+            PauseButton.BorderBrush = SessionColorBrush.CreateAlpha(color, isDark ? 0.70 : 0.50);
+            PauseButton.BorderThickness = new Thickness(1);
+            PauseButton.Foreground = Presentation.ThemeBrush("FkForeground", isDark);
+
+            StopButton.Visibility = Visibility.Visible;
+            StopButton.IsEnabled = canAct;
+            StopButton.Background = Presentation.ThemeBrush("FkSurface2", isDark);
+            StopButton.BorderBrush = Presentation.ThemeBrush("FkBorder", isDark);
+            StopButton.BorderThickness = new Thickness(1);
+            StopButton.Foreground = Presentation.ThemeBrush("FkSecondary", isDark);
+        }
 
         if (stateChanged)
         {

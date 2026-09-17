@@ -1,31 +1,25 @@
 # Focus Key — Project Progress & State Checkpoint
 
 ## Current Goal
-Yearly Reports experience completed, verified across viewports/themes/eligibility states, and ready for clean git commit.
+Reports Acceptance Refinement & Temporary Yearly Preview Override completed and verified.
 
 ## Current Checkpoint
-Yearly Reports is 100% implemented and verified:
-- **Eligibility & Availability**:
-  - Requires >= 1 year of usable history (`earliestDate.AddYears(1) <= today`), derived deterministically from native sessions and imported historical focus.
-  - Ineligible users see only `[ Week | Month ]`; `Year` button is completely omitted from the segmented selector.
-  - Eligible users see `[ Week | Month | Year ]` with fully functional and active `Year` selector.
-- **12-Month Calendar Grid & Bars**:
-  - Exactly 12 monthly bars (Jan → Dec) representing real accumulated focus duration.
-  - Dynamic Y-axis step hours (10h, 20h, 50h, 100h) via `ComputeYearlyStepHours(maxSeconds)` ensuring 4–6 legible grid lines.
-  - Responsive bar width scaling (`fillRatio = 0.65`, `maxBarWidth = 64`, `minBarWidth = 14`).
-  - Duration labels above bars via `FormatYearlyBarDuration` (e.g. `58h`, `5h 30m`).
-  - Current calendar month emphasized in bold foreground on the X-axis.
-- **Yearly Contextual Insights**:
-  - Truthful prior-year focus comparison (`↑`/`↓`) displayed *only* when prior-year data exists.
-  - Active focus streak with badge.
-  - Strongest focus month with exact duration badge (e.g. `August (58h 00m)`).
-  - Active months consistency (e.g. `9 of 9 months`, with monthly average duration).
-  - Work sessions finished count.
-- **Year Navigation**:
-  - Smooth navigation between years (`<` and `>`), date subtitle formatting (`Calendar Year 2026 · Jan 1 – Dec 31`), and clamping to prevent navigating into unsupported future years (`_nextButton` disabled at current year).
-- **Automated Tests**: 714/714 unit tests passing (`dotnet test -c Release`), including 20 new tests in `YearlyReportsTests.cs`.
+Reports Acceptance Refinement and Temporary Yearly Preview Override are 100% implemented and verified:
+- **Insights Rail Refinement**:
+  - Streak presentation redesigned into a deliberate 2-column "Streaks" group with distinct, balanced statistics for **Current Streak** and **Longest Streak** (Consolas 20 SemiBold, no fire emoji 🔥, no tiny subtext caption).
+  - Redundant insights (e.g. "Work sessions finished" repeating top summary metrics) eliminated from the insights rail across all periods.
+  - Symmetrical 4-item truthful insights suite across all reporting periods:
+    - Weekly: Period Comparison (`↑`/`↓`), Streaks group (Current & Longest), Strongest Day, Active focus days + daily average.
+    - Monthly: Period Comparison (`↑`/`↓`), Streaks group (Current & Longest), Strongest Week, Active focus weeks + weekly average.
+    - Yearly: Prior-year Comparison (if prior data exists), Streaks group (Current & Longest), Strongest Month, Active focus months + monthly average.
+- **Temporary Yearly Preview Override (`FOCUSKEY_YEARLY_PREVIEW=1`)**:
+  - When `FOCUSKEY_YEARLY_PREVIEW=1` (or `"true"`), the `Year` selector appears and is interactive even if the user has < 1 full year history.
+  - When unset/default, production behavior remains completely untouched (`Year` is completely hidden until real domain eligibility is met).
+  - Domain eligibility invariant (`ReportsService.IsYearEligible`), persisted data, and reporting calculations remain pure and untouched.
+  - Note: Will be removed upon final user visual acceptance.
+- **Automated Tests**: 715/715 unit tests passing (`dotnet test -c Release`), 0 failed, 0 skipped.
 - **Build**: 0 Warning(s), 0 Error(s) (`dotnet build -c Release`).
-- **Visual Verification**: Authoritative runtime inspection completed across Maximized Dark/Light, Restored Dark (~1000x720), Minimum size (680x500), Ineligible state (`[ Week | Month ]`), and Weekly/Monthly regressions.
+- **Visual Verification**: Authoritative runtime inspection completed across Maximized Dark/Light, Restored Dark (~1000x720), Minimum size (680x500), Ineligible state (`[ Week | Month ]`), Ineligible state with preview override (`[ Week | Month | Year ]`), and Weekly/Monthly regressions.
 
 ## Completed Work
 - **Visual & UX Audit**: Comprehensive desktop/full-screen audit documented in `VISUAL_AUDIT.md`.
@@ -38,12 +32,12 @@ Yearly Reports is 100% implemented and verified:
   - Dual global shortcuts (`Shift + F3` Quick Overlay, `Shift + F4` Open Focus Key) with SQLite persistence and conflict management (`4e5e783`).
 - **Stage 4 (Reports Redesign: Cohesive Desktop Dashboard)**: Dominant chart hero (~75%), 3 compact summary metrics, secondary contextual insights rail (~25%), reflow to stacked, truthful period comparison & insights.
 - **Stage 5 (Yearly Reports)**: Data-driven eligibility, 12-month calendar aggregation, dynamic yearly ceiling/intervals, truthful prior-year comparison and insights, and future navigation clamping.
+- **Stage 5b (Reports Acceptance Refinement & Temporary Preview)**: Balanced streaks group, zero metric repetition, comprehensive consistency metrics across all periods, and temporary `FOCUSKEY_YEARLY_PREVIEW` override.
 
 ## Remaining Work
 - **Stage 6: Approved Pending Items from FUTURE_PLAN.md**
   - Item 1: Window Close (X) Choice Dialog (hide to background tray vs. quit).
-  - Item 2: Adaptive Navigation & Sidebar Geometry.
-  - Item 3: Today Active Timer Hero & Lifecycle Actions.
+  - Item 2: Today Active Timer Hero & Lifecycle Actions.
 - **Stage 7: Settings Page & Quick Overlay Refinement**
   - Settings Page: Constrain container to 880 DIP max-width, center on desktop, expand color preset click targets (36x36 DIP), clean microcopy echoes.
   - Quick Overlay: Clean floating card hierarchy, standardize Stop action, harmonize keyboard hints (`[← →]`, `[Enter]`, `[Esc]`).
@@ -59,16 +53,17 @@ Yearly Reports is 100% implemented and verified:
 
 ## Last Verification
 - **Build**: `dotnet build -c Release` (0 Warnings, 0 Errors).
-- **Test Suite**: `dotnet test -c Release` (714 passed, 0 failed, 0 skipped).
+- **Test Suite**: `dotnet test -c Release` (715 passed, 0 failed, 0 skipped).
 - **Visual Captures**:
-  - `reports_year_maximized_dark.png`: 75%/25% side-by-side, 12 monthly bars (Jan-Dec), 20h intervals (0h-60h), 5 truthful yearly insights, disabled Next button.
+  - `reports_year_maximized_dark.png`: 75%/25% side-by-side, 12 monthly bars (Jan-Dec), 20h intervals (0h-60h), balanced streaks group, no redundancy, disabled Next button.
   - `reports_year_maximized_light.png`: High-contrast dark typography on white cards, forest teal bars.
   - `reports_year_restored_dark.png`: Stacked responsive reflow at ~1000x720 DIP.
   - `reports_year_minimum_dark.png`: Minimum size (680x500 DIP) boundary check, intact sidebar and wrapping header.
   - `reports_ineligible_week_dark.png`: Ineligible user state verified with `[ Week | Month ]` (Year button completely absent).
-  - `reports_week_regression_dark.png`: Weekly view regression verified intact.
-  - `reports_month_regression_dark.png`: Monthly view regression verified intact.
+  - `reports_ineligible_preview_enabled_dark.png`: Ineligible user with `FOCUSKEY_YEARLY_PREVIEW=1` verified with `[ Week | Month | Year ]` (Year active & interactive).
+  - `reports_week_regression_dark.png`: Weekly view regression verified intact with balanced streaks group and active days consistency.
+  - `reports_month_regression_dark.png`: Monthly view regression verified intact with balanced streaks group and active weeks consistency.
 
 ## Current Git State
 - Branch: `native/phased-rewrite`
-- Working tree contains complete, verified Yearly Reports implementation ready for commit.
+- Working tree contains complete, verified Reports Acceptance Refinement & Temporary Yearly Preview implementation.

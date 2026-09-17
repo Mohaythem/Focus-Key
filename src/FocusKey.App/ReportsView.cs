@@ -51,8 +51,8 @@ internal sealed class ReportsView : UserControl, IDisposable
         _date.MinDate = DateValue(ReportRange.MinimumDate); _date.MaxDate = DateValue(ReportRange.MaximumDate);
         AutomationProperties.SetName(_date, "Date in reporting period");
 
-        // Build segmented period selector (Year segment hidden initially until eligibility confirmed)
-        BuildPeriodSelector(false);
+        // Build segmented period selector (Year segment hidden initially unless eligible or preview override enabled)
+        BuildPeriodSelector(IsYearlyPreviewEnabled());
 
         var panel = new StackPanel { Spacing = 16, HorizontalAlignment = HorizontalAlignment.Stretch };
 
@@ -208,9 +208,10 @@ internal sealed class ReportsView : UserControl, IDisposable
         {
             _rendering = true;
             _date.Date = DateValue(_reports.Date);
-            if (_reports.Snapshot is { } snap && snap.IsYearEligible != _lastBuiltYearEligible)
+            bool showYear = (_reports.Snapshot?.IsYearEligible ?? false) || IsYearlyPreviewEnabled();
+            if (showYear != _lastBuiltYearEligible)
             {
-                BuildPeriodSelector(snap.IsYearEligible);
+                BuildPeriodSelector(showYear);
             }
             UpdatePeriodHighlight();
             UpdateNavigationState();
@@ -414,14 +415,8 @@ internal sealed class ReportsView : UserControl, IDisposable
                 items.Add(CreateInsightItem(diffValue, diffLabel));
             }
 
-            // 2. Streak
-            int currentStreak = snapshot.Streaks.CurrentStreak;
-            string streakValue = $"🔥 {currentStreak} {(currentStreak == 1 ? "day" : "days")}";
-            string streakLabel = "Current streak";
-            string? streakSub = snapshot.Streaks.LongestStreak > currentStreak
-                ? $"Best: {snapshot.Streaks.LongestStreak} days"
-                : null;
-            items.Add(CreateInsightItem(streakValue, streakLabel, streakSub));
+            // 2. Streaks (distinct, balanced statistics for current and longest streak)
+            items.Add(CreateStreaksInsightGroup(snapshot.Streaks.CurrentStreak, snapshot.Streaks.LongestStreak));
 
             // 3. Strongest day / week / month
             if (snapshot.Trend.Count > 0)
@@ -459,7 +454,7 @@ internal sealed class ReportsView : UserControl, IDisposable
                 }
             }
 
-            // 4. Consistency / active days or months
+            // 4. Consistency / active days, weeks, or months
             if (snapshot.Period == ReportPeriod.Weekly)
             {
                 int activeDays = snapshot.Trend.Count(b => b.Totals.FocusTime > TimeSpan.Zero);
@@ -469,6 +464,19 @@ internal sealed class ReportsView : UserControl, IDisposable
                     string activeLabel = "Active focus days";
                     TimeSpan dailyAvg = TimeSpan.FromTicks(snapshot.Totals.FocusTime.Ticks / 7);
                     string activeSub = $"Daily avg: {ReportsFormatting.FormatDuration(dailyAvg)}";
+                    items.Add(CreateInsightItem(activeValue, activeLabel, activeSub));
+                }
+            }
+            else if (snapshot.Period == ReportPeriod.Monthly)
+            {
+                int totalWeeks = snapshot.Trend.Count;
+                int activeWeeks = snapshot.Trend.Count(b => b.Totals.FocusTime > TimeSpan.Zero);
+                if (activeWeeks > 0 && totalWeeks > 0)
+                {
+                    string activeValue = $"{activeWeeks} of {totalWeeks} {(totalWeeks == 1 ? "week" : "weeks")}";
+                    string activeLabel = "Active focus weeks";
+                    TimeSpan weeklyAvg = TimeSpan.FromTicks(snapshot.Totals.FocusTime.Ticks / totalWeeks);
+                    string activeSub = $"Weekly avg: {ReportsFormatting.FormatDuration(weeklyAvg)}";
                     items.Add(CreateInsightItem(activeValue, activeLabel, activeSub));
                 }
             }
@@ -485,22 +493,6 @@ internal sealed class ReportsView : UserControl, IDisposable
                     TimeSpan monthlyAvg = TimeSpan.FromTicks(snapshot.Totals.FocusTime.Ticks / Math.Max(1, elapsedMonths));
                     string activeSub = $"Monthly avg: {ReportsFormatting.FormatDuration(monthlyAvg)}";
                     items.Add(CreateInsightItem(activeValue, activeLabel, activeSub));
-                }
-
-                if (snapshot.Totals.CompletedWork > 0)
-                {
-                    string sessionValue = $"{snapshot.Totals.CompletedWork} completed";
-                    string sessionLabel = "Work sessions finished";
-                    items.Add(CreateInsightItem(sessionValue, sessionLabel));
-                }
-            }
-            else
-            {
-                if (snapshot.Totals.CompletedWork > 0)
-                {
-                    string sessionValue = $"{snapshot.Totals.CompletedWork} completed";
-                    string sessionLabel = "Work sessions finished";
-                    items.Add(CreateInsightItem(sessionValue, sessionLabel));
                 }
             }
 
@@ -570,9 +562,37 @@ internal sealed class ReportsView : UserControl, IDisposable
         return card;
     }
 
-    private UIElement CreateInsightItem(string value, string label, string? subtext = null)
+    private UIElement CreateStreaksInsightGroup(int currentStreak, int longestStreak)
     {
-        var itemPanel = new StackPanel { Spacing = 2 };
+        var grid = new Grid { ColumnSpacing = 16 };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        var currentCol = new StackPanel { Spacing = 2 };
+        var currentVal = CreateValueTextBlock($"{currentStreak} {(currentStreak == 1 ? "day" : "days")}");
+        var currentLbl = Presentation.Text("Current streak", 12);
+        currentLbl.FontWeight = FontWeights.Medium;
+        currentCol.Children.Add(currentVal);
+        currentCol.Children.Add(currentLbl);
+        Grid.SetColumn(currentCol, 0);
+
+        var longestCol = new StackPanel { Spacing = 2 };
+        var longestVal = CreateValueTextBlock($"{longestStreak} {(longestStreak == 1 ? "day" : "days")}");
+        var longestLbl = Presentation.Text("Longest streak", 12);
+        longestLbl.FontWeight = FontWeights.Medium;
+        longestCol.Children.Add(longestVal);
+        longestCol.Children.Add(longestLbl);
+        Grid.SetColumn(longestCol, 1);
+
+        grid.Children.Add(currentCol);
+        grid.Children.Add(longestCol);
+
+        AutomationProperties.SetName(grid, $"Current streak: {currentStreak} days, Longest streak: {longestStreak} days");
+        return grid;
+    }
+
+    private static TextBlock CreateValueTextBlock(string value)
+    {
         var valBlock = new TextBlock
         {
             Text = value,
@@ -590,7 +610,13 @@ internal sealed class ReportsView : UserControl, IDisposable
             valBlock.FontSize = 20;
             valBlock.Margin = new Thickness(0, 0, 0, 2);
         }
+        return valBlock;
+    }
 
+    private UIElement CreateInsightItem(string value, string label, string? subtext = null)
+    {
+        var itemPanel = new StackPanel { Spacing = 2 };
+        var valBlock = CreateValueTextBlock(value);
         var labelBlock = Presentation.Text(label, 12);
         labelBlock.FontWeight = FontWeights.Medium;
         itemPanel.Children.Add(valBlock);
@@ -605,6 +631,14 @@ internal sealed class ReportsView : UserControl, IDisposable
         AutomationProperties.SetName(itemPanel, $"{label}, {value}");
         return itemPanel;
     }
+
+    /// <summary>
+    /// Temporary development and verification override allowing Yearly reports preview before 1 full year of history is reached.
+    /// MUST be removed after final user visual acceptance.
+    /// </summary>
+    internal static bool IsYearlyPreviewEnabled() =>
+        string.Equals(Environment.GetEnvironmentVariable("FOCUSKEY_YEARLY_PREVIEW"), "1", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(Environment.GetEnvironmentVariable("FOCUSKEY_YEARLY_PREVIEW"), "true", StringComparison.OrdinalIgnoreCase);
 
     private FrameworkElement ChartCard(ReportsSnapshot snapshot)
     {

@@ -80,6 +80,37 @@ public sealed class ReportsPolishVerificationTests
         Assert.Equal(2, future.Streaks.LongestStreak);
     }
 
+    [Fact]
+    public async Task ConsistencyMetrics_WeeklyMonthlyAndYearlyCalculateCorrectActiveBuckets()
+    {
+        using var store = new SessionStore();
+        var zone = TimeZoneInfo.Utc;
+        var date = new DateTimeOffset(2026, 9, 15, 12, 0, 0, TimeSpan.Zero);
+
+        // Add sessions across 3 days this week
+        await store.Repository.AddAsync(Finished(new DateTimeOffset(2026, 9, 14, 10, 0, 0, TimeSpan.Zero), SessionType.Work, SessionStatus.Completed, 60));
+        await store.Repository.AddAsync(Finished(new DateTimeOffset(2026, 9, 15, 10, 0, 0, TimeSpan.Zero), SessionType.Work, SessionStatus.Completed, 60));
+        await store.Repository.AddAsync(Finished(new DateTimeOffset(2026, 9, 10, 10, 0, 0, TimeSpan.Zero), SessionType.Work, SessionStatus.Completed, 60));
+
+        var service = new ReportsService(store.Repository, new ManualTimeProvider(date), () => zone);
+
+        // Weekly consistency: 3 active days out of 7
+        var weekly = await service.ReadAsync(ReportPeriod.Weekly, new DateOnly(2026, 9, 15));
+        int activeWeeklyDays = weekly.Trend.Count(b => b.Totals.FocusTime > TimeSpan.Zero);
+        Assert.Equal(3, activeWeeklyDays);
+        Assert.Equal(TimeSpan.FromMinutes(180), weekly.Totals.FocusTime);
+
+        // Monthly consistency: active weeks in month
+        var monthly = await service.ReadAsync(ReportPeriod.Monthly, new DateOnly(2026, 9, 15));
+        int activeMonthlyWeeks = monthly.Trend.Count(b => b.Totals.FocusTime > TimeSpan.Zero);
+        Assert.Equal(2, activeMonthlyWeeks); // Week 2 (Sept 10) and Week 3 (Sept 14 & 15)
+
+        // Yearly consistency: active months in year
+        var yearly = await service.ReadAsync(ReportPeriod.Yearly, new DateOnly(2026, 9, 15));
+        int activeYearlyMonths = yearly.Trend.Count(b => b.Totals.FocusTime > TimeSpan.Zero);
+        Assert.Equal(1, activeYearlyMonths); // September (month 9)
+    }
+
     private static SessionRecord Finished(DateTimeOffset start, SessionType type, SessionStatus status, int minutes) =>
         TestSessions.Finished(status, startedAt: start, type: type, plannedDuration: TimeSpan.FromMinutes(minutes));
 }

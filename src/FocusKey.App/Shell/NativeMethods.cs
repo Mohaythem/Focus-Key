@@ -135,6 +135,84 @@ internal static class NativeMethods
     [DllImport("comctl32.dll", SetLastError = true)]
     internal static extern IntPtr DefSubclassProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam);
 
+    internal const uint WM_NCLBUTTONDOWN = 0x00A1;
+    internal const int HTCAPTION = 2;
+    internal const int MONITOR_DEFAULTTONEAREST = 2;
+    internal const int MONITOR_DEFAULTTOPRIMARY = 1;
+
+    [DllImport("user32.dll", ExactSpelling = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool ReleaseCapture();
+
+    [DllImport("user32.dll", EntryPoint = "SendMessageW", ExactSpelling = true)]
+    internal static extern IntPtr SendMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct RECT
+    {
+        internal int Left;
+        internal int Top;
+        internal int Right;
+        internal int Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    internal struct MONITORINFO
+    {
+        internal uint cbSize;
+        internal RECT rcMonitor;
+        internal RECT rcWork;
+        internal uint dwFlags;
+    }
+
+    [DllImport("user32.dll")]
+    internal static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+
+    internal delegate bool MonitorEnumProc(IntPtr hMonitor, IntPtr hdcMonitor, ref RECT lprcMonitor, IntPtr dwData);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool EnumDisplayMonitors(IntPtr hdc, IntPtr lprcClip, MonitorEnumProc lpfnEnum, IntPtr dwData);
+
+    internal static IReadOnlyList<FocusKey.Foundation.Overlay.ScreenRect> GetAllWorkAreas()
+    {
+        var list = new List<FocusKey.Foundation.Overlay.ScreenRect>();
+        EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, (IntPtr hMon, IntPtr hdc, ref RECT rc, IntPtr data) =>
+        {
+            var mi = new MONITORINFO { cbSize = (uint)Marshal.SizeOf<MONITORINFO>() };
+            if (GetMonitorInfo(hMon, ref mi))
+            {
+                list.Add(new FocusKey.Foundation.Overlay.ScreenRect(
+                    mi.rcWork.Left,
+                    mi.rcWork.Top,
+                    mi.rcWork.Right - mi.rcWork.Left,
+                    mi.rcWork.Bottom - mi.rcWork.Top));
+            }
+            return true;
+        }, IntPtr.Zero);
+        return list;
+    }
+
+    internal static FocusKey.Foundation.Overlay.ScreenRect GetForegroundWorkArea()
+    {
+        IntPtr fg = GetForegroundWindow();
+        IntPtr hMon = MonitorFromWindow(fg, MONITOR_DEFAULTTONEAREST);
+        var mi = new MONITORINFO { cbSize = (uint)Marshal.SizeOf<MONITORINFO>() };
+        if (hMon != IntPtr.Zero && GetMonitorInfo(hMon, ref mi))
+        {
+            return new FocusKey.Foundation.Overlay.ScreenRect(
+                mi.rcWork.Left,
+                mi.rcWork.Top,
+                mi.rcWork.Right - mi.rcWork.Left,
+                mi.rcWork.Bottom - mi.rcWork.Top);
+        }
+        return new FocusKey.Foundation.Overlay.ScreenRect(0, 0, 1920, 1080);
+    }
+
     internal static void ForceForeground(IntPtr targetWindow)
     {
         if (targetWindow == IntPtr.Zero) return;

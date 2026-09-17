@@ -1,4 +1,5 @@
 using System.Globalization;
+using FocusKey.Foundation.Settings;
 
 namespace FocusKey.Foundation.Today;
 
@@ -66,5 +67,17 @@ public static class TodayFormatting
             return (string.Create(Culture, $"{hours}h {mins}"), "m");
         }
         return (string.Create(Culture, $"{hours}"), hours == 1 ? "hr" : "hrs");
+    }
+
+    /// <summary>
+    /// Formats a clock time according to the configured TimeFormat (12h: "h:mm tt", 24h: "HH:mm").
+    /// </summary>
+    public static string FormatClockTime(DateTimeOffset time, TimeZoneInfo zone, TimeFormat format)
+    {
+        ArgumentNullException.ThrowIfNull(zone);
+        var local = TimeZoneInfo.ConvertTime(time, zone);
+        return format == TimeFormat.TwelveHour
+            ? local.ToString("h:mm tt", CultureInfo.InvariantCulture)
+            : local.ToString("HH:mm", CultureInfo.InvariantCulture);
     }
 }

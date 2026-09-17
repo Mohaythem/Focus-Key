@@ -235,5 +235,14 @@ public static class SchemaMigrations
             Sql: """
                 ALTER TABLE application_settings ADD COLUMN main_window_shortcut TEXT NOT NULL DEFAULT 'Shift + F4';
                 """),
+
+        new SchemaMigration(
+            Version: 11,
+            Name: "overlay_position_and_time_format",
+            Sql: """
+                ALTER TABLE application_settings ADD COLUMN overlay_position_x INTEGER;
+                ALTER TABLE application_settings ADD COLUMN overlay_position_y INTEGER;
+                ALTER TABLE application_settings ADD COLUMN time_format TEXT NOT NULL DEFAULT '24h';
+                """),
     ];
 }

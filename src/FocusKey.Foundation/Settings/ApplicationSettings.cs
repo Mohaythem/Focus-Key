@@ -17,6 +17,9 @@ public sealed record ApplicationSettings
         ActivityCollapsed = true,
         GlobalShortcut = GlobalShortcut.Default,
         MainWindowShortcut = GlobalShortcut.DefaultMainWindow,
+        TimeFormat = TimeFormat.TwentyFourHour,
+        OverlayPositionX = null,
+        OverlayPositionY = null,
     };
 
     public required TimeSpan WorkDuration { get; init; }
@@ -31,6 +34,9 @@ public sealed record ApplicationSettings
     public bool ActivityCollapsed { get; init; } = true;
     public GlobalShortcut GlobalShortcut { get; init; } = GlobalShortcut.Default;
     public GlobalShortcut MainWindowShortcut { get; init; } = GlobalShortcut.DefaultMainWindow;
+    public TimeFormat TimeFormat { get; init; } = TimeFormat.TwentyFourHour;
+    public int? OverlayPositionX { get; init; }
+    public int? OverlayPositionY { get; init; }
 
     public void Validate()
     {
@@ -40,6 +46,10 @@ public sealed record ApplicationSettings
             throw new ArgumentException($"Unsupported appearance '{Appearance}'.", nameof(Appearance));
         if (!Enum.IsDefined(Contrast))
             throw new ArgumentException($"Unsupported contrast '{Contrast}'.", nameof(Contrast));
+        if (!Enum.IsDefined(TimeFormat))
+            throw new ArgumentException($"Unsupported time format '{TimeFormat}'.", nameof(TimeFormat));
+        if ((OverlayPositionX.HasValue && !OverlayPositionY.HasValue) || (!OverlayPositionX.HasValue && OverlayPositionY.HasValue))
+            throw new ArgumentException("Overlay position X and Y must both be set or both be null.");
         ValidateColor(WorkColor, nameof(WorkColor));
         ValidateColor(BreakColor, nameof(BreakColor));
         (LightTheme ?? ThemeConfiguration.DefaultLight).Validate(false);

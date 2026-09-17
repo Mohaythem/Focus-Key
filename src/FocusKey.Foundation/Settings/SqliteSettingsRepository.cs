@@ -13,7 +13,7 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
         await using SqliteCommand command = connection.CreateCommand();
         command.CommandText =
             """
-            SELECT work_duration_seconds, break_duration_seconds, appearance, work_color, break_color, session_sounds_enabled, activity_collapsed, global_shortcut, main_window_shortcut
+            SELECT work_duration_seconds, break_duration_seconds, appearance, work_color, break_color, session_sounds_enabled, activity_collapsed, global_shortcut, main_window_shortcut, overlay_position_x, overlay_position_y, time_format
             FROM application_settings WHERE singleton = 1;
             """;
         await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
@@ -34,6 +34,9 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
             var mainWindowShortcut = GlobalShortcut.TryParse(reader.GetString(8), out var parsedMainWindowShortcut)
                 ? parsedMainWindowShortcut
                 : GlobalShortcut.DefaultMainWindow;
+            int? overlayX = reader.IsDBNull(9) ? null : reader.GetInt32(9);
+            int? overlayY = reader.IsDBNull(10) ? null : reader.GetInt32(10);
+            var timeFormat = reader.IsDBNull(11) ? TimeFormat.TwentyFourHour : (TimeFormatText.TryParse(reader.GetString(11), out var tf) ? tf : TimeFormat.TwentyFourHour);
             if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
                 throw new InvalidDataException("More than one authoritative application settings record exists.");
             await reader.CloseAsync().ConfigureAwait(false);
@@ -54,6 +57,9 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
                 ActivityCollapsed = activityCollapsed,
                 GlobalShortcut = globalShortcut,
                 MainWindowShortcut = mainWindowShortcut,
+                OverlayPositionX = overlayX,
+                OverlayPositionY = overlayY,
+                TimeFormat = timeFormat,
             };
             settings.Validate();
             return settings;
@@ -84,7 +90,10 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
                 session_sounds_enabled = $sounds,
                 activity_collapsed = $activityCollapsed,
                 global_shortcut = $globalShortcut,
-                main_window_shortcut = $mainWindowShortcut
+                main_window_shortcut = $mainWindowShortcut,
+                overlay_position_x = $overlayX,
+                overlay_position_y = $overlayY,
+                time_format = $timeFormat
             WHERE singleton = 1;
             """;
         var light = settings.LightTheme ?? ThemeConfiguration.DefaultLight;
@@ -98,6 +107,9 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
         command.Parameters.AddWithValue("$activityCollapsed", settings.ActivityCollapsed ? 1 : 0);
         command.Parameters.AddWithValue("$globalShortcut", (settings.GlobalShortcut ?? GlobalShortcut.Default).ToString());
         command.Parameters.AddWithValue("$mainWindowShortcut", (settings.MainWindowShortcut ?? GlobalShortcut.DefaultMainWindow).ToString());
+        command.Parameters.AddWithValue("$overlayX", settings.OverlayPositionX.HasValue ? (object)settings.OverlayPositionX.Value : DBNull.Value);
+        command.Parameters.AddWithValue("$overlayY", settings.OverlayPositionY.HasValue ? (object)settings.OverlayPositionY.Value : DBNull.Value);
+        command.Parameters.AddWithValue("$timeFormat", TimeFormatText.Format(settings.TimeFormat));
         if (await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
             throw new InvalidDataException("The authoritative application settings record is missing.");
 

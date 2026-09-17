@@ -82,6 +82,7 @@ public partial class App : Application
             _window.ApplyShortcut(initialSettings.GlobalShortcut);
             _window.GlobalShortcutUpdated += shortcut => _quickOverlayWindow?.ApplyShortcut(shortcut);
             _window.SetActivityCollapsed(initialSettings.ActivityCollapsed);
+            _window.ApplyTimeFormat(initialSettings.TimeFormat);
             _startup.Appearance.Changed += OnAppearanceChanged;
             _startup.Appearance.ColorsChanged += OnColorsChanged;
             _startup.Appearance.PalettesChanged += OnPalettesChanged;
@@ -228,7 +229,10 @@ public partial class App : Application
 
     private IQuickOverlayView CreateQuickOverlay()
     {
-        var window = new QuickOverlayWindow(message => _startup?.Logger.Info(message));
+        var window = new QuickOverlayWindow(
+            () => _startup!.Settings.LoadAsync(),
+            (x, y) => _startup!.Settings.UpdateOverlayPositionAsync(x, y),
+            message => _startup?.Logger.Info(message));
         bool isDark = _startup!.Appearance.Current switch
         {
             Appearance.Dark => true,
@@ -262,6 +266,8 @@ public partial class App : Application
         var startup = _startup;
         var currentSettings = await startup.Settings.LoadAsync();
         _sessionSoundsEnabled = currentSettings.SessionSoundsEnabled;
+        _window?.ApplyTimeFormat(currentSettings.TimeFormat);
+        _quickOverlayWindow?.ApplyPosition(currentSettings.OverlayPositionX, currentSettings.OverlayPositionY);
         await Task.Run(() => startup.Appearance.RefreshAsync());
         if (_startup is null || _isExiting) return;
         ApplyAppearance(_startup.Appearance.Current);

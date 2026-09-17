@@ -1,25 +1,29 @@
 # Focus Key — Project Progress & State Checkpoint
 
 ## Current Goal
-Reports Insights Vertical Composition + Today Summary Polish + Yearly Preview Verification completed and verified.
+Settings + Quick Overlay Final Refinement completed and verified.
 
 ## Current Checkpoint
-Visual acceptance refinements across Reports and Today are 100% implemented and verified:
-- **Reports Insights Vertical Composition**:
-  - Maintained the full-height Insights rail matching the adjacent chart card height (~380–420 DIP).
-  - Rebuilt `InsightsRailCard.RebuildInsights` using a proportional `Grid` with `1*` rows and vertical centering for each zone (Comparison, Streaks, Strongest Period, Consistency & Averages) separated by subtle 1px dividers, eliminating bottom dead space.
-  - Symmetrical 2-column Streaks group (`STREAKS` header with `Current` and `Longest` metrics side-by-side).
-  - 3-tier item visual hierarchy (Primary Value, Secondary Label, Supporting Subtext).
-  - Balanced wide desktop proportions: 72% Main Chart / 28% Insights Rail with 16 DIP column spacing for optimal breathing room and zero label wrapping.
-- **Today Summary Card Polish**:
-  - Maintained 1 single coherent card (`TodaySummaryCard`) with `Padding="28,24,28,24"`.
-  - Refined internal 2 × 2 metric grid: Row 0 (`1*`) for Focus Time & Work Sessions, Row 1 (`Auto`) for subtle horizontal divider line, Row 2 (`1*`) for Break Time & Completion Rate.
-  - Symmetrical vertical centering, Consolas 26 SemiBold metric values, and clean column alignment.
-- **Yearly Preview Verification**:
-  - `FOCUSKEY_YEARLY_PREVIEW=1` verified to reliably expose the Yearly report selector on pre-1-year installations without altering real data-driven eligibility or touching the user's real DB.
-  - Synthetically seeded 12-month full-year dataset (2025: Jan–Dec, 355h 42m total focus, 176 work sessions, 100% completion rate) and sparse week dataset in isolated `DbTool` test database.
-  - Multi-theme and responsive reflow verification completed (Maximized Dark/Light, Restored, Minimum-size).
-- **Automated Tests**: 715/715 unit tests passing (`dotnet test -c Release`), 0 failed, 0 skipped.
+Settings and Quick Overlay final refinements are 100% implemented, tested, and visually verified:
+- **Quick Overlay Visual Refinement**:
+  - Consistent compact window shell (480 DIP width, ~280–340 DIP height) across Idle, Running, and Paused states.
+  - Idle state launcher: Work & Break selection cards using configured durations from Settings, subtle semantic accents, primary `[ Start ]` action.
+  - Running state: Dominant 52 DIP timer typography in Consolas font, 6 DIP semantic progress bar, primary `[ Pause ]` (elevated) and secondary `[ Stop ]` (neutral) actions.
+  - Paused state: Frozen timer, primary `[ Continue ]` (elevated), `[ Start New ]` (neutral), and `[ Stop ]` actions.
+  - Light mode consistency matching Carbon Studio tokens and contrast standards.
+  - Esc key dismisses Overlay across all states without stopping the session; small Close (`×`) button in quiet draggable header.
+- **Draggable Quick Overlay & Position Persistence**:
+  - Movable by mouse via header region (native Win32 `ReleaseCapture` + `SendMessage WM_NCLBUTTONDOWN HTCAPTION`).
+  - Persist last valid screen position to SQLite settings repository (`overlay_position_x`, `overlay_position_y`, Migration 11).
+  - Multi-monitor and off-screen recovery: DPI-aware clamping against available monitor work areas (`OverlayPositionHelper.ClampToWorkAreas`) ensuring an always-reachable header.
+  - Default first opening centered on foreground/active monitor (`OverlayPositionHelper.CalculateInitialCenter`).
+  - Position stability: Window does not jump/recenter across Idle → Running → Paused → Continue → Start New state transitions.
+- **Settings Page Refinements**:
+  - Two clean shortcut rows inside `SHORTCUTS` section (`Quick Overlay`, `Open Focus Key`) with conflict detection, duplicate prevention, and rollback.
+  - `QUICK OVERLAY` section with `Reset position` button (clears custom coordinates back to default centered behavior).
+  - `TIME FORMAT` section: User-selectable 12-hour (`9:05 AM`) / 24-hour (`09:05`) clock format preference applied consistently to wall-clock timestamps (Today Activity, session history) via `TodayFormatting.FormatClockTime` while preserving countdown durations.
+  - Fixed live theme-refresh issues when toggling Dark ↔ Light in Settings so all shortcut, position, and selector controls update dynamically without stale brushes or restart (`SettingsView.RefreshVisuals`).
+- **Automated Tests**: 781/781 unit tests passing (`dotnet test`), 0 failed, 0 skipped.
 - **Build**: 0 Warning(s), 0 Error(s) (`dotnet build -c Release`).
 
 ## Completed Work
@@ -36,44 +40,35 @@ Visual acceptance refinements across Reports and Today are 100% implemented and 
 - **Stage 5b (Reports Acceptance Refinement & Temporary Preview)**: Balanced streaks group, zero metric repetition, comprehensive consistency metrics across all periods, and temporary `FOCUSKEY_YEARLY_PREVIEW` override.
 - **Stage 6 (Today Final Hero Redesign)**: Maximized 3-tier desktop composition (2/3 Hero + 1/3 Summary + full-width Activity), unified zero-layout-jump hero surface, dominant 80 DIP typography, semantic Pause/Continue/Start New/Stop actions, responsive 3-breakpoint scaling.
 - **Stage 6b (Reports Insights Vertical Composition + Today Summary Polish + Yearly Preview Verification)**: Proportional 4-zone grid distribution in Reports Insights rail, 72%/28% ratio, polished Today Summary 2x2 grid with horizontal divider, and full-year synthetic dataset verification.
+- **Stage 7 (Settings + Quick Overlay Final Refinement)**: Draggable Quick Overlay with multi-monitor clamping and SQLite position persistence, 480 DIP unified shell across Idle/Running/Paused states, Settings live theme refresh, dual shortcuts with collision prevention, 12/24-hour time format preference in Today activity.
 
 ## Remaining Work
-- **Stage 7: Approved Pending Items from FUTURE_PLAN.md**
+- **Stage 8: Approved Pending Items from FUTURE_PLAN.md**
   - Item 1: Window Close (X) Choice Dialog (hide to background tray vs. quit).
-  - Item 2: User-Selectable 12-Hour / 24-Hour Time Format (Settings).
-- **Stage 8: Settings Page & Quick Overlay Refinement**
-  - Settings Page: Constrain container to 880 DIP max-width, center on desktop, expand color preset click targets (36x36 DIP), clean microcopy echoes.
-  - Quick Overlay: Clean floating card hierarchy, standardize Stop action, harmonize keyboard hints (`[← →]`, `[Enter]`, `[Esc]`).
 - **Stage 9: Final Consistency QA & Windows Packaging**
   - Full-surface visual regression audit (Maximized, Restored, Minimum; Dark, Light, High Contrast).
   - Package clean standalone Release installer (`FocusKeySetup.exe`).
 
 ## Important Active Decisions
-- **Proportional Insights Distribution**: Using a vertical `Grid` with `1*` rows inside `InsightsRailCard` dynamically expands each insight quadrant to match the adjacent chart card height, eliminating dead lower half space.
-- **72% / 28% Reports Ratio**: Gives ~340 DIP width to the Insights rail on standard wide desktop, ensuring ample room for 2-column streaks and comparison copy without wrapping.
-- **Unified Today Summary Card**: Symmetrically dividing the 2x2 metric grid into two `1*` rows with a subtle divider line creates an intentional desktop panel harmonizing with `SessionHeroCard`.
-- **Year Eligibility Invariant**: Derived strictly from real data (`earliestDate.AddYears(1) <= today`), surviving app restarts without arbitrary UI flags. Ineligible users see only `[ Week | Month ]`. The temporary `FOCUSKEY_YEARLY_PREVIEW=1` override is strictly a development aid and will be removed after final acceptance.
+- **Native Header Dragging**: Using `ReleaseCapture()` and `SendMessage(hwnd, WM_NCLBUTTONDOWN, HTCAPTION, 0)` on the header element gives smooth OS-native dragging without custom coordinate-tracking jitter.
+- **Work Area Clamping & Recovery**: Clamping window geometry with `OverlayPositionHelper.ClampToWorkAreas` prevents off-screen loss if display configurations change, while `CalculateInitialCenter` ensures clean default placement on the active display.
+- **Live Theme Synchronization**: `SettingsView.RefreshVisuals()` directly reapplies all token brushes to UI elements on theme switch events, ensuring seamless Dark ↔ Light transitions.
+- **12h/24h Time Format**: Applied strictly to wall-clock timestamps (`TodayFormatting.FormatClockTime`) in session history/activity while keeping duration timers (`mm:ss` / `h m`) standard.
 
 ## Last Verification
 - **Build**: `dotnet build -c Release` (0 Warnings, 0 Errors).
-- **Test Suite**: `dotnet test -c Release` (715 passed, 0 failed, 0 skipped).
+- **Test Suite**: `dotnet test -c Release` (781 passed, 0 failed, 0 skipped).
 - **Visual Captures Inspected**:
-  - `today_idle_maximized_dark_refined.png`: Maximized Today idle with polished 2x2 summary card, Work selector, Start button.
-  - `today_running_work_maximized_dark_refined.png`: Maximized Today running work with 80 DIP countdown and balanced summary metrics.
-  - `today_paused_work_maximized_dark_refined.png`: Maximized Today paused state with `[ Continue ]` and `[ Start New ]`.
-  - `today_idle_maximized_light_refined.png`: Maximized Today light theme.
-  - `today_restored_dark_refined.png`: Restored window Today reflow.
-  - `reports_week_maximized_dark_refined.png`: Weekly reports with 72%/28% ratio and vertically distributed 4-zone Insights rail.
-  - `reports_month_maximized_dark_refined.png`: Monthly reports with 4 weekly bars and balanced Insights rail.
-  - `reports_year_maximized_dark_refined.png`: 2026 Yearly reports (9 active months) with full vertical rail coverage.
-  - `reports_year_fullyear_2025_dark_refined.png`: 2025 Full-year dataset (12 monthly bars) with 355h 42m focus and 4 balanced rail zones.
-  - `reports_year_maximized_light_refined.png`: Yearly reports in Light theme.
-  - `reports_week_sparse_dark_refined.png`: Weekly reports with sparse data (2 active days) cleanly balanced.
-  - `reports_restored_dark_refined.png`: Reports in medium restored window (~1000x720 DIP).
-  - `reports_minimum_size_dark_refined.png`: Reports in minimum size window (680x500 DIP).
+  - `today_24h_activity_dark.png`: Today activity list showing 24h timestamps (`09:00`, `14:30`).
+  - `today_12h_activity_dark.png` & `today_12h_activity_light.png`: Today activity list in Dark/Light showing 12h timestamps (`9:00 AM`, `2:30 PM`).
+  - `settings_dark_top.png` & `settings_dark_bottom.png`: Dark theme Settings showing Shortcuts, Time Format, and Quick Overlay sections.
+  - `settings_light_top.png`: Light theme Settings with updated theme-aware brushes.
+  - `overlay_idle_dark.png` & `overlay_idle_light.png`: Idle Quick Overlay launcher in Dark and Light themes.
+  - `overlay_running_work_dark.png` & `overlay_running_work_light.png`: Running Work state with 52 DIP timer, 6 DIP progress bar, and Pause action.
+  - `overlay_running_break_dark.png` & `overlay_running_break_light.png`: Running Break state in Dark and Light.
+  - `overlay_paused_work_dark.png` & `overlay_paused_work_light.png`: Paused Work state with Continue and Start New actions.
+  - `overlay_paused_break_dark.png` & `overlay_paused_break_light.png`: Paused Break state in Dark and Light.
 
 ## Current Git State
 - Branch: `native/phased-rewrite`
-- Working tree contains complete, verified Reports Insights Vertical Composition + Today Summary Polish + Yearly Preview Verification implementation.
-
-
+- Working tree contains complete, verified Settings + Quick Overlay Final Refinement implementation.

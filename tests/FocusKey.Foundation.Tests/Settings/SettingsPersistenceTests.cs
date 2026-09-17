@@ -79,6 +79,85 @@ public sealed class SettingsPersistenceTests
     }
 
     [Fact]
+    public async Task SqliteSettingsRepository_SavesAndLoads_OverlayPositionAndTimeFormat()
+    {
+        using var fixture = new Fixture();
+        var changed = ApplicationSettings.Default with
+        {
+            TimeFormat = TimeFormat.TwelveHour,
+            OverlayPositionX = 350,
+            OverlayPositionY = 150,
+        };
+        await fixture.Repository.SaveAsync(changed);
+
+        var reopened = new SqliteSettingsRepository(new SqliteConnectionFactory(fixture.File));
+        ApplicationSettings loaded = await reopened.LoadAsync();
+        Assert.Equal(TimeFormat.TwelveHour, loaded.TimeFormat);
+        Assert.Equal(350, loaded.OverlayPositionX);
+        Assert.Equal(150, loaded.OverlayPositionY);
+    }
+
+    [Fact]
+    public async Task SqliteSettingsRepository_SavesAndLoads_NegativeOverlayPositions()
+    {
+        using var fixture = new Fixture();
+        var changed = ApplicationSettings.Default with
+        {
+            OverlayPositionX = -1200,
+            OverlayPositionY = -200,
+        };
+        await fixture.Repository.SaveAsync(changed);
+
+        var reopened = new SqliteSettingsRepository(new SqliteConnectionFactory(fixture.File));
+        ApplicationSettings loaded = await reopened.LoadAsync();
+        Assert.Equal(-1200, loaded.OverlayPositionX);
+        Assert.Equal(-200, loaded.OverlayPositionY);
+    }
+
+    [Fact]
+    public async Task SettingsService_UpdatesTimeFormatAndOverlayPositionAndSurvivesRestart()
+    {
+        using var fixture = new Fixture();
+        var service = new SettingsService(fixture.Repository);
+        await service.UpdateTimeFormatAsync(TimeFormat.TwelveHour);
+        await service.UpdateOverlayPositionAsync(500, 300);
+
+        var reopened = new SqliteSettingsRepository(new SqliteConnectionFactory(fixture.File));
+        ApplicationSettings loaded = await reopened.LoadAsync();
+        Assert.Equal(TimeFormat.TwelveHour, loaded.TimeFormat);
+        Assert.Equal(500, loaded.OverlayPositionX);
+        Assert.Equal(300, loaded.OverlayPositionY);
+
+        await service.ResetOverlayPositionAsync();
+        ApplicationSettings afterReset = await reopened.LoadAsync();
+        Assert.Null(afterReset.OverlayPositionX);
+        Assert.Null(afterReset.OverlayPositionY);
+        Assert.Equal(TimeFormat.TwelveHour, afterReset.TimeFormat);
+    }
+
+    [Fact]
+    public async Task SchemaTenDatabaseMigratesToElevenWithOverlayPositionAndTimeFormat()
+    {
+        using var temp = new TempDirectory();
+        string file = Path.Combine(temp.Path, "focus_key.db");
+        var connections = new SqliteConnectionFactory(file);
+        CreateSchemaTen(connections);
+
+        DatabaseInitializationResult result = new DatabaseBootstrapper(connections).Initialize();
+
+        Assert.Equal(10, result.SchemaVersionBefore);
+        Assert.Equal(SchemaMigrations.TargetVersion, result.SchemaVersionAfter);
+        Assert.Equal([11], result.AppliedMigrations);
+
+        var repo = new SqliteSettingsRepository(connections);
+        ApplicationSettings settings = await repo.LoadAsync();
+        Assert.Equal(TimeFormat.TwentyFourHour, settings.TimeFormat);
+        Assert.Null(settings.OverlayPositionX);
+        Assert.Null(settings.OverlayPositionY);
+        ClearPool(connections);
+    }
+
+    [Fact]
     public void ApplicationSettings_Validation_RejectsIdenticalGlobalAndMainWindowShortcuts()
     {
         var shortcut = GlobalShortcut.Parse("Shift + F3");
@@ -204,6 +283,18 @@ public sealed class SettingsPersistenceTests
                 $"INSERT INTO schema_migrations VALUES ({migration.Version}, '{migration.Name}', '{UtcTimestamp.Format(TestSessions.Anchor)}');");
         }
         Execute(connection, "PRAGMA user_version = 2;");
+    }
+
+    private static void CreateSchemaTen(SqliteConnectionFactory connections)
+    {
+        using SqliteConnection connection = connections.OpenConnection();
+        foreach (SchemaMigration migration in SchemaMigrations.All.Where(m => m.Version <= 10))
+        {
+            Execute(connection, migration.Sql);
+            Execute(connection,
+                $"INSERT INTO schema_migrations VALUES ({migration.Version}, '{migration.Name}', '{UtcTimestamp.Format(TestSessions.Anchor)}');");
+        }
+        Execute(connection, "PRAGMA user_version = 10;");
     }
 
     private static void Execute(SqliteConnection connection, string sql)

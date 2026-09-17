@@ -7,7 +7,8 @@ public enum SettingsField
     WorkDuration, BreakDuration, Appearance, Contrast, WorkColor, BreakColor,
     LightPreset, LightBackground, LightForeground, LightAccent,
     DarkPreset, DarkBackground, DarkForeground, DarkAccent,
-    SessionSounds, GlobalShortcut, MainWindowShortcut
+    SessionSounds, GlobalShortcut, MainWindowShortcut,
+    TimeFormat, OverlayPosition
 }
 
 /// <summary>UI-thread auto-save queue. Only committed values are published to runtime.</summary>
@@ -72,6 +73,12 @@ public sealed class SettingsPageController(SettingsService settings, Func<Task> 
         ChangeAsync(SettingsField.GlobalShortcut, () => settings.UpdateGlobalShortcutAsync(value), cancellationToken);
     public Task UpdateMainWindowShortcutAsync(GlobalShortcut value, CancellationToken cancellationToken = default) =>
         ChangeAsync(SettingsField.MainWindowShortcut, () => settings.UpdateMainWindowShortcutAsync(value), cancellationToken);
+    public Task UpdateTimeFormatAsync(TimeFormat value, CancellationToken cancellationToken = default) =>
+        ChangeAsync(SettingsField.TimeFormat, () => settings.UpdateTimeFormatAsync(value), cancellationToken);
+    public Task UpdateOverlayPositionAsync(int? x, int? y, CancellationToken cancellationToken = default) =>
+        ChangeAsync(SettingsField.OverlayPosition, () => settings.UpdateOverlayPositionAsync(x, y), cancellationToken);
+    public Task ResetOverlayPositionAsync(CancellationToken cancellationToken = default) =>
+        ChangeAsync(SettingsField.OverlayPosition, () => settings.ResetOverlayPositionAsync(), cancellationToken);
 
     public Task UpdateLightPresetAsync(string presetId, CancellationToken cancellationToken = default)
     {

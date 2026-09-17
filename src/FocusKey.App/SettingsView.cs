@@ -24,6 +24,9 @@ internal sealed class SettingsView : UserControl
     private readonly ComboBox _appearance = new() { ItemsSource = Enum.GetNames<Appearance>(), MinWidth = 140, FontSize = 12 };
     private static readonly string[] ContrastOptions = ["Standard", "Higher Contrast"];
     private readonly ComboBox _contrast = new() { ItemsSource = ContrastOptions, MinWidth = 140, FontSize = 12 };
+    private static readonly string[] TimeFormatOptions = ["24-hour (09:05)", "12-hour (9:05 AM)"];
+    private readonly ComboBox _timeFormat = new() { ItemsSource = TimeFormatOptions, MinWidth = 160, FontSize = 12 };
+    private readonly Button _resetOverlayPositionButton = new() { Content = "Reset position", FontSize = 12, Padding = new Thickness(12, 6, 12, 6) };
     private readonly ColorPicker _workColor = Picker("Work color picker");
     private readonly ColorPicker _breakColor = Picker("Break color picker");
     private readonly Button _workButton = new();
@@ -92,6 +95,8 @@ internal sealed class SettingsView : UserControl
     private readonly TextBlock _mainWindowShortcutError = new() { Visibility = Visibility.Collapsed };
     private GlobalShortcut _currentMainWindowShortcut = GlobalShortcut.DefaultMainWindow;
     private bool _isListeningForMainWindowShortcut;
+    private Action? _refreshWorkSwatches;
+    private Action? _refreshBreakSwatches;
 
     internal SettingsView(
         SettingsService settings,
@@ -125,6 +130,8 @@ internal sealed class SettingsView : UserControl
         AutomationProperties.SetName(_contrast, "Contrast");
         AutomationProperties.SetName(_lightPreset, "Light theme preset");
         AutomationProperties.SetName(_darkPreset, "Dark theme preset");
+        AutomationProperties.SetName(_timeFormat, "Time format");
+        AutomationProperties.SetName(_resetOverlayPositionButton, "Reset overlay window position");
         AutomationProperties.SetName(_sessionSounds, "Session sounds");
         AutomationProperties.SetName(_startWithWindows, "Start with Windows");
         AutomationProperties.SetName(_importHistoryButton, "Import history");
@@ -164,7 +171,12 @@ internal sealed class SettingsView : UserControl
         darkTheme.Children.Add(Row("Accent", "Dark interactive accent and highlights", _darkAccentButton, true));
         _fields.Children.Add(Section("DARK THEME", darkTheme));
 
-        // 4. SESSION COLORS
+        // 4. TIME FORMAT
+        var timeFormatSection = new StackPanel { Spacing = 0 };
+        timeFormatSection.Children.Add(Row("Clock format", "Display time in 24-hour (09:05) or 12-hour (9:05 AM) format", _timeFormat, true));
+        _fields.Children.Add(Section("TIME FORMAT", timeFormatSection));
+
+        // 5. SESSION COLORS
         var colors = new StackPanel { Spacing = 0 };
         ConfigureColor(_workButton, _workColor, "Work color");
         ConfigureColor(_breakButton, _breakColor, "Break color");
@@ -174,14 +186,14 @@ internal sealed class SettingsView : UserControl
         colors.Children.Add(Row("Break color", "Used for break session indicators and timer", breakSelector, true));
         _fields.Children.Add(Section("SESSION COLORS", colors));
 
-        // 5. SESSIONS
+        // 6. SESSIONS
         var sessions = new StackPanel { Spacing = 0 };
         sessions.Children.Add(Row("Work duration", null, DurationFields(_workMinutes, _workSeconds)));
         sessions.Children.Add(Row("Break duration", null, DurationFields(_breakMinutes, _breakSeconds)));
         sessions.Children.Add(Row("Session sounds", "Play a soft tick on start and a chime on completion", _sessionSounds, true));
         _fields.Children.Add(Section("SESSIONS", sessions));
 
-        // 6. SHORTCUTS
+        // 7. SHORTCUTS
         var shortcuts = new StackPanel { Spacing = 0 };
         var overlayShortcutControl = BuildShortcutControl();
         var mainWindowShortcutControl = BuildMainWindowShortcutControl();
@@ -189,12 +201,17 @@ internal sealed class SettingsView : UserControl
         shortcuts.Children.Add(Row("Open Focus Key", "Global shortcut to open and focus the main window (default Shift + F4)", mainWindowShortcutControl, true));
         _fields.Children.Add(Section("SHORTCUTS", shortcuts));
 
-        // 7. SYSTEM
+        // 8. QUICK OVERLAY
+        var quickOverlay = new StackPanel { Spacing = 0 };
+        quickOverlay.Children.Add(Row("Reset position", "Reset overlay window position to the center of your screen", _resetOverlayPositionButton, true));
+        _fields.Children.Add(Section("QUICK OVERLAY", quickOverlay));
+
+        // 9. SYSTEM
         var system = new StackPanel { Spacing = 0 };
         system.Children.Add(Row("Start with Windows", "Launch Focus Key automatically when you sign in.", _startWithWindows, true));
         _fields.Children.Add(Section("SYSTEM", system));
 
-        // 8. DATA
+        // 10. DATA
         var data = new StackPanel { Spacing = 0 };
         data.Children.Add(Row("Import history", "Import website-compatible focus history (tab-delimited CSV)", _importHistoryButton));
         data.Children.Add(Row("Export history", "Export all focus history to website-compatible tab-delimited CSV", _exportHistoryButton, true));
@@ -230,6 +247,20 @@ internal sealed class SettingsView : UserControl
                 await FlushPendingColorSaveAsync();
                 await _controller.UpdateContrastAsync((Contrast)_contrast.SelectedIndex);
             }
+        };
+        _timeFormat.SelectionChanged += async (_, _) =>
+        {
+            if (!_applying && _timeFormat.SelectedIndex >= 0)
+            {
+                await FlushPendingColorSaveAsync();
+                await _controller.UpdateTimeFormatAsync((TimeFormat)_timeFormat.SelectedIndex);
+            }
+        };
+        _resetOverlayPositionButton.Click += async (_, _) =>
+        {
+            if (_applying) return;
+            await FlushPendingColorSaveAsync();
+            await _controller.ResetOverlayPositionAsync();
         };
         _workColor.ColorChanged += (_, _) =>
         {
@@ -515,6 +546,11 @@ internal sealed class SettingsView : UserControl
                 case SettingsField.MainWindowShortcut:
                     UpdateMainWindowShortcutVisuals(saved.MainWindowShortcut ?? GlobalShortcut.DefaultMainWindow);
                     break;
+                case SettingsField.TimeFormat:
+                    _timeFormat.SelectedIndex = (int)saved.TimeFormat;
+                    break;
+                case SettingsField.OverlayPosition:
+                    break;
             }
         }
         finally { _applying = false; }
@@ -674,10 +710,28 @@ internal sealed class SettingsView : UserControl
             UpdateSwatches(ColorValue(picker));
         };
 
+        if (isWork) _refreshWorkSwatches = () => UpdateSwatches(ColorValue(picker));
+        else _refreshBreakSwatches = () => UpdateSwatches(ColorValue(picker));
+
         customButton.Margin = new Thickness(6, 0, 0, 0);
         panel.Children.Add(customButton);
         UpdateSwatches(ColorValue(picker));
         return panel;
+    }
+
+    internal void RefreshVisuals(Contrast? contrast = null)
+    {
+        _refreshWorkSwatches?.Invoke();
+        _refreshBreakSwatches?.Invoke();
+        _shortcutText.Foreground = Presentation.ThemeBrush("FkSecondary", this);
+        _resetShortcutButton.Background = Presentation.ThemeBrush("FkSurface2", this);
+        _resetShortcutButton.BorderBrush = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", this);
+        _resetShortcutButton.Foreground = Presentation.ThemeBrush("FkSecondary", this);
+        _mainWindowShortcutText.Foreground = Presentation.ThemeBrush("FkSecondary", this);
+        _resetMainWindowShortcutButton.Background = Presentation.ThemeBrush("FkSurface2", this);
+        _resetMainWindowShortcutButton.BorderBrush = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", this);
+        _resetMainWindowShortcutButton.Foreground = Presentation.ThemeBrush("FkSecondary", this);
+        Render();
     }
 
     private FrameworkElement BuildShortcutControl()

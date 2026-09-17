@@ -23,17 +23,28 @@ namespace FocusKey.Overlay;
 public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
 {
     private QuickOverlayState _state = new(SessionType.Work, true, false, null);
-    private DisplayArea? _display;
     private bool _visible;
     private bool _closing;
     private long _shownTimestamp;
     private readonly Microsoft.UI.Dispatching.DispatcherQueueTimer _displayTimer;
     private readonly Action<string>? _trace;
+    private readonly Func<Task<ApplicationSettings>>? _getSettings;
+    private readonly Func<int?, int?, Task>? _savePosition;
     private SessionColors _colors = SessionColors.From(ApplicationSettings.Default);
     private ThemePalette? _palette;
     private Appearance _appearance = Appearance.System;
     private Contrast _contrast = Contrast.Standard;
+    private int? _persistedPositionX;
+    private int? _persistedPositionY;
+    private bool _positionLoaded;
+
     internal void ApplyColors(SessionColors colors) { _colors = colors; Render(_state); }
+    internal void ApplyPosition(int? x, int? y)
+    {
+        _persistedPositionX = x;
+        _persistedPositionY = y;
+        _positionLoaded = true;
+    }
     internal void ApplyShortcut(GlobalShortcut shortcut)
     {
         if (OverlayShortcutHint is not null)
@@ -42,8 +53,13 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
         }
     }
 
-    public QuickOverlayWindow(Action<string>? trace = null)
+    public QuickOverlayWindow(
+        Func<Task<ApplicationSettings>>? getSettings = null,
+        Func<int?, int?, Task>? savePosition = null,
+        Action<string>? trace = null)
     {
+        _getSettings = getSettings;
+        _savePosition = savePosition;
         _trace = trace;
         InitializeComponent();
         _displayTimer = DispatcherQueue.CreateTimer();
@@ -61,7 +77,7 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
         try { AppWindow.IsShownInSwitchers = false; }
         catch { }
         Surface.PreviewKeyDown += OnPreviewKeyDown;
-        Surface.Loaded += (_, _) => { ResizeAndCenter(); FocusSelection(); };
+        Surface.Loaded += (_, _) => { PositionWindow(recenter: true); FocusSelection(); };
         Surface.ActualThemeChanged += (_, _) =>
         {
             if (_appearance == Appearance.System && _state.Active is null) ApplySystemSurfaceTheme();
@@ -73,7 +89,15 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
         {
             if (_closing) return;
             args.Cancel = true;
+            SaveCurrentPosition();
             DismissRequested?.Invoke();
+        };
+        AppWindow.Changed += (_, args) =>
+        {
+            if (args.DidPositionChange && _visible)
+            {
+                // Drag completed or window moved
+            }
         };
         Activated += (_, args) =>
         {
@@ -83,6 +107,7 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
                 double elapsedMs = (now - _shownTimestamp) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
                 if (_visible && elapsedMs > 250)
                 {
+                    SaveCurrentPosition();
                     DismissRequested?.Invoke();
                 }
             }
@@ -177,28 +202,51 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
                 ? $"Quick overlay state: {paused.Type} paused; id={paused.Id}; remaining={paused.PlannedDuration - paused.AccumulatedActiveDuration}; busy={state.IsBusy}."
                 : $"Quick overlay state: selection; ready={state.CanStart}; busy={state.IsBusy}.");
         _state = state;
-        Surface.Padding = hasActive ? new Thickness(24, 24, 24, 20) : new Thickness(24);
-        IdleHeader.Visibility = hasActive ? Visibility.Collapsed : Visibility.Visible;
-        SelectionCards.Visibility = hasActive ? Visibility.Collapsed : Visibility.Visible;
-        StartButton.Visibility = hasActive ? Visibility.Collapsed : Visibility.Visible;
-        KeyboardHints.Visibility = hasActive ? Visibility.Collapsed : Visibility.Visible;
+
+        bool isHighContrast = new Windows.UI.ViewManagement.AccessibilitySettings().HighContrast;
+        bool isDark = IsDarkTheme();
+
+        // Header configuration
+        if (hasActive && state.Active is { } currentSession)
+        {
+            var sessionColor = currentSession.Type == SessionType.Work ? _colors.Work : _colors.Break;
+            ActiveBadgeDot.Visibility = Visibility.Visible;
+            ActiveBadgeDot.Fill = SessionColorBrush.Create(sessionColor);
+            HeaderTitle.Text = currentSession.Type == SessionType.Work
+                ? (isPaused ? "WORK SESSION (PAUSED)" : "WORK SESSION")
+                : (isPaused ? "BREAK SESSION (PAUSED)" : "BREAK SESSION");
+            HeaderTitle.Foreground = Presentation.ThemeBrush("FkForeground", Surface);
+            ShortcutHintContainer.Visibility = Visibility.Collapsed;
+        }
+        else
+        {
+            ActiveBadgeDot.Visibility = Visibility.Collapsed;
+            HeaderTitle.Text = "FOCUS KEY";
+            HeaderTitle.Foreground = Presentation.ThemeBrush("FkSecondary", Surface);
+            ShortcutHintContainer.Visibility = Visibility.Visible;
+        }
+
+        // View Visibility
+        IdleContent.Visibility = hasActive ? Visibility.Collapsed : Visibility.Visible;
         ActiveCard.Visibility = hasActive ? Visibility.Visible : Visibility.Collapsed;
 
+        // Active Controls
         PauseButton.IsEnabled = hasActive && !state.IsBusy;
         PauseButton.Content = state.IsBusy ? "Please wait…" : isPaused ? "Continue" : "Pause";
         AutomationProperties.SetName(PauseButton, isPaused ? "Continue Session" : "Pause Session");
+
+        StopButton.IsEnabled = hasActive && !state.IsBusy;
+        StopButton.Content = "Stop";
+        AutomationProperties.SetName(StopButton, "Stop Session");
 
         StartNewButton.Visibility = isPaused ? Visibility.Visible : Visibility.Collapsed;
         StartNewButton.IsEnabled = isPaused && !state.IsBusy;
         StartNewButton.Content = "Start New";
         AutomationProperties.SetName(StartNewButton, "Start New Session");
 
-        bool isHighContrast = new Windows.UI.ViewManagement.AccessibilitySettings().HighContrast;
-        bool isDark = IsDarkTheme();
         if (state.Active is { } session)
         {
             var sessionColor = session.Type == SessionType.Work ? _colors.Work : _colors.Break;
-            ActiveType.Text = session.Type == SessionType.Work ? (isPaused ? "WORK SESSION (PAUSED)" : "WORK SESSION") : (isPaused ? "BREAK SESSION (PAUSED)" : "BREAK SESSION");
 
             if (isHighContrast)
             {
@@ -206,11 +254,13 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
                 Surface.BorderBrush = Presentation.ThemeBrush("FkBorder", Surface);
                 ProgressBar.Background = Presentation.ThemeBrush("FkAccent", Surface);
                 ProgressTrack.Background = Presentation.ThemeBrush("FkBorder", Surface);
-                ActiveType.Foreground = Presentation.ThemeBrush("FkForeground", Surface);
                 ActiveRemaining.Foreground = Presentation.ThemeBrush("FkForeground", Surface);
                 PauseButton.Background = Presentation.ThemeBrush("FkSurface2", Surface);
                 PauseButton.BorderBrush = Presentation.ThemeBrush("FkBorder", Surface);
                 PauseButton.Foreground = Presentation.ThemeBrush("FkForeground", Surface);
+                StopButton.Background = Presentation.ThemeBrush("FkSurface2", Surface);
+                StopButton.BorderBrush = Presentation.ThemeBrush("FkBorder", Surface);
+                StopButton.Foreground = Presentation.ThemeBrush("FkForeground", Surface);
                 StartNewButton.Background = Presentation.ThemeBrush("FkSurface2", Surface);
                 StartNewButton.BorderBrush = Presentation.ThemeBrush("FkBorder", Surface);
                 StartNewButton.Foreground = Presentation.ThemeBrush("FkForeground", Surface);
@@ -219,47 +269,70 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
             }
             else if (isDark)
             {
-                var shaded = SessionColorBrush.CreateShaded(sessionColor, -18);
-                Surface.Background = shaded;
-                Surface.BorderBrush = SessionColorBrush.Create(sessionColor);
+                Surface.Background = Presentation.ThemeBrush("FkOverlay", Surface);
+                Surface.BorderBrush = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", Surface);
                 ProgressBar.Background = SessionColorBrush.Create(sessionColor);
-                ProgressTrack.Background = SessionColorBrush.CreateAlpha(HexColor.Parse("#FFFFFF"), 0.18);
-                Windows.UI.Color activeSurfaceColor = shaded.Color;
-                var activeTextColor = SessionColors.Foreground(ToHexColor(activeSurfaceColor));
-                ActiveType.Foreground = SessionColorBrush.Create(activeTextColor);
-                ActiveRemaining.Foreground = SessionColorBrush.Create(activeTextColor);
+                ProgressTrack.Background = SessionColorBrush.CreateAlpha(HexColor.Parse("#FFFFFF"), 0.12);
+                ActiveRemaining.Foreground = Presentation.ThemeBrush("FkForeground", Surface);
+
                 if (isPaused)
                 {
                     PauseButton.Background = SessionColorBrush.Create(sessionColor);
                     PauseButton.BorderBrush = SessionColorBrush.Create(sessionColor);
                     PauseButton.Foreground = SessionColorBrush.Create(SessionColors.Foreground(sessionColor));
+
                     StartNewButton.Background = Presentation.ThemeBrush("FkSurface2", Surface);
-                    StartNewButton.BorderBrush = SessionColorBrush.CreateAlpha(sessionColor, 0.40);
-                    StartNewButton.Foreground = Presentation.ThemeBrush("FkSecondary", Surface);
+                    StartNewButton.BorderBrush = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", Surface);
+                    StartNewButton.Foreground = Presentation.ThemeBrush("FkForeground", Surface);
+
+                    StopButton.Background = Presentation.ThemeBrush("FkSurface2", Surface);
+                    StopButton.BorderBrush = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", Surface);
+                    StopButton.Foreground = Presentation.ThemeBrush("FkSecondary", Surface);
                 }
                 else
                 {
-                    PauseButton.Background = Presentation.ThemeBrush("FkSurface2", Surface);
-                    PauseButton.BorderBrush = SessionColorBrush.CreateAlpha(sessionColor, 0.40);
-                    PauseButton.Foreground = Presentation.ThemeBrush("FkSecondary", Surface);
+                    PauseButton.Background = SessionColorBrush.Create(sessionColor);
+                    PauseButton.BorderBrush = SessionColorBrush.Create(sessionColor);
+                    PauseButton.Foreground = SessionColorBrush.Create(SessionColors.Foreground(sessionColor));
+
+                    StopButton.Background = Presentation.ThemeBrush("FkSurface2", Surface);
+                    StopButton.BorderBrush = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", Surface);
+                    StopButton.Foreground = Presentation.ThemeBrush("FkSecondary", Surface);
                 }
                 ApplyDwmBorder(ToColorRef(sessionColor));
             }
             else
             {
-                Surface.Background = SessionColorBrush.Create(sessionColor);
-                Surface.BorderBrush = SessionColorBrush.Create(sessionColor);
-                var activeTextColor = SessionColors.Foreground(sessionColor);
-                ActiveType.Foreground = SessionColorBrush.Create(activeTextColor);
-                ActiveRemaining.Foreground = SessionColorBrush.Create(activeTextColor);
-                ProgressBar.Background = SessionColorBrush.Create(activeTextColor);
-                ProgressTrack.Background = SessionColorBrush.CreateAlpha(activeTextColor, 0.25);
-                PauseButton.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 255, 255));
-                PauseButton.BorderBrush = SessionColorBrush.CreateAlpha(activeTextColor, 0.35);
-                PauseButton.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 20, 20, 20));
-                StartNewButton.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 255, 255));
-                StartNewButton.BorderBrush = SessionColorBrush.CreateAlpha(activeTextColor, 0.35);
-                StartNewButton.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 20, 20, 20));
+                Surface.Background = Presentation.ThemeBrush("FkOverlay", Surface);
+                Surface.BorderBrush = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", Surface);
+                ProgressBar.Background = SessionColorBrush.Create(sessionColor);
+                ProgressTrack.Background = Presentation.ThemeBrush("FkBorder", Surface);
+                ActiveRemaining.Foreground = Presentation.ThemeBrush("FkForeground", Surface);
+
+                if (isPaused)
+                {
+                    PauseButton.Background = SessionColorBrush.Create(sessionColor);
+                    PauseButton.BorderBrush = SessionColorBrush.Create(sessionColor);
+                    PauseButton.Foreground = SessionColorBrush.Create(SessionColors.Foreground(sessionColor));
+
+                    StartNewButton.Background = Presentation.ThemeBrush("FkSurface2", Surface);
+                    StartNewButton.BorderBrush = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", Surface);
+                    StartNewButton.Foreground = Presentation.ThemeBrush("FkForeground", Surface);
+
+                    StopButton.Background = Presentation.ThemeBrush("FkSurface2", Surface);
+                    StopButton.BorderBrush = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", Surface);
+                    StopButton.Foreground = Presentation.ThemeBrush("FkSecondary", Surface);
+                }
+                else
+                {
+                    PauseButton.Background = SessionColorBrush.Create(sessionColor);
+                    PauseButton.BorderBrush = SessionColorBrush.Create(sessionColor);
+                    PauseButton.Foreground = SessionColorBrush.Create(SessionColors.Foreground(sessionColor));
+
+                    StopButton.Background = Presentation.ThemeBrush("FkSurface2", Surface);
+                    StopButton.BorderBrush = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", Surface);
+                    StopButton.Foreground = Presentation.ThemeBrush("FkSecondary", Surface);
+                }
                 ApplyDwmBorder(ToColorRef(sessionColor));
             }
         }
@@ -283,6 +356,9 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
             PauseButton.ClearValue(Control.BackgroundProperty);
             PauseButton.ClearValue(Control.BorderBrushProperty);
             PauseButton.ClearValue(Control.ForegroundProperty);
+            StopButton.ClearValue(Control.BackgroundProperty);
+            StopButton.ClearValue(Control.BorderBrushProperty);
+            StopButton.ClearValue(Control.ForegroundProperty);
             StartNewButton.ClearValue(Control.BackgroundProperty);
             StartNewButton.ClearValue(Control.BorderBrushProperty);
             StartNewButton.ClearValue(Control.ForegroundProperty);
@@ -310,17 +386,17 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
         StartButton.BorderThickness = new Thickness(0);
         FeedbackText.Text = state.Feedback ?? string.Empty;
         FeedbackText.Visibility = state.Feedback is null ? Visibility.Collapsed : Visibility.Visible;
-        if (_visible) ResizeAndCenter();
+
+        if (_visible) PositionWindow(recenter: false);
         if (_visible && changedMode)
         {
             FocusSelection();
-            AnimateMode(hasActive ? ActiveCard : SelectionCards);
+            AnimateMode(hasActive ? ActiveCard : IdleContent);
         }
     }
 
     private static void AnimateMode(UIElement element)
     {
-        // A short compositor fade never delays focus, input or lifecycle transitions.
         if (!new Windows.UI.ViewManagement.UISettings().AnimationsEnabled) return;
         var visual = ElementCompositionPreview.GetElementVisual(element);
         var animation = visual.Compositor.CreateScalarKeyFrameAnimation();
@@ -341,27 +417,35 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
             double totalSecs = activeSession.PlannedDuration.TotalSeconds;
             double remSecs = Math.Max(0, remaining.TotalSeconds);
             double pct = totalSecs > 0 ? Math.Clamp((totalSecs - remSecs) / totalSecs, 0, 1) : 0;
-            double trackWidth = ProgressTrack.ActualWidth > 0 ? ProgressTrack.ActualWidth : 372;
-            ProgressBar.Width = Math.Max(2, trackWidth * pct);
+            double trackWidth = ProgressTrack.ActualWidth > 0 ? ProgressTrack.ActualWidth : 432;
+            ProgressBar.Width = Math.Max(3, trackWidth * pct);
         }
         if (_visible && _state.Active is not null && remaining > TimeSpan.Zero) _displayTimer.Start();
         else _displayTimer.Stop();
     }
 
-    public void ShowAndFocus()
+    public async void ShowAndFocus()
     {
         if (_closing) return;
         _shownTimestamp = System.Diagnostics.Stopwatch.GetTimestamp();
-        if (!_visible)
+
+        if (!_positionLoaded && _getSettings is not null)
         {
-            IntPtr foreground = NativeMethods.GetForegroundWindow();
-            _display = DisplayArea.GetFromWindowId(Win32Interop.GetWindowIdFromWindow(foreground), DisplayAreaFallback.Primary);
-            // Move to the foreground monitor first so subsequent DPI queries belong to that monitor.
-            RectInt32 area = _display.WorkArea;
-            AppWindow.Move(new PointInt32(area.X + area.Width / 2, area.Y + area.Height / 2));
+            try
+            {
+                var settings = await _getSettings();
+                _persistedPositionX = settings.OverlayPositionX;
+                _persistedPositionY = settings.OverlayPositionY;
+                _positionLoaded = true;
+            }
+            catch (Exception ex)
+            {
+                _trace?.Invoke($"Could not load overlay position settings: {ex.Message}");
+            }
         }
+
         _visible = true;
-        ResizeAndCenter();
+        PositionWindow(recenter: !_positionLoaded || !_persistedPositionX.HasValue || !_persistedPositionY.HasValue);
         AppWindow.Show();
         Activate();
 
@@ -381,6 +465,7 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
     {
         _visible = false;
         _displayTimer.Stop();
+        SaveCurrentPosition();
         if (!_closing) AppWindow.Hide();
     }
 
@@ -390,46 +475,93 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
         _visible = false;
         _closing = true;
         _displayTimer.Stop();
+        SaveCurrentPosition();
         Close();
     }
 
     private void FocusSelection() =>
         (_state.Active is not null ? PauseButton : _state.Selected == SessionType.Work ? WorkCard : BreakCard).Focus(FocusState.Keyboard);
 
-    private void ResizeAndCenter()
+    private void PositionWindow(bool recenter)
     {
-        _display ??= DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary);
-        // Keep the reference surface stable. Feedback and idle measurement allow dynamic sizing
-        // so keyboard hints and text scaling never clip or collide with the bottom window border.
-        double widthDip = _state.Active is not null ? 379 : 420;
-        double heightDip;
+        const double widthDip = 480.0;
         Surface.Width = widthDip;
         Surface.Height = double.NaN;
         Surface.Measure(new Windows.Foundation.Size(widthDip, double.PositiveInfinity));
 
+        double heightDip;
         if (_state.Active is not null)
         {
-            heightDip = Math.Max(198, Math.Ceiling(Surface.DesiredSize.Height));
+            heightDip = Math.Max(220, Math.Ceiling(Surface.DesiredSize.Height));
         }
         else
         {
-            // Baseline 286 DIP provides comfortable bottom breathing room; expands dynamically for text scaling or feedback
-            heightDip = Math.Max(286, Math.Ceiling(Surface.DesiredSize.Height));
+            heightDip = Math.Max(280, Math.Ceiling(Surface.DesiredSize.Height));
             if (_state.Feedback is not null)
             {
-                heightDip = Math.Max(320, heightDip);
+                heightDip = Math.Max(310, heightDip);
             }
         }
 
         Surface.Width = widthDip;
         Surface.Height = heightDip;
-        double scale = NativeMethods.GetDpiForWindow(WindowNative.GetWindowHandle(this)) / 96.0;
-        if (scale <= 0) scale = 1;
-        int width = (int)Math.Ceiling(widthDip * scale);
-        int height = (int)Math.Ceiling(heightDip * scale);
-        RectInt32 area = _display.WorkArea;
-        AppWindow.MoveAndResize(new RectInt32(area.X + (area.Width - width) / 2,
-            area.Y + (area.Height - height) / 2, width, height));
+        IntPtr hwnd = WindowNative.GetWindowHandle(this);
+        double scale = NativeMethods.GetDpiForWindow(hwnd) / 96.0;
+        if (scale <= 0) scale = 1.0;
+        int widthPx = (int)Math.Ceiling(widthDip * scale);
+        int heightPx = (int)Math.Ceiling(heightDip * scale);
+
+        if (recenter || !_persistedPositionX.HasValue || !_persistedPositionY.HasValue)
+        {
+            var fgWorkArea = NativeMethods.GetForegroundWorkArea();
+            var center = OverlayPositionHelper.CalculateInitialCenter(widthPx, heightPx, fgWorkArea);
+            AppWindow.MoveAndResize(new RectInt32(center.X, center.Y, widthPx, heightPx));
+        }
+        else
+        {
+            var workAreas = NativeMethods.GetAllWorkAreas();
+            int currentX = AppWindow.Position.X != 0 ? AppWindow.Position.X : _persistedPositionX.Value;
+            int currentY = AppWindow.Position.Y != 0 ? AppWindow.Position.Y : _persistedPositionY.Value;
+            var clamped = OverlayPositionHelper.ClampToWorkAreas(currentX, currentY, widthPx, heightPx, workAreas);
+            AppWindow.MoveAndResize(new RectInt32(clamped.X, clamped.Y, widthPx, heightPx));
+        }
+    }
+
+    private void SaveCurrentPosition()
+    {
+        if (!_visible && !_closing) return;
+        try
+        {
+            int posX = AppWindow.Position.X;
+            int posY = AppWindow.Position.Y;
+            if (posX != 0 || posY != 0)
+            {
+                _persistedPositionX = posX;
+                _persistedPositionY = posY;
+                _savePosition?.Invoke(posX, posY);
+            }
+        }
+        catch (Exception ex)
+        {
+            _trace?.Invoke($"Could not save overlay position: {ex.Message}");
+        }
+    }
+
+    private void OnHeaderPointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        if (e.GetCurrentPoint(Surface).Properties.IsLeftButtonPressed)
+        {
+            IntPtr hwnd = WindowNative.GetWindowHandle(this);
+            NativeMethods.ReleaseCapture();
+            NativeMethods.SendMessage(hwnd, NativeMethods.WM_NCLBUTTONDOWN, (IntPtr)NativeMethods.HTCAPTION, IntPtr.Zero);
+            SaveCurrentPosition();
+        }
+    }
+
+    private void OnCloseButtonClick(object sender, RoutedEventArgs args)
+    {
+        SaveCurrentPosition();
+        DismissRequested?.Invoke();
     }
 
     private void OnWorkClicked(object sender, RoutedEventArgs args) => SelectionRequested?.Invoke(SessionType.Work);
@@ -449,6 +581,7 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
         {
             case VirtualKey.Escape:
                 args.Handled = true;
+                SaveCurrentPosition();
                 DismissRequested?.Invoke();
                 break;
             case VirtualKey.Left:
@@ -459,19 +592,18 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
                 FocusSelection();
                 break;
             case VirtualKey.Enter:
-                // Handle once at the preview stage, avoiding an additional native Button click.
                 args.Handled = true;
                 if (args.KeyStatus.WasKeyDown) break;
                 if (_state.Active is { Status: SessionStatus.Running }) PauseRequested?.Invoke();
                 else StartRequested?.Invoke();
                 break;
         }
-        // Space and Tab retain the native Button keyboard/focus behavior.
     }
 
     private void OnCloseClicked(object sender, PointerRoutedEventArgs args)
     {
         args.Handled = true;
+        SaveCurrentPosition();
         DismissRequested?.Invoke();
     }
 
@@ -516,20 +648,6 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
         }
     }
 
-    private static Windows.UI.Color Blend(HexColor foreground, double opacity, Windows.UI.Color background)
-    {
-        Windows.UI.Color source = SessionColorBrush.Create(foreground).Color;
-        byte alpha = (byte)Math.Clamp((int)Math.Round(opacity * 255), 0, 255);
-        byte BlendChannel(byte sourceChannel, byte backgroundChannel) =>
-            (byte)Math.Clamp((sourceChannel * alpha + backgroundChannel * (255 - alpha) + 127) / 255, 0, 255);
-        return Windows.UI.Color.FromArgb(255,
-            BlendChannel(source.R, background.R),
-            BlendChannel(source.G, background.G),
-            BlendChannel(source.B, background.B));
-    }
-
-    private static HexColor ToHexColor(Windows.UI.Color color) =>
-        HexColor.Parse($"#{color.R:X2}{color.G:X2}{color.B:X2}");
     [DllImport("dwmapi.dll")] private static extern int DwmSetWindowAttribute(IntPtr window, uint attribute, ref uint value, int size);
 }
 

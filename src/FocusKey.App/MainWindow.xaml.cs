@@ -61,6 +61,13 @@ public sealed partial class MainWindow : Window
     private Contrast _contrast = Contrast.Standard;
     private ThemePalette? _lightPalette;
     private ThemePalette? _darkPalette;
+    private TimeFormat _timeFormat = TimeFormat.TwentyFourHour;
+
+    internal void ApplyTimeFormat(TimeFormat format)
+    {
+        _timeFormat = format;
+        if (_today is not null) Render();
+    }
 
     internal void ApplyAppearance(Appearance appearance, ThemePalette? lightPalette = null, ThemePalette? darkPalette = null, Contrast contrast = Contrast.Standard)
     {
@@ -96,6 +103,7 @@ public sealed partial class MainWindow : Window
         MainSurface.RequestedTheme = targetTheme;
 
         _reports?.RefreshVisuals(_contrast);
+        _settings?.RefreshVisuals(_contrast);
         if (_today is not null) Render();
     }
 
@@ -446,7 +454,7 @@ public sealed partial class MainWindow : Window
             CompletionValue.Text = snapshot.CompletionRate is { } rate ? rate.ToString("0", CultureInfo.InvariantCulture) + "%" : "—";
             ActivityRows.ItemsSource = snapshot.Sessions.Select(session =>
             {
-                string started = TimeZoneInfo.ConvertTime(session.StartedAt, snapshot.TimeZone).ToString("HH:mm", CultureInfo.InvariantCulture);
+                string started = TodayFormatting.FormatClockTime(session.StartedAt, snapshot.TimeZone, _timeFormat);
                 string duration = session.ActualDuration is { } actual ? Presentation.Duration(actual) : $"{Presentation.Duration(session.PlannedDuration)} planned";
                 var row = new Grid { ColumnSpacing = 16, Padding = new Thickness(0, 10, 0, 10) };
                 foreach (var width in new[] { new GridLength(44), new GridLength(6), new GridLength(1, GridUnitType.Star), GridLength.Auto, new GridLength(72) })

@@ -360,6 +360,51 @@ public sealed class SettingsPageControllerTests
         Assert.Equal(TimeSpan.FromMinutes(17), (await service.LoadAsync()).BreakDuration);
     }
 
+    [Fact]
+    public async Task UpdateTimeFormatAsync_SavesAndSettles()
+    {
+        var repo = new FakeRepository();
+        var page = new SettingsPageController(new(repo), () => Task.CompletedTask, _ => { });
+        await page.LoadAsync();
+
+        SettingsField? settledField = null;
+        page.Settled += (field, _) => settledField = field;
+
+        await page.UpdateTimeFormatAsync(TimeFormat.TwelveHour);
+
+        Assert.Equal(TimeFormat.TwelveHour, page.Saved!.TimeFormat);
+        Assert.Equal(TimeFormat.TwelveHour, repo.Value.TimeFormat);
+        Assert.Equal(SettingsField.TimeFormat, settledField);
+    }
+
+    [Fact]
+    public async Task UpdateOverlayPositionAsync_AndReset_SavesAndSettles()
+    {
+        var repo = new FakeRepository();
+        var page = new SettingsPageController(new(repo), () => Task.CompletedTask, _ => { });
+        await page.LoadAsync();
+
+        SettingsField? settledField = null;
+        page.Settled += (field, _) => settledField = field;
+
+        await page.UpdateOverlayPositionAsync(300, 400);
+
+        Assert.Equal(300, page.Saved!.OverlayPositionX);
+        Assert.Equal(400, page.Saved.OverlayPositionY);
+        Assert.Equal(300, repo.Value.OverlayPositionX);
+        Assert.Equal(400, repo.Value.OverlayPositionY);
+        Assert.Equal(SettingsField.OverlayPosition, settledField);
+
+        settledField = null;
+        await page.ResetOverlayPositionAsync();
+
+        Assert.Null(page.Saved.OverlayPositionX);
+        Assert.Null(page.Saved.OverlayPositionY);
+        Assert.Null(repo.Value.OverlayPositionX);
+        Assert.Null(repo.Value.OverlayPositionY);
+        Assert.Equal(SettingsField.OverlayPosition, settledField);
+    }
+
     private sealed class FakeRepository : ISettingsRepository
     {
         public ApplicationSettings Value = ApplicationSettings.Default;

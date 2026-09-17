@@ -42,6 +42,12 @@ public sealed class SettingsService(ISettingsRepository repository)
         UpdateAsync(current => current with { GlobalShortcut = value }, cancellationToken);
     public Task<ApplicationSettings> UpdateMainWindowShortcutAsync(GlobalShortcut value, CancellationToken cancellationToken = default) =>
         UpdateAsync(current => current with { MainWindowShortcut = value }, cancellationToken);
+    public Task<ApplicationSettings> UpdateTimeFormatAsync(TimeFormat value, CancellationToken cancellationToken = default) =>
+        UpdateAsync(current => current with { TimeFormat = value }, cancellationToken);
+    public Task<ApplicationSettings> UpdateOverlayPositionAsync(int? x, int? y, CancellationToken cancellationToken = default) =>
+        UpdateAsync(current => current with { OverlayPositionX = x, OverlayPositionY = y }, cancellationToken);
+    public Task<ApplicationSettings> ResetOverlayPositionAsync(CancellationToken cancellationToken = default) =>
+        UpdateOverlayPositionAsync(null, null, cancellationToken);
 
     private async Task<ApplicationSettings> UpdateAsync(
         Func<ApplicationSettings, ApplicationSettings> change, CancellationToken cancellationToken)

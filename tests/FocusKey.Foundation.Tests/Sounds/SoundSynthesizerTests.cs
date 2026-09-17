@@ -15,11 +15,22 @@ public sealed class SoundSynthesizerTests
         ValidateWavHeader(wav, expectedSampleRate: 44100, expectedChannels: 1, expectedBitsPerSample: 16);
 
         // Ensure asset file exists on disk
-        string targetDir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "FocusKey.App", "Assets", "Sounds"));
-        if (Directory.Exists(Path.GetDirectoryName(targetDir)))
+        try
         {
-            Directory.CreateDirectory(targetDir);
-            File.WriteAllBytes(Path.Combine(targetDir, "start_tick.wav"), wav);
+            string targetDir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "FocusKey.App", "Assets", "Sounds"));
+            if (Directory.Exists(Path.GetDirectoryName(targetDir)))
+            {
+                Directory.CreateDirectory(targetDir);
+                string filePath = Path.Combine(targetDir, "start_tick.wav");
+                if (!File.Exists(filePath))
+                {
+                    File.WriteAllBytes(filePath, wav);
+                }
+            }
+        }
+        catch (IOException)
+        {
+            // File may be locked by another process or audio player
         }
     }
 
@@ -33,11 +44,22 @@ public sealed class SoundSynthesizerTests
         ValidateWavHeader(wav, expectedSampleRate: 44100, expectedChannels: 1, expectedBitsPerSample: 16);
 
         // Ensure asset file exists on disk
-        string targetDir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "FocusKey.App", "Assets", "Sounds"));
-        if (Directory.Exists(Path.GetDirectoryName(targetDir)))
+        try
         {
-            Directory.CreateDirectory(targetDir);
-            File.WriteAllBytes(Path.Combine(targetDir, "completion_bell.wav"), wav);
+            string targetDir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "FocusKey.App", "Assets", "Sounds"));
+            if (Directory.Exists(Path.GetDirectoryName(targetDir)))
+            {
+                Directory.CreateDirectory(targetDir);
+                string filePath = Path.Combine(targetDir, "completion_bell.wav");
+                if (!File.Exists(filePath))
+                {
+                    File.WriteAllBytes(filePath, wav);
+                }
+            }
+        }
+        catch (IOException)
+        {
+            // File may be locked by another process or audio player
         }
     }
 

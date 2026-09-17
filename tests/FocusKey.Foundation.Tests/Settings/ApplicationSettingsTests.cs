@@ -15,6 +15,9 @@ public sealed class ApplicationSettingsTests
         Assert.Equal("#2F8F83", settings.WorkColor.Value);
         Assert.Equal("#7667B8", settings.BreakColor.Value);
         Assert.Equal(GlobalShortcut.Default, settings.GlobalShortcut);
+        Assert.Equal(TimeFormat.TwentyFourHour, settings.TimeFormat);
+        Assert.Null(settings.OverlayPositionX);
+        Assert.Null(settings.OverlayPositionY);
     }
 
     [Theory]
@@ -58,6 +61,52 @@ public sealed class ApplicationSettingsTests
             { Appearance = (Appearance)99 }).Validate());
         Assert.Throws<ArgumentException>(() => (ApplicationSettings.Default with
             { WorkColor = default }).Validate());
+    }
+
+    [Fact]
+    public void ValidationAcceptsValidTimeFormats()
+    {
+        (ApplicationSettings.Default with { TimeFormat = TimeFormat.TwentyFourHour }).Validate();
+        (ApplicationSettings.Default with { TimeFormat = TimeFormat.TwelveHour }).Validate();
+    }
+
+    [Fact]
+    public void ValidationRejectsUnsupportedTimeFormat()
+    {
+        var invalid = ApplicationSettings.Default with { TimeFormat = (TimeFormat)99 };
+        var ex = Assert.Throws<ArgumentException>(() => invalid.Validate());
+        Assert.Equal("TimeFormat", ex.ParamName);
+    }
+
+    [Theory]
+    [InlineData(100, 200)]
+    [InlineData(-500, -200)]
+    [InlineData(0, 0)]
+    public void ValidationAcceptsBothOverlayCoordinatesSet(int x, int y)
+    {
+        var valid = ApplicationSettings.Default with { OverlayPositionX = x, OverlayPositionY = y };
+        valid.Validate();
+        Assert.Equal(x, valid.OverlayPositionX);
+        Assert.Equal(y, valid.OverlayPositionY);
+    }
+
+    [Fact]
+    public void ValidationAcceptsBothOverlayCoordinatesNull()
+    {
+        var valid = ApplicationSettings.Default with { OverlayPositionX = null, OverlayPositionY = null };
+        valid.Validate();
+        Assert.Null(valid.OverlayPositionX);
+        Assert.Null(valid.OverlayPositionY);
+    }
+
+    [Theory]
+    [InlineData(100, null)]
+    [InlineData(null, 200)]
+    public void ValidationRejectsPartialOverlayCoordinates(int? x, int? y)
+    {
+        var invalid = ApplicationSettings.Default with { OverlayPositionX = x, OverlayPositionY = y };
+        var ex = Assert.Throws<ArgumentException>(() => invalid.Validate());
+        Assert.Contains("must both be set or both be null", ex.Message);
     }
 
     [Fact]

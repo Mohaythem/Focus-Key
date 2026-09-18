@@ -14,7 +14,7 @@ This document serves as the persistent repository-level source of truth for all 
 
 ## Active Work (Current Roadmap Task)
 
-*None currently active. Awaiting user acceptance of the Window Close Experience milestone.*
+*None (all currently planned milestones implemented, verified, and awaiting final user acceptance).*
 
 ---
 
@@ -25,6 +25,26 @@ This document serves as the persistent repository-level source of truth for all 
 ---
 
 ## Implemented Work Awaiting Final User Acceptance
+
+### Quick Overlay Surgical Visual Restore (Implemented — Awaiting Final User Acceptance)
+Surgically restored Quick Overlay visual presentation, proportions, geometry, and layout to the approved `a19b522` baseline:
+1. **Visual Presentation & Proportions**:
+   - Surface width restored to `480` DIP with padding `24,20,24,20` (height `220` DIP active, `280` DIP idle).
+   - Left-aligned `52` DIP bold Consolas countdown timer (`ActiveRemaining`).
+   - `432` DIP width × `6` DIP height progress bar track (`ProgressTrack`) with rounded caps and active session color.
+   - Persistent compact header (`FOCUS KEY` in idle, `• WORK SESSION` / `• BREAK SESSION` in active, `• WORK SESSION (PAUSED)` in paused).
+   - Selection cards in idle restored to `FkOverlayCard` with left content alignment and clean margins.
+   - Action buttons right-aligned at bottom in active/paused states.
+2. **Retained Approved Interactions**:
+   - **Running state**: `[ Pause ]` only (no visible Stop button).
+   - **Paused state**: `[ Start New ]` (neutral secondary) and `[ Continue ]` (accent primary) side-by-side (no visible Stop button).
+   - **Idle state**: Work / Break selection cards + full-width `[ Start ]` button.
+   - Underlying Stop/session-finalization architecture strictly preserved.
+3. **Preserved Shell & System Features**:
+   - Native header dragging via Win32 `WM_NCLBUTTONDOWN`, SQLite position persistence (`overlay_position_x`, `overlay_position_y`), multi-monitor work-area clamping, default center on foreground display, and Reset position in Settings.
+   - Global shortcuts (`Shift + F3` Overlay, `Shift + F4` Main Window) and single-instance activation.
+   - Today visual design, Window Close Experience (`0a1f457`), Settings, and 12/24-hour preferences untouched.
+
 
 ### Window Close Experience: Hide or Quit (Implemented — Awaiting Final User Acceptance)
 Implemented native Windows 11 close decision modal when closing the main window:

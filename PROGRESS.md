@@ -1,34 +1,36 @@
 # Focus Key — Project Progress & State Checkpoint
 
 ## Current Goal
-Window Close Experience: Hide or Quit completed, verified, and ready for user acceptance.
+Quick Overlay Surgical Visual Restore completed, verified across 8 runtime states (Dark & Light), and ready for user acceptance.
 
 ## Current Checkpoint
-Window Close Experience (Hide vs. Quit decision modal) is 100% implemented, tested, and visually verified:
-- **Main Window Close (X) Modal**:
-  - Native WinUI 3 `ContentDialog` presented over `MainWindow` on title bar `X` click or `WM_CLOSE`.
-  - Title: `Close Focus Key?`
-  - Body: `Hide Focus Key to keep it running in the system tray, or quit the app completely.`
-  - Primary button: `[ Hide Focus Key ]` (accent elevated default action).
-  - Secondary button: `[ Quit Focus Key ]` (neutral distinct action).
-  - Cancel button: `[ Cancel ]` (neutral close action, dismisses dialog on Esc/click).
-  - Theme synchronization: Explicit `RequestedTheme` ensures clean Dark, Light, and High Contrast rendering.
-- **Distinct Window Behaviors**:
-  - **Minimize**: Direct hide-to-tray with NO dialog (existing behavior preserved).
-  - **Close (X)**: Presents the Hide or Quit decision dialog.
-  - **Tray Exit & Sidebar Exit**: Direct canonical graceful exit with NO dialog.
-  - **Quick Overlay Close/Esc**: Dismisses overlay only without opening main close dialog.
-  - **Focus Loss**: Standard OS focus behavior (does not hide).
-- **Hide vs. Quit Semantics**:
-  - **Hide Focus Key**: Hides `MainWindow` from desktop and taskbar, keeps process and tray icon alive, preserves running/paused sessions, global shortcuts (`Shift + F3`, `Shift + F4`), and Quick Overlay. Restores smoothly via tray or `Shift + F4`.
-  - **Quit Focus Key**: Reuses canonical tray-exit application shutdown path (`_shell.ExitAsync()`), tearing down hotkeys, tray icon, timers, and persisting active/paused sessions under established recovery rules.
-- **Safety & Reentrancy**:
-  - `_isCloseDialogShowing` single-dialog guard prevents duplicate dialogs on rapid clicks or duplicate `WM_CLOSE` messages.
-  - `_allowClose` flag prevents recursive close calls during intentional application shutdown.
-- **Automated Tests**: 786/786 unit tests passing (`dotnet test`), 0 failed, 0 skipped.
-- **Build**: 0 Warning(s), 0 Error(s) (`dotnet build -c Release`).
-- **Visual Captures Inspected**: Maximized Dark, Restored Dark, Maximized Light, Running Work Dark, Paused Work Dark.
-- **Functional Runtime Scenarios Verified**: All 10 scenarios (A through J) tested and confirmed.
+Quick Overlay visual presentation, layout, and proportions have been surgically restored to the approved `a19b522` baseline while maintaining all approved interaction behaviors:
+- **Surface Geometry & Spacing**:
+  - Surface width: `480` DIP (restored from 560 DIP).
+  - Surface padding: `24,20,24,20` DIP.
+  - Window heights: `280` DIP (Idle), `220` DIP (Active / Paused), `310` DIP (Completion Feedback).
+- **Header & Visual Hierarchy**:
+  - Compact persistent header with `ActiveBadgeDot` and `HeaderTitle` left-aligned.
+  - Title shows `FOCUS KEY` in Idle, `• WORK SESSION` / `• BREAK SESSION` in Running, and `• WORK SESSION (PAUSED)` in Paused.
+  - Native dismiss button (`X`) and shortcut pill (`Shift + F3`) right-aligned.
+- **Timer & Progress Track**:
+  - Left-aligned bold `52` DIP Consolas countdown timer (`ActiveRemaining`).
+  - Full-width `432` DIP × `6` DIP progress bar track (`ProgressTrack`) with rounded caps and active session accent color.
+- **Action Buttons & States**:
+  - **Running State**: Single `[ Pause ]` button aligned to the bottom right (no visible Stop button).
+  - **Paused State**: `[ Start New ]` (neutral secondary) and `[ Continue ]` (accent primary) side-by-side, aligned to bottom right (no visible Stop button).
+  - **Idle State**: Left-aligned `FkOverlayCard` Work & Break selection cards side-by-side with full-width `[ Start ]` button and bottom keyboard hints (`↔ Select`, `↵ Start`, `Esc Close`).
+- **Preserved Native Capabilities**:
+  - Native header dragging (`WM_NCLBUTTONDOWN`), SQLite coordinate persistence (`overlay_position_x`, `overlay_position_y`), multi-monitor work-area clamping, default center on foreground display, and Settings reset button.
+  - Full isolation of Esc/X close actions (never triggers MainWindow close dialog).
+- **Automated Tests**: 786/786 unit tests passing (`dotnet test -c Release`), 0 failed, 0 skipped.
+- **Build**: 0 Warning(s), 0 Error(s) (`dotnet build src/FocusKey.App/FocusKey.App.csproj -c Release`).
+- **Visual Captures Inspected**:
+  - `overlay_idle_dark.png` & `overlay_idle_light.png`
+  - `overlay_idle_break_dark.png`
+  - `overlay_running_work_dark.png` & `overlay_running_work_light.png`
+  - `overlay_running_break_dark.png`
+  - `overlay_paused_work_dark.png` & `overlay_paused_work_light.png`
 
 ## Completed Work
 - **Visual & UX Audit**: Comprehensive desktop/full-screen audit documented in `VISUAL_AUDIT.md`.
@@ -45,8 +47,9 @@ Window Close Experience (Hide vs. Quit decision modal) is 100% implemented, test
 - **Stage 6 (Today Final Hero Redesign)**: Maximized 3-tier desktop composition (2/3 Hero + 1/3 Summary + full-width Activity), unified zero-layout-jump hero surface, dominant 80 DIP typography, semantic Pause/Continue/Start New/Stop actions, responsive 3-breakpoint scaling.
 - **Stage 6b (Reports Insights Vertical Composition + Today Summary Polish + Yearly Preview Verification)**: Proportional 4-zone grid distribution in Reports Insights rail, 72%/28% ratio, polished Today Summary 2x2 grid with horizontal divider, and full-year synthetic dataset verification.
 - **Stage 7 (Settings + Quick Overlay Final Refinement)**: Draggable Quick Overlay with multi-monitor clamping and SQLite position persistence, unified shell across Idle/Running/Paused states, Settings live theme refresh, dual shortcuts with collision prevention, 12/24-hour time format preference in Today activity.
-- **Stage 8 (Today + Quick Overlay Final Acceptance Polish)**: Removed visible Stop button from Running (Pause only) and Paused (Continue + Start New side-by-side) states across Today and Quick Overlay; ~310 DIP top row Today geometry with centered Idle cards and 2x2 metric grid; 560 DIP horizontal Quick Overlay desktop flyout with stretched selection tiles, persistent header, and clear subheader.
-- **Stage 9 (Window Close Experience: Hide or Quit)**: Modal `ContentDialog` on main window close with clear `Hide Focus Key` (primary) vs. `Quit Focus Key` (secondary) choice; single-dialog reentrancy protection; canonical shutdown reuse; direct minimize preservation; running/paused session preservation.
+- **Stage 8 (Today + Quick Overlay Final Acceptance Polish)**: Removed visible Stop button from Running (Pause only) and Paused (Continue + Start New side-by-side) states across Today and Quick Overlay; ~310 DIP top row Today geometry with centered Idle cards and 2x2 metric grid.
+- **Stage 9 (Window Close Experience: Hide or Quit)**: Modal `ContentDialog` on main window close with clear `Hide Focus Key` (primary) vs. `Quit Focus Key` (secondary) choice; single-dialog reentrancy protection; canonical shutdown reuse; direct minimize preservation; running/paused session preservation (`0a1f457`).
+- **Stage 9b (Quick Overlay Surgical Visual Restore)**: Surgically restored Quick Overlay visual presentation and geometry to approved `a19b522` baseline (480 DIP width, 432 DIP progress bar, left-aligned 52 DIP timer, persistent header dot + title, right-aligned buttons).
 
 ## Remaining Work
 - **Stage 10: Final Consistency QA & Windows Packaging**

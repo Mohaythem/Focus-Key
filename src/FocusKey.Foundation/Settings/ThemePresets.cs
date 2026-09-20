@@ -119,7 +119,7 @@ public static class ThemePresets
                 Sidebar = HexColor.Parse("#181818"),
                 Surface = HexColor.Parse("#1E1E1E"),
                 Surface2 = HexColor.Parse("#252525"),
-                Border = HexColor.Parse("#2E2E2E"),
+                Border = HexColor.Parse("#363636"),
                 Secondary = HexColor.Parse("#A0A0A0"),
                 Dim = HexColor.Parse("#6E6E6E")
             }
@@ -137,7 +137,7 @@ public static class ThemePresets
                 Sidebar = HexColor.Parse("#0E1212"),
                 Surface = HexColor.Parse("#0E1212"),
                 Surface2 = HexColor.Parse("#131818"),
-                Border = HexColor.Parse("#1E2424"),
+                Border = HexColor.Parse("#263030"),
                 Secondary = HexColor.Parse("#909B9B"),
                 Dim = HexColor.Parse("#5A6666")
             }
@@ -155,7 +155,7 @@ public static class ThemePresets
                 Sidebar = HexColor.Parse("#2E3440"),
                 Surface = HexColor.Parse("#2E3440"),
                 Surface2 = HexColor.Parse("#3B4252"),
-                Border = HexColor.Parse("#434C5E"),
+                Border = HexColor.Parse("#4C566A"),
                 Secondary = HexColor.Parse("#D8DEE9"),
                 Dim = HexColor.Parse("#7B88A1")
             }
@@ -173,7 +173,7 @@ public static class ThemePresets
                 Sidebar = HexColor.Parse("#1C1916"),
                 Surface = HexColor.Parse("#1C1916"),
                 Surface2 = HexColor.Parse("#24201C"),
-                Border = HexColor.Parse("#332D27"),
+                Border = HexColor.Parse("#3D352E"),
                 Secondary = HexColor.Parse("#A89F95"),
                 Dim = HexColor.Parse("#736B63")
             }
@@ -191,7 +191,7 @@ public static class ThemePresets
                 Sidebar = HexColor.Parse("#101A14"),
                 Surface = HexColor.Parse("#101A14"),
                 Surface2 = HexColor.Parse("#16231B"),
-                Border = HexColor.Parse("#1F3327"),
+                Border = HexColor.Parse("#253D2F"),
                 Secondary = HexColor.Parse("#8EAFA0"),
                 Dim = HexColor.Parse("#587567")
             }

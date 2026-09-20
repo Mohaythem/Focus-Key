@@ -15,15 +15,15 @@ namespace FocusKey;
 internal sealed class SettingsView : UserControl
 {
     private readonly SettingsPageController _controller;
-    private readonly StackPanel _fields = new() { Spacing = 20 };
+    private readonly StackPanel _fields = new() { Spacing = 16 };
     private readonly ContentControl _editor = new();
     private readonly TextBox _workMinutes = Number("Work minutes");
     private readonly TextBox _workSeconds = Number("Work seconds");
     private readonly TextBox _breakMinutes = Number("Break minutes");
     private readonly TextBox _breakSeconds = Number("Break seconds");
-    private readonly ComboBox _appearance = new() { ItemsSource = Enum.GetNames<Appearance>(), MinWidth = 140, FontSize = 12 };
+    private readonly ComboBox _appearance = new() { ItemsSource = Enum.GetNames<Appearance>(), MinWidth = 160, FontSize = 12 };
     private static readonly string[] ContrastOptions = ["Standard", "Higher Contrast"];
-    private readonly ComboBox _contrast = new() { ItemsSource = ContrastOptions, MinWidth = 140, FontSize = 12 };
+    private readonly ComboBox _contrast = new() { ItemsSource = ContrastOptions, MinWidth = 160, FontSize = 12 };
     private static readonly string[] TimeFormatOptions = ["24-hour (09:05)", "12-hour (9:05 AM)"];
     private readonly ComboBox _timeFormat = new() { ItemsSource = TimeFormatOptions, MinWidth = 160, FontSize = 12 };
     private readonly Button _resetOverlayPositionButton = new() { Content = "Reset position", FontSize = 12, Padding = new Thickness(12, 6, 12, 6) };
@@ -68,8 +68,12 @@ internal sealed class SettingsView : UserControl
     private bool _colorDrainRunning;
     private bool _applying;
     private bool _workDirty, _breakDirty;
-    private readonly ToggleSwitch _sessionSounds = new() { OnContent = "On", OffContent = "Off" };
-    private readonly ToggleSwitch _startWithWindows = new() { OnContent = "On", OffContent = "Off" };
+    private readonly ToggleSwitch _sessionSounds = new() { OnContent = "On", OffContent = "Off", MinWidth = 0 };
+    private readonly ToggleSwitch _startSound = new() { OnContent = "On", OffContent = "Off", MinWidth = 0 };
+    private readonly ToggleSwitch _completionSound = new() { OnContent = "On", OffContent = "Off", MinWidth = 0 };
+    private readonly Button _startSoundPreviewButton = new() { Content = "Preview", FontSize = 12, Padding = new Thickness(10, 5, 10, 5), CornerRadius = new CornerRadius(4) };
+    private readonly Button _completionSoundPreviewButton = new() { Content = "Preview", FontSize = 12, Padding = new Thickness(10, 5, 10, 5), CornerRadius = new CornerRadius(4) };
+    private readonly ToggleSwitch _startWithWindows = new() { OnContent = "On", OffContent = "Off", MinWidth = 0 };
     private readonly Button _importHistoryButton = new() { Content = "Import history…", FontSize = 12, Padding = new Thickness(12, 6, 12, 6) };
     private readonly Button _exportHistoryButton = new() { Content = "Export history…", FontSize = 12, Padding = new Thickness(12, 6, 12, 6) };
     private readonly FocusKey.Foundation.Shell.IWindowsStartupService _windowsStartup;
@@ -77,6 +81,8 @@ internal sealed class SettingsView : UserControl
     private readonly Func<Task> _refreshReports;
     private readonly Func<IntPtr> _getWindowHandle;
     private readonly Action<Exception> _report;
+    private readonly Action? _previewStart;
+    private readonly Action? _previewCompletion;
     internal delegate bool TryUpdateShortcutHandler(GlobalShortcut newShortcut, out string? error);
     private readonly TryUpdateShortcutHandler? _tryUpdateShortcut;
     private readonly TryUpdateShortcutHandler? _tryUpdateMainWindowShortcut;
@@ -112,7 +118,9 @@ internal sealed class SettingsView : UserControl
         TryUpdateShortcutHandler? tryUpdateShortcut = null,
         TryUpdateShortcutHandler? tryUpdateMainWindowShortcut = null,
         Action<GlobalShortcut>? onShortcutChanged = null,
-        Action<GlobalShortcut>? onMainWindowShortcutChanged = null)
+        Action<GlobalShortcut>? onMainWindowShortcutChanged = null,
+        Action? previewStart = null,
+        Action? previewCompletion = null)
     {
         _windowsStartup = windowsStartup ?? throw new ArgumentNullException(nameof(windowsStartup));
         _historyService = history ?? throw new ArgumentNullException(nameof(history));
@@ -123,19 +131,27 @@ internal sealed class SettingsView : UserControl
         _tryUpdateMainWindowShortcut = tryUpdateMainWindowShortcut;
         _onShortcutChanged = onShortcutChanged;
         _onMainWindowShortcutChanged = onMainWindowShortcutChanged;
+        _previewStart = previewStart;
+        _previewCompletion = previewCompletion;
         _controller = new(settings, refresh, report);
         _colorDebounceTimer = DispatcherQueue.CreateTimer();
         _colorDebounceTimer.Interval = TimeSpan.FromMilliseconds(250);
         _colorDebounceTimer.Tick += (_, _) => StartColorDrain();
         Unloaded += async (_, _) => await FlushPendingColorSaveAsync();
 
-        AutomationProperties.SetName(_appearance, "Appearance");
+        AutomationProperties.SetName(_appearance, "Color scheme");
         AutomationProperties.SetName(_contrast, "Contrast");
         AutomationProperties.SetName(_lightPreset, "Light theme preset");
         AutomationProperties.SetName(_darkPreset, "Dark theme preset");
-        AutomationProperties.SetName(_timeFormat, "Time format");
+        AutomationProperties.SetName(_timeFormat, "Clock format");
         AutomationProperties.SetName(_resetOverlayPositionButton, "Reset overlay window position");
         AutomationProperties.SetName(_sessionSounds, "Session sounds");
+        AutomationProperties.SetName(_startSound, "Start sound");
+        AutomationProperties.SetName(_completionSound, "Completion sound");
+        AutomationProperties.SetName(_startSoundPreviewButton, "Preview start sound");
+        AutomationProperties.SetName(_completionSoundPreviewButton, "Preview completion sound");
+        ToolTipService.SetToolTip(_startSoundPreviewButton, "Preview start sound");
+        ToolTipService.SetToolTip(_completionSoundPreviewButton, "Preview completion sound");
         AutomationProperties.SetName(_startWithWindows, "Start with Windows");
         AutomationProperties.SetName(_importHistoryButton, "Import history");
         AutomationProperties.SetName(_exportHistoryButton, "Export history");
@@ -147,19 +163,32 @@ internal sealed class SettingsView : UserControl
         HorizontalAlignment = HorizontalAlignment.Stretch;
 
         // 1. SESSION (Permanent Top-Level Card)
-        var sessions = new StackPanel { Spacing = 0 };
-        sessions.Children.Add(Row("Work duration", null, DurationFields(_workMinutes, _workSeconds), false));
-        sessions.Children.Add(Row("Break duration", null, DurationFields(_breakMinutes, _breakSeconds), false));
-        sessions.Children.Add(Row("Session sounds", "Play a soft tick on start and a chime on completion", _sessionSounds, true));
-        _fields.Children.Add(BuildSessionSection(sessions));
+        var sessionLayout = new StackPanel { Spacing = 12 };
+
+        // Sub-card A: DURATIONS
+        var durationsPanel = new StackPanel { Spacing = 0 };
+        durationsPanel.Children.Add(Row("Work duration", "Length of work focus sessions.", DurationFields(_workMinutes, _workSeconds), false));
+        durationsPanel.Children.Add(Row("Break duration", "Length of break rest sessions.", DurationFields(_breakMinutes, _breakSeconds), true));
+        sessionLayout.Children.Add(SubCard("DURATIONS", durationsPanel));
+
+        // Sub-card B: SESSION SOUNDS (Master + Per-Sound Model)
+        var soundsPanel = new StackPanel { Spacing = 0 };
+        soundsPanel.Children.Add(Row("Session sounds", "Play audio cues for session start and completion.", _sessionSounds, false));
+        var startSoundControl = SoundActionFields(_startSoundPreviewButton, _startSound);
+        soundsPanel.Children.Add(Row("Start sound", "Played when a Work or Break session starts.", startSoundControl, false));
+        var completionSoundControl = SoundActionFields(_completionSoundPreviewButton, _completionSound);
+        soundsPanel.Children.Add(Row("Completion sound", "Played when a session completes.", completionSoundControl, true));
+        sessionLayout.Children.Add(SubCard("SESSION SOUNDS", soundsPanel));
+
+        _fields.Children.Add(BuildSessionSection(sessionLayout));
 
         // 2. APPEARANCE (Collapsible Top-Level Card)
         var appearanceLayout = new StackPanel { Spacing = 12 };
 
         // Sub-card A: SYSTEM APPEARANCE
         var systemAppearance = new StackPanel { Spacing = 0 };
-        systemAppearance.Children.Add(Row("Color scheme", "Controls whether the application uses light, dark, or system theme", _appearance, false));
-        systemAppearance.Children.Add(Row("Contrast", "Enhances text legibility and border definition across the interface", _contrast, true));
+        systemAppearance.Children.Add(Row("Color scheme", "Choose system default, light, or dark theme.", _appearance, false));
+        systemAppearance.Children.Add(Row("Contrast", "Enhance text legibility and border definition.", _contrast, true));
         appearanceLayout.Children.Add(SubCard("SYSTEM APPEARANCE", systemAppearance));
 
         // Sub-card B: LIGHT THEME
@@ -167,10 +196,10 @@ internal sealed class SettingsView : UserControl
         ConfigureColor(_lightBgButton, _lightBgColor, "Light background");
         ConfigureColor(_lightFgButton, _lightFgColor, "Light foreground");
         ConfigureColor(_lightAccentButton, _lightAccentColor, "Light accent");
-        lightTheme.Children.Add(Row("Preset", "Curated light theme palette", _lightPreset, false));
-        lightTheme.Children.Add(Row("Background", "Light page and window background", _lightBgButton, false));
-        lightTheme.Children.Add(Row("Foreground", "Light primary text and icons", _lightFgButton, false));
-        lightTheme.Children.Add(Row("Accent", "Light interactive accent and highlights", _lightAccentButton, true));
+        lightTheme.Children.Add(Row("Preset", "Curated light theme palette.", _lightPreset, false));
+        lightTheme.Children.Add(Row("Background", "Light page and window background.", _lightBgButton, false));
+        lightTheme.Children.Add(Row("Foreground", "Light primary text and icons.", _lightFgButton, false));
+        lightTheme.Children.Add(Row("Accent", "Light interactive accent and highlights.", _lightAccentButton, true));
         appearanceLayout.Children.Add(SubCard("LIGHT THEME", lightTheme));
 
         // Sub-card C: DARK THEME
@@ -178,10 +207,10 @@ internal sealed class SettingsView : UserControl
         ConfigureColor(_darkBgButton, _darkBgColor, "Dark background");
         ConfigureColor(_darkFgButton, _darkFgColor, "Dark foreground");
         ConfigureColor(_darkAccentButton, _darkAccentColor, "Dark accent");
-        darkTheme.Children.Add(Row("Preset", "Curated dark theme palette", _darkPreset, false));
-        darkTheme.Children.Add(Row("Background", "Dark page and window background", _darkBgButton, false));
-        darkTheme.Children.Add(Row("Foreground", "Dark primary text and icons", _darkFgButton, false));
-        darkTheme.Children.Add(Row("Accent", "Dark interactive accent and highlights", _darkAccentButton, true));
+        darkTheme.Children.Add(Row("Preset", "Curated dark theme palette.", _darkPreset, false));
+        darkTheme.Children.Add(Row("Background", "Dark page and window background.", _darkBgButton, false));
+        darkTheme.Children.Add(Row("Foreground", "Dark primary text and icons.", _darkFgButton, false));
+        darkTheme.Children.Add(Row("Accent", "Dark interactive accent and highlights.", _darkAccentButton, true));
         appearanceLayout.Children.Add(SubCard("DARK THEME", darkTheme));
 
         // Sub-card D: SESSION COLORS
@@ -190,13 +219,13 @@ internal sealed class SettingsView : UserControl
         ConfigureColor(_breakButton, _breakColor, "Break color");
         var workSelector = BuildColorSelector(_workButton, _workColor, WorkColorPresets, true);
         var breakSelector = BuildColorSelector(_breakButton, _breakColor, BreakColorPresets, false);
-        sessionColors.Children.Add(Row("Work color", "Used for work session indicators and timer", workSelector, false));
-        sessionColors.Children.Add(Row("Break color", "Used for break session indicators and timer", breakSelector, true));
+        sessionColors.Children.Add(Row("Work color", "Used for work session indicators and timer.", workSelector, false));
+        sessionColors.Children.Add(Row("Break color", "Used for break session indicators and timer.", breakSelector, true));
         appearanceLayout.Children.Add(SubCard("SESSION COLORS", sessionColors));
 
         // Sub-card E: DISPLAY
         var display = new StackPanel { Spacing = 0 };
-        display.Children.Add(Row("Clock format", "Display time in 24-hour (09:05) or 12-hour (9:05 AM) format", _timeFormat, true));
+        display.Children.Add(Row("Clock format", "Display time in 24-hour (09:05) or 12-hour (9:05 AM) format.", _timeFormat, true));
         appearanceLayout.Children.Add(SubCard("DISPLAY", display));
 
         _fields.Children.Add(BuildCollapsibleSection(
@@ -216,13 +245,13 @@ internal sealed class SettingsView : UserControl
         // Sub-card A: QUICK OVERLAY
         var overlayShortcutPanel = new StackPanel { Spacing = 0 };
         var overlayShortcutControl = BuildShortcutControl();
-        overlayShortcutPanel.Children.Add(Row("Quick Overlay", "Global shortcut to toggle quick overlay (default Shift + F3)", overlayShortcutControl, true));
+        overlayShortcutPanel.Children.Add(Row("Quick Overlay", "Global shortcut to toggle the quick overlay.", overlayShortcutControl, true));
         shortcutsLayout.Children.Add(SubCard("QUICK OVERLAY", overlayShortcutPanel));
 
         // Sub-card B: OPEN FOCUS KEY
         var mainWindowShortcutPanel = new StackPanel { Spacing = 0 };
         var mainWindowShortcutControl = BuildMainWindowShortcutControl();
-        mainWindowShortcutPanel.Children.Add(Row("Open Focus Key", "Global shortcut to open and focus the main window (default Shift + F4)", mainWindowShortcutControl, true));
+        mainWindowShortcutPanel.Children.Add(Row("Open Focus Key", "Global shortcut to open and focus the main window.", mainWindowShortcutControl, true));
         shortcutsLayout.Children.Add(SubCard("OPEN FOCUS KEY", mainWindowShortcutPanel));
 
         _fields.Children.Add(BuildCollapsibleSection(
@@ -246,13 +275,13 @@ internal sealed class SettingsView : UserControl
 
         // Sub-card B: QUICK OVERLAY POSITION
         var overlayPosPanel = new StackPanel { Spacing = 0 };
-        overlayPosPanel.Children.Add(Row("Reset position", "Reset overlay window position to the center of your screen", _resetOverlayPositionButton, true));
+        overlayPosPanel.Children.Add(Row("Reset position", "Reset overlay window position to the center of your screen.", _resetOverlayPositionButton, true));
         advancedLayout.Children.Add(SubCard("QUICK OVERLAY", overlayPosPanel));
 
         // Sub-card C: DATA
         var dataPanel = new StackPanel { Spacing = 0 };
-        dataPanel.Children.Add(Row("Import history", "Import website-compatible focus history (tab-delimited CSV)", _importHistoryButton, false));
-        dataPanel.Children.Add(Row("Export history", "Export all focus history to website-compatible tab-delimited CSV", _exportHistoryButton, true));
+        dataPanel.Children.Add(Row("Import history", "Import focus history from a tab-delimited CSV file.", _importHistoryButton, false));
+        dataPanel.Children.Add(Row("Export history", "Export all focus history to a tab-delimited CSV file.", _exportHistoryButton, true));
         advancedLayout.Children.Add(SubCard("DATA", dataPanel));
 
         _fields.Children.Add(BuildCollapsibleSection(
@@ -266,7 +295,6 @@ internal sealed class SettingsView : UserControl
             },
             out _setAdvancedExpanded));
 
-        _fields.Spacing = 16;
         _editor.Content = _fields;
         _editor.HorizontalContentAlignment = HorizontalAlignment.Stretch;
 
@@ -279,7 +307,24 @@ internal sealed class SettingsView : UserControl
         footer.Children.Add(_reload);
         footer.Children.Add(_status);
 
-        var panel = new StackPanel { Spacing = 0, HorizontalAlignment = HorizontalAlignment.Stretch };
+        // Settings Page Heading (Matching Today and Reports visual hierarchy)
+        var title = new TextBlock
+        {
+            Text = "Settings",
+            Style = Application.Current?.Resources["FkPageTitleText"] as Style,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        AutomationProperties.SetHeadingLevel(title, AutomationHeadingLevel.Level1);
+
+        var topHeader = new Grid
+        {
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            Margin = new Thickness(0, 0, 0, 4)
+        };
+        topHeader.Children.Add(title);
+
+        var panel = new StackPanel { Spacing = 16, HorizontalAlignment = HorizontalAlignment.Stretch };
+        panel.Children.Add(topHeader);
         panel.Children.Add(_editor);
         panel.Children.Add(footer);
         Content = panel;
@@ -411,9 +456,31 @@ internal sealed class SettingsView : UserControl
             if (!_applying)
             {
                 await FlushPendingColorSaveAsync();
+                UpdateSoundControlsInteractiveState(_sessionSounds.IsOn);
                 await _controller.UpdateSessionSoundsAsync(_sessionSounds.IsOn);
             }
         };
+
+        _startSound.Toggled += async (_, _) =>
+        {
+            if (!_applying)
+            {
+                await FlushPendingColorSaveAsync();
+                await _controller.UpdateStartSoundAsync(_startSound.IsOn);
+            }
+        };
+
+        _completionSound.Toggled += async (_, _) =>
+        {
+            if (!_applying)
+            {
+                await FlushPendingColorSaveAsync();
+                await _controller.UpdateCompletionSoundAsync(_completionSound.IsOn);
+            }
+        };
+
+        _startSoundPreviewButton.Click += (_, _) => _previewStart?.Invoke();
+        _completionSoundPreviewButton.Click += (_, _) => _previewCompletion?.Invoke();
 
         _startWithWindows.Toggled += (_, _) =>
         {
@@ -460,6 +527,16 @@ internal sealed class SettingsView : UserControl
         await FlushPendingColorSaveAsync();
         await _controller.LoadAsync();
         RefreshStartupToggle();
+    }
+
+    private void UpdateSoundControlsInteractiveState(bool masterOn)
+    {
+        _startSound.IsEnabled = masterOn;
+        _completionSound.IsEnabled = masterOn;
+        _startSound.Opacity = masterOn ? 1.0 : 0.6;
+        _completionSound.Opacity = masterOn ? 1.0 : 0.6;
+        _startSoundPreviewButton.IsEnabled = true;
+        _completionSoundPreviewButton.IsEnabled = true;
     }
 
     private void RefreshStartupToggle()
@@ -596,6 +673,13 @@ internal sealed class SettingsView : UserControl
                     break;
                 case SettingsField.SessionSounds:
                     _sessionSounds.IsOn = saved.SessionSoundsEnabled;
+                    UpdateSoundControlsInteractiveState(saved.SessionSoundsEnabled);
+                    break;
+                case SettingsField.StartSound:
+                    _startSound.IsOn = saved.StartSoundEnabled;
+                    break;
+                case SettingsField.CompletionSound:
+                    _completionSound.IsOn = saved.CompletionSoundEnabled;
                     break;
                 case SettingsField.GlobalShortcut:
                     UpdateShortcutVisuals(saved.GlobalShortcut ?? GlobalShortcut.Default);
@@ -711,7 +795,7 @@ internal sealed class SettingsView : UserControl
 
     private FrameworkElement BuildColorSelector(Button customButton, ColorPicker picker, (string Name, HexColor Color)[] presets, bool isWork)
     {
-        var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, VerticalAlignment = VerticalAlignment.Center };
+        var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right };
         var swatches = new List<Border>();
 
         void UpdateSwatches(HexColor current)
@@ -797,13 +881,19 @@ internal sealed class SettingsView : UserControl
         _resetMainWindowShortcutButton.Background = Presentation.ThemeBrush("FkSurface2", this);
         _resetMainWindowShortcutButton.BorderBrush = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", this);
         _resetMainWindowShortcutButton.Foreground = Presentation.ThemeBrush("FkSecondary", this);
+        _startSoundPreviewButton.Background = Presentation.ThemeBrush("FkSurface2", this);
+        _startSoundPreviewButton.BorderBrush = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", this);
+        _startSoundPreviewButton.Foreground = Presentation.ThemeBrush("FkSecondary", this);
+        _completionSoundPreviewButton.Background = Presentation.ThemeBrush("FkSurface2", this);
+        _completionSoundPreviewButton.BorderBrush = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", this);
+        _completionSoundPreviewButton.Foreground = Presentation.ThemeBrush("FkSecondary", this);
         Render();
     }
 
     private FrameworkElement BuildShortcutControl()
     {
         var root = new StackPanel { Spacing = 6, HorizontalAlignment = HorizontalAlignment.Right };
-        var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, VerticalAlignment = VerticalAlignment.Center };
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right };
 
         _shortcutButton.Style = Application.Current?.Resources["FkColorButton"] as Style;
         _shortcutButton.MinWidth = 120;
@@ -981,7 +1071,7 @@ internal sealed class SettingsView : UserControl
     private FrameworkElement BuildMainWindowShortcutControl()
     {
         var root = new StackPanel { Spacing = 6, HorizontalAlignment = HorizontalAlignment.Right };
-        var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, VerticalAlignment = VerticalAlignment.Center };
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right };
 
         _mainWindowShortcutButton.Style = Application.Current?.Resources["FkColorButton"] as Style;
         _mainWindowShortcutButton.MinWidth = 120;
@@ -1189,7 +1279,7 @@ internal sealed class SettingsView : UserControl
 
     private static StackPanel DurationFields(TextBox minutes, TextBox seconds)
     {
-        var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, VerticalAlignment = VerticalAlignment.Center };
+        var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right };
         panel.Children.Add(minutes);
         var minutesLabel = Presentation.Text("min", 12, true);
         minutesLabel.VerticalAlignment = VerticalAlignment.Center;
@@ -1201,6 +1291,20 @@ internal sealed class SettingsView : UserControl
         return panel;
     }
 
+    private static StackPanel SoundActionFields(Button previewButton, ToggleSwitch toggle)
+    {
+        var panel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Right
+        };
+        panel.Children.Add(previewButton);
+        panel.Children.Add(toggle);
+        return panel;
+    }
+
     private static Border BuildSessionSection(UIElement content)
     {
         var card = new Border
@@ -1209,9 +1313,9 @@ internal sealed class SettingsView : UserControl
             Padding = new Thickness(0)
         };
 
-        var panel = new StackPanel { Spacing = 0 };
+        var panel = new StackPanel { Spacing = 0, HorizontalAlignment = HorizontalAlignment.Stretch };
         var heading = Presentation.BodyStrong("SESSION", 13);
-        heading.Margin = new Thickness(16, 14, 16, 10);
+        heading.Margin = new Thickness(16, 14, 16, 14);
         panel.Children.Add(heading);
 
         var divider = new Border
@@ -1222,7 +1326,13 @@ internal sealed class SettingsView : UserControl
             HorizontalAlignment = HorizontalAlignment.Stretch
         };
         panel.Children.Add(divider);
-        panel.Children.Add(content);
+
+        var contentContainer = new Border
+        {
+            Padding = new Thickness(14, 14, 14, 14),
+            Child = content
+        };
+        panel.Children.Add(contentContainer);
 
         card.Child = panel;
         return card;
@@ -1249,8 +1359,17 @@ internal sealed class SettingsView : UserControl
         {
             heading.Style = style;
         }
-        heading.Margin = new Thickness(16, 12, 16, 6);
+        heading.Margin = new Thickness(16, 12, 16, 10);
         panel.Children.Add(heading);
+
+        var divider = new Border
+        {
+            Height = 1,
+            Background = Application.Current?.Resources["CardStrokeColorDefaultBrush"] as Brush,
+            Opacity = 0.4,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        panel.Children.Add(divider);
         panel.Children.Add(content);
 
         border.Child = panel;

@@ -253,5 +253,13 @@ public static class SchemaMigrations
                 ALTER TABLE application_settings ADD COLUMN shortcuts_expanded INTEGER NOT NULL DEFAULT 0;
                 ALTER TABLE application_settings ADD COLUMN advanced_expanded INTEGER NOT NULL DEFAULT 0;
                 """),
+
+        new SchemaMigration(
+            Version: 13,
+            Name: "individual_session_sounds_settings",
+            Sql: """
+                ALTER TABLE application_settings ADD COLUMN start_sound_enabled INTEGER NOT NULL DEFAULT 1;
+                ALTER TABLE application_settings ADD COLUMN completion_sound_enabled INTEGER NOT NULL DEFAULT 1;
+                """),
     ];
 }

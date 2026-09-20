@@ -14,7 +14,29 @@ This document serves as the persistent repository-level source of truth for all 
 
 ## Active Work (Current Roadmap Task)
 
-*None currently active. Awaiting user acceptance of implemented work or new goal assignment.*
+*None currently active.*
+
+---
+
+## Implemented Work Awaiting Final User Acceptance
+
+### Settings Final Polish & Session Sounds Refinement (Implemented — Awaiting Final User Acceptance)
+**Status:** Implemented — Awaiting Final User Acceptance
+**Scope & Deliverables:**
+1. **Settings Page Title & Hierarchy**: Add real "Settings" page title consistent with Today and Reports typography, move SESSION card lower with comfortable spacing (16 DIP).
+2. **Sub-Card Dividers & Border Definition**: Add subtle theme-aware dividers between sub-card titles and content; strengthen card and sub-card boundary strokes for clean definition in Dark (`#363636`) and Light (`#E5E5E5`) modes.
+3. **Right-Edge Alignment Normalization**: Audit and align trailing controls (durations, master and individual sound toggles, preview buttons, comboboxes, shortcut buttons, Start with Windows toggle, reset position, import/export buttons).
+4. **Settings Copy Audit**: Audit every visible label and description for sentence case, consistent product naming, clarity, and conciseness.
+5. **Session Sounds Architecture**:
+   - Master gate toggle (`Session sounds [On/Off]`) controlling playback permission without overwriting child preferences.
+   - Individual `Start sound` setting with description, `Preview` button, and On/Off toggle switch.
+   - Individual `Completion sound` setting with description, `Preview` button, and On/Off toggle switch.
+   - Sound audition / Preview playing sound immediately even if master or individual sound is disabled.
+   - Visually subdued child controls (`Opacity = 0.45`, `IsEnabled = false`) when master toggle is OFF.
+6. **Playback Semantics & Backward Compatibility**:
+   - Start sound plays on new Work/Break start (not on resume/continue, not on selection changes).
+   - Completion sound plays on natural completion (not on stop/pause/interrupt).
+   - SQLite migration 13 for `start_sound_enabled` and `completion_sound_enabled` with backward-compatible defaults.
 
 ---
 

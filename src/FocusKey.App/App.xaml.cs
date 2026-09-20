@@ -32,6 +32,8 @@ public partial class App : Application
     private Appearance? _appliedAppearance;
     private SoundPlayerService? _sounds;
     private volatile bool _sessionSoundsEnabled = true;
+    private volatile bool _startSoundEnabled = true;
+    private volatile bool _completionSoundEnabled = true;
     private NativeMethods.SubclassProc? _windowSubclassProc;
 
     public App()
@@ -71,14 +73,19 @@ public partial class App : Application
             _startup = await FoundationBootstrap.RunAsync();
             var initialSettings = await _startup.Settings.LoadAsync();
             _sessionSoundsEnabled = initialSettings.SessionSoundsEnabled;
-            _sounds = new SoundPlayerService(() => _sessionSoundsEnabled);
+            _startSoundEnabled = initialSettings.StartSoundEnabled;
+            _completionSoundEnabled = initialSettings.CompletionSoundEnabled;
+            _sounds = new SoundPlayerService(
+                () => _sessionSoundsEnabled,
+                () => _startSoundEnabled,
+                () => _completionSoundEnabled);
             _startup.Logger.Info("Single-instance shell ownership acquired.");
             var integration = new WindowsShellIntegration(initialSettings.GlobalShortcut, initialSettings.MainWindowShortcut);
             _shellIntegration = integration;
             ApplyThemePalettes(_startup.Appearance.LightPalette, _startup.Appearance.DarkPalette);
             _window = new MainWindow(_startup, StartSessionAsync, StopSessionAsync,
                 exception => _startup?.Logger.Error("Main-page operation failed.", exception), RefreshSettingsAsync,
-                integration, PauseSessionAsync, ContinueSessionAsync);
+                integration, PauseSessionAsync, ContinueSessionAsync, _sounds);
             _window.ApplyShortcut(initialSettings.GlobalShortcut);
             _window.GlobalShortcutUpdated += shortcut => _quickOverlayWindow?.ApplyShortcut(shortcut);
             _window.SetActivityCollapsed(initialSettings.ActivityCollapsed);
@@ -306,6 +313,8 @@ public partial class App : Application
         var startup = _startup;
         var currentSettings = await startup.Settings.LoadAsync();
         _sessionSoundsEnabled = currentSettings.SessionSoundsEnabled;
+        _startSoundEnabled = currentSettings.StartSoundEnabled;
+        _completionSoundEnabled = currentSettings.CompletionSoundEnabled;
         _window?.ApplyTimeFormat(currentSettings.TimeFormat);
         _quickOverlayWindow?.ApplyPosition(currentSettings.OverlayPositionX, currentSettings.OverlayPositionY);
         await Task.Run(() => startup.Appearance.RefreshAsync());
@@ -457,7 +466,6 @@ public partial class App : Application
     private async Task<SessionOutcome> ContinueSessionAsync(SessionId expectedId, CancellationToken cancellationToken)
     {
         SessionOutcome result = await _completion!.ContinueAsync(expectedId, cancellationToken);
-        _sounds?.PlayStartTick();
         _window?.RefreshPages();
         if (_quickOverlay is not null) await _quickOverlay.RefreshIfVisibleAsync();
         return result;

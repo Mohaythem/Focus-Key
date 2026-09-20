@@ -1,29 +1,35 @@
 # Focus Key — Project Progress & State Checkpoint
 
 ## Current Goal
-Settings Visual Hierarchy & Nested Card Refinement implemented and verified with 816/816 passing tests and zero build warnings/errors.
+Settings Final Polish & Session Sounds Refinement implemented and verified with 825/825 passing tests and zero build warnings/errors.
 
 ## Current Checkpoint
 Implemented and verified:
-- **1. Top-Level Sections as Prominent Native Fluent Cards**:
-  - **SESSION (Permanent)**: Outer `FkCard` container (8px corner radius, 1px stroke), `"SESSION"` SemiBold 13px title header, 1px divider (`CardStrokeColorDefaultBrush`, opacity 0.6), and 3 session duration/sound rows.
-  - **APPEARANCE (Collapsible)**: Outer `FkCard` container, full-width 48px header button with SemiBold 13px title and animated chevron (`\uE76C` collapsed / `\uE70E` expanded), 1px divider, and nested sub-cards.
-  - **SHORTCUTS (Collapsible)**: Outer `FkCard` container, full-width 48px header button + chevron, 1px divider, and nested sub-cards.
-  - **ADVANCED (Collapsible)**: Outer `FkCard` container, full-width 48px header button + chevron, 1px divider, and nested sub-cards.
-- **2. Nested Sub-Cards**:
-  - Expanded content cleanly organized into sub-cards (`FkCardSubtle` surface, 6px corner radius, subtle uppercase title headings with `FkSectionText` style and 60 character spacing).
-  - **APPEARANCE Sub-Cards**: `SYSTEM APPEARANCE` (Color scheme, Contrast), `LIGHT THEME` (Preset, Bg, Fg, Accent), `DARK THEME` (Preset, Bg, Fg, Accent), `SESSION COLORS` (Work color, Break color), `DISPLAY` (Clock format).
-  - **SHORTCUTS Sub-Cards**: `QUICK OVERLAY` (Shortcut button + reset), `OPEN FOCUS KEY` (Shortcut button + reset).
-  - **ADVANCED Sub-Cards**: `STARTUP` (Start with Windows), `QUICK OVERLAY` (Reset position), `DATA` (Import history, Export history).
-- **3. Relocated Administrative Footer**:
-  - Auto-save feedback note (`_status`) and reload button (`_reload`) placed at the true bottom of the Settings page with clear vertical margin separation from the cards (`Margin = 4, 20, 4, 16`).
-- **4. Persistent SQLite Section Expansion (Migration 12)**:
-  - Columns `appearance_expanded`, `shortcuts_expanded`, `advanced_expanded` in `application_settings`.
-  - Expansion states survive page navigation and application restarts.
-- **5. Zero Feature Loss & Scope Discipline**:
-  - 100% of the 15 existing settings preserved with full bidirectional binding.
-  - No changes to Today, Reports, Quick Overlay, or Close dialog surfaces.
-- **Automated Tests**: 816/816 unit tests passing (`dotnet test -c Release`), 0 failed, 0 skipped.
+- **1. Settings Page Title & Visual Hierarchy**:
+  - Prominent "Settings" page heading matching Today/Reports typography (`FkPageTitle` style, 28px SemiBold, 0 DIP left margin).
+  - 16 DIP vertical spacing before `SESSION` card (`Margin = 0, 16, 0, 0`).
+- **2. Sub-Card Dividers & Border Definition**:
+  - Subtle theme-aware dividers inside all Settings sub-cards (`Rectangle` 1px height, `CardStrokeColorDefaultBrush`, `Opacity = 0.4`, `Margin = 0, 0, 0, 10`).
+  - Strengthened card and sub-card border definition in Dark mode (`#363636` border stroke) while keeping Light mode natural and soft (`#E5E5E5`).
+- **3. Normalized Right-Edge Alignment**:
+  - Normalized all trailing controls (`ToggleSwitch` controls use `MinWidth = 0`, shared right margin `Margin = 0, 0, 0, 0`, consistent action button sizing).
+- **4. Polished Settings Copy**:
+  - Sentence case across all section headings, sub-card titles, descriptions, and action buttons.
+  - Consistent periods on explanatory descriptions, clear and concise terminology.
+- **5. Session Sounds Architecture**:
+  - Master gate toggle (`Session sounds [On/Off]`) controlling playback permission without overwriting child preferences.
+  - Granular `Start sound` toggle + description + unconditional `Preview` action.
+  - Granular `Completion sound` toggle + description + unconditional `Preview` action.
+  - Child toggles subdued visually (`Opacity = 0.45`, `IsEnabled = false`) when master toggle is OFF.
+  - Preview buttons remain active and play audio unconditionally regardless of toggle states.
+- **6. Playback Semantics & Backward Compatibility**:
+  - Start sound plays strictly on new session start (never on resume/continue).
+  - Completion sound plays strictly on natural completion (never on stop/pause/interrupt).
+  - SQLite Migration 13 (`individual_session_sounds_settings`) adding `start_sound_enabled` (default 1) and `completion_sound_enabled` (default 1) with backward-compatible defaults.
+- **7. Zero Feature Loss & Scope Discipline**:
+  - 100% of existing settings preserved with full bidirectional binding and live theme refresh.
+  - Zero regressions across Today, Reports, Quick Overlay, or MainWindow drag/close logic.
+- **Automated Tests**: 825/825 unit tests passing (`dotnet test -c Release`), 0 failed, 0 skipped.
 - **Build**: 0 Warning(s), 0 Error(s) (`dotnet build src/FocusKey.App/FocusKey.App.csproj -c Release`).
 
 ## Completed Work
@@ -44,6 +50,7 @@ Implemented and verified:
 - **Stage 10 (Today Native Windows Adaptive Redesign)**: Adaptive navigation shell (Expanded 220 DIP, Compact rail 54 DIP, Collapsed 0 DIP with drawer), 2-column desktop composition on Wide/Medium and single vertical stack on Narrow, zero-layout-jump Session Hero with integrated idle switcher, restrained active-session navigation status dot, and unclipped timer digit typography.
 - **Stage 10b (Post-Today UX Refinement Pass)**: Keyboard navigation & activation (Left/Right arrows for idle selector, Up/Down for nav, Esc for drawer), preserved session-colored Today status dot, stable Today activity overflow scrolling (420 DIP max height internal viewer), 4 fixed weekly buckets in monthly reports, and enlarged draggable Quick Overlay header.
 - **Stage 14 (Settings Information Architecture & Nested Card Hierarchy)**: Restructured 4 top-level sections as native Fluent cards (`SESSION`, `APPEARANCE`, `SHORTCUTS`, `ADVANCED`), sub-card grouping (`FkCardSubtle`), 48px button headers with chevron toggle and full keyboard accessibility, SQLite expansion persistence, and bottom-anchored reload footer.
+- **Settings Final Polish & Session Sounds Refinement**: Prominent Settings page header, 16 DIP top vertical spacing, sub-card title dividers, darkened `#363636` borders, normalized right-edge alignment, full copy audit, master + granular session sounds with unconditional previews, Continue non-retriggering start sound, and SQLite Migration 13.
 
 ## Remaining Work
 - **Stage 11: Final Consistency QA & Windows Packaging**
@@ -51,15 +58,15 @@ Implemented and verified:
   - Package clean standalone Release installer (`FocusKeySetup.exe`).
 
 ## Important Active Decisions
-- **Top-Level Card Consistency**: Top-level sections wrap both header and content in an outer `FkCard` border, maintaining clear visual boundaries regardless of expanded/collapsed state.
-- **Sub-Card Grouping**: Nested groups within expanded sections use `FkCardSubtle` surfaces with 6px corner radius and `FkSectionText` headings to provide clear secondary hierarchy without visual clutter.
-- **Header Button Affordance**: Header buttons use 48px height, 16px horizontal padding, and transparent background to ensure the entire card top is clickable and responds with native hover/press states.
-- **Tab Focus Hygiene**: Collapsed section content is set to `Visibility = Visibility.Collapsed` to completely remove offscreen/collapsed controls from keyboard focus.
+- **Master Gate vs Granular Sound Preferences**: The master `SessionSoundsEnabled` gate controls playback permission without mutating individual `StartSoundEnabled` / `CompletionSoundEnabled` preferences. When master is OFF, child controls are visually subdued (`Opacity = 0.45`) and disabled, but retain their configured states.
+- **Unconditional Preview Audition**: Preview buttons on Start and Completion sound rows always play the sound immediately via `ISoundPlayer.PreviewStartTick()` and `PreviewCompletionBell()`, allowing users to test sounds even if sounds are currently disabled.
+- **Continue Playback Semantics**: Resuming a paused session via `Continue` never re-triggers the Start tick sound; Start tick is strictly for newly initialized sessions.
+- **Border Definition**: In Dark mode, outer cards and sub-cards use `#363636` (`FkBorder`, `CardStrokeColorDefaultBrush`, and preset borders) for crisp visual separation against the `#1E1E1E` and `#252525` background layers.
 
 ## Last Verification
 - **Build**: `dotnet build src/FocusKey.App/FocusKey.App.csproj -c Release` (0 Warnings, 0 Errors).
-- **Test Suite**: `dotnet test -c Release` (816 passed, 0 failed, 0 skipped).
+- **Test Suite**: `dotnet test -c Release` (825 passed, 0 failed, 0 skipped).
 
 ## Current Git State
 - Branch: `native/phased-rewrite`
-- Working tree contains verified Settings visual hierarchy & nested card refinement.
+- Working tree contains verified Settings final polish & session sounds refinement.

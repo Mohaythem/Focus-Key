@@ -9,16 +9,31 @@ public sealed class SessionSoundCoordinationTests
     {
         public int StartTickCount { get; private set; }
         public int CompletionBellCount { get; private set; }
-        public bool Enabled { get; set; } = true;
+        public int PreviewStartTickCount { get; private set; }
+        public int PreviewCompletionBellCount { get; private set; }
+
+        public bool SessionSoundsEnabled { get; set; } = true;
+        public bool StartSoundEnabled { get; set; } = true;
+        public bool CompletionSoundEnabled { get; set; } = true;
 
         public void PlayStartTick()
         {
-            if (Enabled) StartTickCount++;
+            if (SessionSoundsEnabled && StartSoundEnabled) StartTickCount++;
         }
 
         public void PlayCompletionBell()
         {
-            if (Enabled) CompletionBellCount++;
+            if (SessionSoundsEnabled && CompletionSoundEnabled) CompletionBellCount++;
+        }
+
+        public void PreviewStartTick()
+        {
+            PreviewStartTickCount++;
+        }
+
+        public void PreviewCompletionBell()
+        {
+            PreviewCompletionBellCount++;
         }
     }
 
@@ -126,12 +141,84 @@ public sealed class SessionSoundCoordinationTests
     [Fact]
     public void SoundsDisabled_SuppressesBothStartAndCompletionSounds()
     {
-        var sound = new MockSoundPlayer { Enabled = false };
+        var sound = new MockSoundPlayer { SessionSoundsEnabled = false };
 
         sound.PlayStartTick();
         sound.PlayCompletionBell();
 
         Assert.Equal(0, sound.StartTickCount);
         Assert.Equal(0, sound.CompletionBellCount);
+    }
+
+    [Fact]
+    public void StartSoundDisabled_SuppressesStartSoundOnly()
+    {
+        var sound = new MockSoundPlayer { StartSoundEnabled = false };
+
+        sound.PlayStartTick();
+        sound.PlayCompletionBell();
+
+        Assert.Equal(0, sound.StartTickCount);
+        Assert.Equal(1, sound.CompletionBellCount);
+    }
+
+    [Fact]
+    public void CompletionSoundDisabled_SuppressesCompletionSoundOnly()
+    {
+        var sound = new MockSoundPlayer { CompletionSoundEnabled = false };
+
+        sound.PlayStartTick();
+        sound.PlayCompletionBell();
+
+        Assert.Equal(1, sound.StartTickCount);
+        Assert.Equal(0, sound.CompletionBellCount);
+    }
+
+    [Fact]
+    public void PreviewSounds_PlayEvenWhenAllSoundsAreDisabled()
+    {
+        var sound = new MockSoundPlayer
+        {
+            SessionSoundsEnabled = false,
+            StartSoundEnabled = false,
+            CompletionSoundEnabled = false
+        };
+
+        sound.PreviewStartTick();
+        sound.PreviewCompletionBell();
+
+        Assert.Equal(1, sound.PreviewStartTickCount);
+        Assert.Equal(1, sound.PreviewCompletionBellCount);
+        Assert.Equal(0, sound.StartTickCount);
+        Assert.Equal(0, sound.CompletionBellCount);
+    }
+
+    [Fact]
+    public async Task ContinueSession_DoesNotTriggerStartSound()
+    {
+        var sound = new MockSoundPlayer();
+        using var store = new SessionStore();
+        var clock = new ManualTimeProvider(TestSessions.Anchor);
+        var sessions = new SessionCoordinator(store.Repository, clock);
+        await sessions.InitializeAsync();
+
+        var session = await sessions.StartAsync(SessionType.Work);
+        sound.PlayStartTick();
+        Assert.Equal(1, sound.StartTickCount);
+
+        // Pause session
+        clock.Advance(TimeSpan.FromMinutes(5));
+        var paused = await sessions.PauseAsync(session.Id);
+        Assert.NotNull(paused.Session);
+        Assert.NotNull(paused.Session.PausedAt);
+
+        // Resume / Continue session: In App.xaml.cs, Continue does NOT call sound.PlayStartTick()
+        clock.Advance(TimeSpan.FromMinutes(2));
+        var resumed = await sessions.ContinueAsync(session.Id);
+        Assert.NotNull(resumed.Session);
+        Assert.Null(resumed.Session.PausedAt);
+
+        // Start sound must still be 1 (never re-triggered on resume)
+        Assert.Equal(1, sound.StartTickCount);
     }
 }

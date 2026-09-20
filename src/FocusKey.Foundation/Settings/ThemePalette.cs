@@ -41,7 +41,7 @@ public sealed record ThemePalette
                 Sidebar = HexFrom(Blend(0.03)),
                 Surface = HexFrom(Blend(0.04)),
                 Surface2 = HexFrom(Blend(0.08)),
-                Border = HexFrom(Blend(0.14)),
+                Border = HexFrom(Blend(0.18)),
                 Secondary = HexFrom(Blend(0.60)),
                 Dim = HexFrom(Blend(0.38)),
             };

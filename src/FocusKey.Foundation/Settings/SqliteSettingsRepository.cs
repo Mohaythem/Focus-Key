@@ -13,7 +13,7 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
         await using SqliteCommand command = connection.CreateCommand();
         command.CommandText =
             """
-            SELECT work_duration_seconds, break_duration_seconds, appearance, work_color, break_color, session_sounds_enabled, activity_collapsed, global_shortcut, main_window_shortcut, overlay_position_x, overlay_position_y, time_format, appearance_expanded, shortcuts_expanded, advanced_expanded
+            SELECT work_duration_seconds, break_duration_seconds, appearance, work_color, break_color, session_sounds_enabled, activity_collapsed, global_shortcut, main_window_shortcut, overlay_position_x, overlay_position_y, time_format, appearance_expanded, shortcuts_expanded, advanced_expanded, start_sound_enabled, completion_sound_enabled
             FROM application_settings WHERE singleton = 1;
             """;
         await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
@@ -40,6 +40,8 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
             bool appearanceExpanded = !reader.IsDBNull(12) && reader.GetInt64(12) != 0;
             bool shortcutsExpanded = !reader.IsDBNull(13) && reader.GetInt64(13) != 0;
             bool advancedExpanded = !reader.IsDBNull(14) && reader.GetInt64(14) != 0;
+            bool startSoundEnabled = reader.IsDBNull(15) || reader.GetInt64(15) != 0;
+            bool completionSoundEnabled = reader.IsDBNull(16) || reader.GetInt64(16) != 0;
             if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
                 throw new InvalidDataException("More than one authoritative application settings record exists.");
             await reader.CloseAsync().ConfigureAwait(false);
@@ -57,6 +59,8 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
                 LightTheme = lightTheme,
                 DarkTheme = darkTheme,
                 SessionSoundsEnabled = soundsEnabled,
+                StartSoundEnabled = startSoundEnabled,
+                CompletionSoundEnabled = completionSoundEnabled,
                 ActivityCollapsed = activityCollapsed,
                 GlobalShortcut = globalShortcut,
                 MainWindowShortcut = mainWindowShortcut,
@@ -94,6 +98,8 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
                 work_color = $workColor,
                 break_color = $breakColor,
                 session_sounds_enabled = $sounds,
+                start_sound_enabled = $startSound,
+                completion_sound_enabled = $completionSound,
                 activity_collapsed = $activityCollapsed,
                 global_shortcut = $globalShortcut,
                 main_window_shortcut = $mainWindowShortcut,
@@ -113,6 +119,8 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
         command.Parameters.AddWithValue("$workColor", settings.WorkColor.Value);
         command.Parameters.AddWithValue("$breakColor", settings.BreakColor.Value);
         command.Parameters.AddWithValue("$sounds", settings.SessionSoundsEnabled ? 1 : 0);
+        command.Parameters.AddWithValue("$startSound", settings.StartSoundEnabled ? 1 : 0);
+        command.Parameters.AddWithValue("$completionSound", settings.CompletionSoundEnabled ? 1 : 0);
         command.Parameters.AddWithValue("$activityCollapsed", settings.ActivityCollapsed ? 1 : 0);
         command.Parameters.AddWithValue("$globalShortcut", (settings.GlobalShortcut ?? GlobalShortcut.Default).ToString());
         command.Parameters.AddWithValue("$mainWindowShortcut", (settings.MainWindowShortcut ?? GlobalShortcut.DefaultMainWindow).ToString());

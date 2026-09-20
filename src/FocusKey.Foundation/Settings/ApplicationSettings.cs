@@ -14,6 +14,8 @@ public sealed record ApplicationSettings
         LightTheme = ThemeConfiguration.DefaultLight,
         DarkTheme = ThemeConfiguration.DefaultDark,
         SessionSoundsEnabled = true,
+        StartSoundEnabled = true,
+        CompletionSoundEnabled = true,
         ActivityCollapsed = true,
         GlobalShortcut = GlobalShortcut.Default,
         MainWindowShortcut = GlobalShortcut.DefaultMainWindow,
@@ -34,6 +36,8 @@ public sealed record ApplicationSettings
     public ThemeConfiguration LightTheme { get; init; } = ThemeConfiguration.DefaultLight;
     public ThemeConfiguration DarkTheme { get; init; } = ThemeConfiguration.DefaultDark;
     public bool SessionSoundsEnabled { get; init; } = true;
+    public bool StartSoundEnabled { get; init; } = true;
+    public bool CompletionSoundEnabled { get; init; } = true;
     public bool ActivityCollapsed { get; init; } = true;
     public GlobalShortcut GlobalShortcut { get; init; } = GlobalShortcut.Default;
     public GlobalShortcut MainWindowShortcut { get; init; } = GlobalShortcut.DefaultMainWindow;

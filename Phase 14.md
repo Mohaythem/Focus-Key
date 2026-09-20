@@ -94,9 +94,38 @@ Each collapsible section uses a dedicated WinUI 3 card header:
 ## 5. Verification Results
 
 1. **Automated Unit Tests**:
-   - `dotnet test -c Release`: 816/816 unit tests passing (0 failed, 0 skipped).
+   - `dotnet test -c Release`: 825/825 unit tests passing (0 failed, 0 skipped).
 2. **Release Build**:
    - `dotnet build src/FocusKey.App/FocusKey.App.csproj -c Release`: 0 warnings, 0 errors.
 3. **Runtime & Visual Verification**:
-   - Verified persistence of all 3 expansion flags across app navigation and restarts.
+   - Verified persistence of all expansion flags and granular sound settings across app navigation and restarts.
    - Tested responsive behavior across Wide, Medium, and Narrow viewports.
+
+---
+
+## 6. Settings Final Polish & Session Sounds Refinement
+
+### Architectural Additions
+1. **Prominent Settings Header**: Added `"Settings"` page heading in `FkPageTitle` style (28px SemiBold, 0 DIP left margin) with 16 DIP spacing before the `SESSION` card.
+2. **Sub-Card Dividers & Border Definition**:
+   - Added subtle theme-aware dividers (`Rectangle` 1px height, `CardStrokeColorDefaultBrush`, `Opacity = 0.4`, `Margin = 0, 0, 0, 10`) separating sub-card titles and content.
+   - Strengthened card and sub-card border strokes in Dark mode to `#363636` while keeping Light mode natural and soft (`#E5E5E5`).
+3. **Normalized Right-Edge Alignment**:
+   - Normalized all trailing controls (`ToggleSwitch` controls use `MinWidth = 0`, shared right margin `0, 0, 0, 0`, consistent action button sizing).
+4. **Copy Audit**:
+   - Normalized all labels, sub-card titles, descriptions, and buttons to sentence case and concise phrasing with consistent periods.
+5. **Session Sounds Master + Granular Model**:
+   - Master gate toggle (`Session sounds [On/Off]`) controlling playback permission without mutating child preferences.
+   - Granular `Start sound` toggle + description + unconditional `Preview` action.
+   - Granular `Completion sound` toggle + description + unconditional `Preview` action.
+   - Child toggles subdued visually (`Opacity = 0.45`, `IsEnabled = false`) when master toggle is OFF.
+   - Preview buttons remain active and play audio unconditionally regardless of toggle states.
+6. **Playback Semantics**:
+   - Start sound plays strictly on new session start (never on resume/continue).
+   - Completion sound plays strictly on natural completion (never on stop/pause/interrupt).
+7. **Database Schema Migration 13**:
+```sql
+ALTER TABLE application_settings ADD COLUMN start_sound_enabled INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE application_settings ADD COLUMN completion_sound_enabled INTEGER NOT NULL DEFAULT 1;
+```
+

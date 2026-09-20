@@ -7,7 +7,7 @@ public enum SettingsField
     WorkDuration, BreakDuration, Appearance, Contrast, WorkColor, BreakColor,
     LightPreset, LightBackground, LightForeground, LightAccent,
     DarkPreset, DarkBackground, DarkForeground, DarkAccent,
-    SessionSounds, GlobalShortcut, MainWindowShortcut,
+    SessionSounds, StartSound, CompletionSound, GlobalShortcut, MainWindowShortcut,
     TimeFormat, OverlayPosition,
     AppearanceExpanded, ShortcutsExpanded, AdvancedExpanded
 }
@@ -70,6 +70,10 @@ public sealed class SettingsPageController(SettingsService settings, Func<Task> 
         ChangeAsync(SettingsField.BreakColor, () => settings.UpdateBreakColorAsync(value), cancellationToken);
     public Task UpdateSessionSoundsAsync(bool value, CancellationToken cancellationToken = default) =>
         ChangeAsync(SettingsField.SessionSounds, () => settings.UpdateSessionSoundsEnabledAsync(value), cancellationToken);
+    public Task UpdateStartSoundAsync(bool value, CancellationToken cancellationToken = default) =>
+        ChangeAsync(SettingsField.StartSound, () => settings.UpdateStartSoundEnabledAsync(value), cancellationToken);
+    public Task UpdateCompletionSoundAsync(bool value, CancellationToken cancellationToken = default) =>
+        ChangeAsync(SettingsField.CompletionSound, () => settings.UpdateCompletionSoundEnabledAsync(value), cancellationToken);
     public Task UpdateGlobalShortcutAsync(GlobalShortcut value, CancellationToken cancellationToken = default) =>
         ChangeAsync(SettingsField.GlobalShortcut, () => settings.UpdateGlobalShortcutAsync(value), cancellationToken);
     public Task UpdateMainWindowShortcutAsync(GlobalShortcut value, CancellationToken cancellationToken = default) =>

@@ -147,7 +147,7 @@ public sealed class SettingsPersistenceTests
 
         Assert.Equal(10, result.SchemaVersionBefore);
         Assert.Equal(SchemaMigrations.TargetVersion, result.SchemaVersionAfter);
-        Assert.Equal([11, 12], result.AppliedMigrations);
+        Assert.Equal([11, 12, 13], result.AppliedMigrations);
 
         var repo = new SqliteSettingsRepository(connections);
         ApplicationSettings settings = await repo.LoadAsync();
@@ -157,6 +157,8 @@ public sealed class SettingsPersistenceTests
         Assert.False(settings.AppearanceExpanded);
         Assert.False(settings.ShortcutsExpanded);
         Assert.False(settings.AdvancedExpanded);
+        Assert.True(settings.StartSoundEnabled);
+        Assert.True(settings.CompletionSoundEnabled);
         ClearPool(connections);
     }
 
@@ -172,13 +174,36 @@ public sealed class SettingsPersistenceTests
 
         Assert.Equal(11, result.SchemaVersionBefore);
         Assert.Equal(SchemaMigrations.TargetVersion, result.SchemaVersionAfter);
-        Assert.Equal([12], result.AppliedMigrations);
+        Assert.Equal([12, 13], result.AppliedMigrations);
 
         var repo = new SqliteSettingsRepository(connections);
         ApplicationSettings settings = await repo.LoadAsync();
         Assert.False(settings.AppearanceExpanded);
         Assert.False(settings.ShortcutsExpanded);
         Assert.False(settings.AdvancedExpanded);
+        Assert.True(settings.StartSoundEnabled);
+        Assert.True(settings.CompletionSoundEnabled);
+        ClearPool(connections);
+    }
+
+    [Fact]
+    public async Task SchemaTwelveDatabaseMigratesToThirteenWithSessionSoundFlags()
+    {
+        using var temp = new TempDirectory();
+        string file = Path.Combine(temp.Path, "focus_key.db");
+        var connections = new SqliteConnectionFactory(file);
+        CreateSchemaTwelve(connections);
+
+        DatabaseInitializationResult result = new DatabaseBootstrapper(connections).Initialize();
+
+        Assert.Equal(12, result.SchemaVersionBefore);
+        Assert.Equal(SchemaMigrations.TargetVersion, result.SchemaVersionAfter);
+        Assert.Equal([13], result.AppliedMigrations);
+
+        var repo = new SqliteSettingsRepository(connections);
+        ApplicationSettings settings = await repo.LoadAsync();
+        Assert.True(settings.StartSoundEnabled);
+        Assert.True(settings.CompletionSoundEnabled);
         ClearPool(connections);
     }
 
@@ -367,6 +392,18 @@ public sealed class SettingsPersistenceTests
                 $"INSERT INTO schema_migrations VALUES ({migration.Version}, '{migration.Name}', '{UtcTimestamp.Format(TestSessions.Anchor)}');");
         }
         Execute(connection, "PRAGMA user_version = 11;");
+    }
+
+    private static void CreateSchemaTwelve(SqliteConnectionFactory connections)
+    {
+        using SqliteConnection connection = connections.OpenConnection();
+        foreach (SchemaMigration migration in SchemaMigrations.All.Where(m => m.Version <= 12))
+        {
+            Execute(connection, migration.Sql);
+            Execute(connection,
+                $"INSERT INTO schema_migrations VALUES ({migration.Version}, '{migration.Name}', '{UtcTimestamp.Format(TestSessions.Anchor)}');");
+        }
+        Execute(connection, "PRAGMA user_version = 12;");
     }
 
     private static void Execute(SqliteConnection connection, string sql)

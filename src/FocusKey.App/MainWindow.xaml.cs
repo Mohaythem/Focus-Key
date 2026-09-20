@@ -123,7 +123,8 @@ public sealed partial class MainWindow : Window
         Func<Task> refreshSettings,
         WindowsShellIntegration shellIntegration,
         Func<SessionId, CancellationToken, Task<SessionOutcome>>? pause = null,
-        Func<SessionId, CancellationToken, Task<SessionOutcome>>? @continue = null)
+        Func<SessionId, CancellationToken, Task<SessionOutcome>>? @continue = null,
+        FocusKey.Shell.ISoundPlayer? soundPlayer = null)
     {
         InitializeComponent();
         _settingsService = startup.Settings;
@@ -148,7 +149,9 @@ public sealed partial class MainWindow : Window
             sc =>
             {
                 // Main window shortcut updated
-            });
+            },
+            () => soundPlayer?.PreviewStartTick(),
+            () => soundPlayer?.PreviewCompletionBell());
         SettingsHost.Content = _settings;
         var hwnd = WindowNative.GetWindowHandle(this);
         startup.Logger.Info($"Main window HWND: {hwnd}.");

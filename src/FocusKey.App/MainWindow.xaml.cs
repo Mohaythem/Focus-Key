@@ -263,13 +263,18 @@ public sealed partial class MainWindow : Window
         await OpenReportsAsync();
     }
 
-    private async void OnSettingsClick(object sender, RoutedEventArgs args)
+    internal async Task OpenSettingsAsync()
     {
         CloseNavDrawer();
         _settings.CommitPendingDurations();
         _reports.Hide();
         await _today.NavigateAsync(MainPage.Settings);
         await _settings.OpenAsync();
+    }
+
+    private async void OnSettingsClick(object sender, RoutedEventArgs args)
+    {
+        await OpenSettingsAsync();
     }
 
     private async void OnRefreshClick(object sender, RoutedEventArgs args) => await _today.RefreshAsync();

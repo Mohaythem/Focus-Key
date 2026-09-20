@@ -20,6 +20,9 @@ public sealed record ApplicationSettings
         TimeFormat = TimeFormat.TwentyFourHour,
         OverlayPositionX = null,
         OverlayPositionY = null,
+        AppearanceExpanded = false,
+        ShortcutsExpanded = false,
+        AdvancedExpanded = false,
     };
 
     public required TimeSpan WorkDuration { get; init; }
@@ -37,6 +40,9 @@ public sealed record ApplicationSettings
     public TimeFormat TimeFormat { get; init; } = TimeFormat.TwentyFourHour;
     public int? OverlayPositionX { get; init; }
     public int? OverlayPositionY { get; init; }
+    public bool AppearanceExpanded { get; init; } = false;
+    public bool ShortcutsExpanded { get; init; } = false;
+    public bool AdvancedExpanded { get; init; } = false;
 
     public void Validate()
     {

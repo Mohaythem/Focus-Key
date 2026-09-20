@@ -147,14 +147,74 @@ public sealed class SettingsPersistenceTests
 
         Assert.Equal(10, result.SchemaVersionBefore);
         Assert.Equal(SchemaMigrations.TargetVersion, result.SchemaVersionAfter);
-        Assert.Equal([11], result.AppliedMigrations);
+        Assert.Equal([11, 12], result.AppliedMigrations);
 
         var repo = new SqliteSettingsRepository(connections);
         ApplicationSettings settings = await repo.LoadAsync();
         Assert.Equal(TimeFormat.TwentyFourHour, settings.TimeFormat);
         Assert.Null(settings.OverlayPositionX);
         Assert.Null(settings.OverlayPositionY);
+        Assert.False(settings.AppearanceExpanded);
+        Assert.False(settings.ShortcutsExpanded);
+        Assert.False(settings.AdvancedExpanded);
         ClearPool(connections);
+    }
+
+    [Fact]
+    public async Task SchemaElevenDatabaseMigratesToTwelveWithSectionExpansionFlags()
+    {
+        using var temp = new TempDirectory();
+        string file = Path.Combine(temp.Path, "focus_key.db");
+        var connections = new SqliteConnectionFactory(file);
+        CreateSchemaEleven(connections);
+
+        DatabaseInitializationResult result = new DatabaseBootstrapper(connections).Initialize();
+
+        Assert.Equal(11, result.SchemaVersionBefore);
+        Assert.Equal(SchemaMigrations.TargetVersion, result.SchemaVersionAfter);
+        Assert.Equal([12], result.AppliedMigrations);
+
+        var repo = new SqliteSettingsRepository(connections);
+        ApplicationSettings settings = await repo.LoadAsync();
+        Assert.False(settings.AppearanceExpanded);
+        Assert.False(settings.ShortcutsExpanded);
+        Assert.False(settings.AdvancedExpanded);
+        ClearPool(connections);
+    }
+
+    [Fact]
+    public async Task SqliteSettingsRepository_SavesAndLoads_SectionExpansionFlags()
+    {
+        using var fixture = new Fixture();
+        var changed = ApplicationSettings.Default with
+        {
+            AppearanceExpanded = true,
+            ShortcutsExpanded = true,
+            AdvancedExpanded = true,
+        };
+        await fixture.Repository.SaveAsync(changed);
+
+        var reopened = new SqliteSettingsRepository(new SqliteConnectionFactory(fixture.File));
+        ApplicationSettings loaded = await reopened.LoadAsync();
+        Assert.True(loaded.AppearanceExpanded);
+        Assert.True(loaded.ShortcutsExpanded);
+        Assert.True(loaded.AdvancedExpanded);
+    }
+
+    [Fact]
+    public async Task SettingsService_UpdatesSectionExpansionAndSurvivesRestart()
+    {
+        using var fixture = new Fixture();
+        var service = new SettingsService(fixture.Repository);
+        await service.UpdateAppearanceExpandedAsync(true);
+        await service.UpdateShortcutsExpandedAsync(false);
+        await service.UpdateAdvancedExpandedAsync(true);
+
+        var reopened = new SqliteSettingsRepository(new SqliteConnectionFactory(fixture.File));
+        ApplicationSettings loaded = await reopened.LoadAsync();
+        Assert.True(loaded.AppearanceExpanded);
+        Assert.False(loaded.ShortcutsExpanded);
+        Assert.True(loaded.AdvancedExpanded);
     }
 
     [Fact]
@@ -295,6 +355,18 @@ public sealed class SettingsPersistenceTests
                 $"INSERT INTO schema_migrations VALUES ({migration.Version}, '{migration.Name}', '{UtcTimestamp.Format(TestSessions.Anchor)}');");
         }
         Execute(connection, "PRAGMA user_version = 10;");
+    }
+
+    private static void CreateSchemaEleven(SqliteConnectionFactory connections)
+    {
+        using SqliteConnection connection = connections.OpenConnection();
+        foreach (SchemaMigration migration in SchemaMigrations.All.Where(m => m.Version <= 11))
+        {
+            Execute(connection, migration.Sql);
+            Execute(connection,
+                $"INSERT INTO schema_migrations VALUES ({migration.Version}, '{migration.Name}', '{UtcTimestamp.Format(TestSessions.Anchor)}');");
+        }
+        Execute(connection, "PRAGMA user_version = 11;");
     }
 
     private static void Execute(SqliteConnection connection, string sql)

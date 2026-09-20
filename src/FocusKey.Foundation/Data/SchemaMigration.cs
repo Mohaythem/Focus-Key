@@ -244,5 +244,14 @@ public static class SchemaMigrations
                 ALTER TABLE application_settings ADD COLUMN overlay_position_y INTEGER;
                 ALTER TABLE application_settings ADD COLUMN time_format TEXT NOT NULL DEFAULT '24h';
                 """),
+
+        new SchemaMigration(
+            Version: 12,
+            Name: "settings_sections_expanded",
+            Sql: """
+                ALTER TABLE application_settings ADD COLUMN appearance_expanded INTEGER NOT NULL DEFAULT 0;
+                ALTER TABLE application_settings ADD COLUMN shortcuts_expanded INTEGER NOT NULL DEFAULT 0;
+                ALTER TABLE application_settings ADD COLUMN advanced_expanded INTEGER NOT NULL DEFAULT 0;
+                """),
     ];
 }

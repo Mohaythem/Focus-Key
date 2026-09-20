@@ -1,23 +1,26 @@
 # Focus Key — Project Progress & State Checkpoint
 
 ## Current Goal
-Keyboard-First UX + Quick Overlay Drag Correction + Activity Scrollbar Breathing Room implemented and verified with 812/812 passing tests and zero build warnings/errors.
+Settings Information Architecture & Collapsible Sections Redesign implemented and verified with 816/816 passing tests and zero build warnings/errors.
 
 ## Current Checkpoint
 Implemented and verified:
-- **1. Today Keyboard-First Experience (No Tab First)**:
-  - **Idle State**: Automatically targets the session selection context on window activation / open. Left Arrow selects Work, Right Arrow selects Break, Enter/Space starts the session immediately without requiring Tab first.
-  - **Running State**: Enter or Space pauses the session immediately without requiring Tab first.
-  - **Paused State**: Continue is focused by default; Left/Right arrows toggle between Continue and Start New; Enter/Space activates the selected button.
-  - Tab cycling preserved cleanly without focus traps.
-- **2. Navigation Direct Arrow Keys**:
-  - Up/Down arrows traverse navigation destinations in Expanded pane, Compact rail, and Narrow drawer (`OnNavGridPreviewKeyDown`, `OnNavDrawerPanePreviewKeyDown`). Enter/Space activates destination; Esc closes the drawer and returns focus to Hamburger button.
-- **3. Quick Overlay Press-Drag-Release**:
-  - Continuous pointer capture (`CapturePointer`, `GetCursorPos`, `AppWindow.Move`) provides standard press-drag-release movement.
-  - Zero toggle stickiness, no modal non-client move loop locking. Interactive controls remain responsive.
-- **4. Activity Scrollbar Padding**:
-  - Right padding (`Padding="0,0,10,0"`) and row column spacing with `CharacterEllipsis` prevent vertical scrollbar from overlapping "Completed" or other status text.
-- **Automated Tests**: 812/812 unit tests passing (`dotnet test -c Release`), 0 failed, 0 skipped.
+- **1. Settings 4-Section Information Architecture**:
+  - **SESSION (Permanent, Top Priority)**: Work duration, Break duration, Session sounds.
+  - **APPEARANCE (Collapsible, Default Collapsed)**: Color scheme, Contrast, Light theme preset/colors, Dark theme preset/colors, Clock format, Session colors.
+  - **SHORTCUTS (Collapsible, Default Collapsed)**: Quick Overlay global shortcut, Open Focus Key global shortcut.
+  - **ADVANCED (Collapsible, Default Collapsed)**: Launch with Windows, Reset Overlay Position, Import history, Export history.
+- **2. Persistent SQLite Section Expansion (Migration 12)**:
+  - Columns `appearance_expanded`, `shortcuts_expanded`, `advanced_expanded` added to `application_settings`.
+  - Expansion states survive page navigation and application restarts.
+- **3. Native WinUI 3 Restrained Collapsible Headers**:
+  - Clean, full-width headers with fluent chevron icons (`\uE76C` collapsed, `\uE70E` expanded).
+  - Full keyboard accessibility (`Enter`/`Space`), screen reader state announcements (`"{Section}, expanded"` / `"{Section}, collapsed"`).
+  - Proper tab-focus hygiene: collapsed content is set to `Visibility.Collapsed` removing children from the keyboard focus cycle.
+- **4. Zero Feature Loss & Scope Discipline**:
+  - 100% of the 15 existing settings preserved.
+  - No changes to Today, Reports, Quick Overlay, or Close dialog surfaces.
+- **Automated Tests**: 816/816 unit tests passing (`dotnet test -c Release`), 0 failed, 0 skipped.
 - **Build**: 0 Warning(s), 0 Error(s) (`dotnet build src/FocusKey.App/FocusKey.App.csproj -c Release`).
 
 ## Completed Work

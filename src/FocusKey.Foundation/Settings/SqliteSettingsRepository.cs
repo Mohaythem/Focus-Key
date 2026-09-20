@@ -13,7 +13,7 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
         await using SqliteCommand command = connection.CreateCommand();
         command.CommandText =
             """
-            SELECT work_duration_seconds, break_duration_seconds, appearance, work_color, break_color, session_sounds_enabled, activity_collapsed, global_shortcut, main_window_shortcut, overlay_position_x, overlay_position_y, time_format
+            SELECT work_duration_seconds, break_duration_seconds, appearance, work_color, break_color, session_sounds_enabled, activity_collapsed, global_shortcut, main_window_shortcut, overlay_position_x, overlay_position_y, time_format, appearance_expanded, shortcuts_expanded, advanced_expanded
             FROM application_settings WHERE singleton = 1;
             """;
         await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
@@ -37,6 +37,9 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
             int? overlayX = reader.IsDBNull(9) ? null : reader.GetInt32(9);
             int? overlayY = reader.IsDBNull(10) ? null : reader.GetInt32(10);
             var timeFormat = reader.IsDBNull(11) ? TimeFormat.TwentyFourHour : (TimeFormatText.TryParse(reader.GetString(11), out var tf) ? tf : TimeFormat.TwentyFourHour);
+            bool appearanceExpanded = !reader.IsDBNull(12) && reader.GetInt64(12) != 0;
+            bool shortcutsExpanded = !reader.IsDBNull(13) && reader.GetInt64(13) != 0;
+            bool advancedExpanded = !reader.IsDBNull(14) && reader.GetInt64(14) != 0;
             if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
                 throw new InvalidDataException("More than one authoritative application settings record exists.");
             await reader.CloseAsync().ConfigureAwait(false);
@@ -60,6 +63,9 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
                 OverlayPositionX = overlayX,
                 OverlayPositionY = overlayY,
                 TimeFormat = timeFormat,
+                AppearanceExpanded = appearanceExpanded,
+                ShortcutsExpanded = shortcutsExpanded,
+                AdvancedExpanded = advancedExpanded,
             };
             settings.Validate();
             return settings;
@@ -93,7 +99,10 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
                 main_window_shortcut = $mainWindowShortcut,
                 overlay_position_x = $overlayX,
                 overlay_position_y = $overlayY,
-                time_format = $timeFormat
+                time_format = $timeFormat,
+                appearance_expanded = $appearanceExpanded,
+                shortcuts_expanded = $shortcutsExpanded,
+                advanced_expanded = $advancedExpanded
             WHERE singleton = 1;
             """;
         var light = settings.LightTheme ?? ThemeConfiguration.DefaultLight;
@@ -110,6 +119,9 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
         command.Parameters.AddWithValue("$overlayX", settings.OverlayPositionX.HasValue ? (object)settings.OverlayPositionX.Value : DBNull.Value);
         command.Parameters.AddWithValue("$overlayY", settings.OverlayPositionY.HasValue ? (object)settings.OverlayPositionY.Value : DBNull.Value);
         command.Parameters.AddWithValue("$timeFormat", TimeFormatText.Format(settings.TimeFormat));
+        command.Parameters.AddWithValue("$appearanceExpanded", settings.AppearanceExpanded ? 1 : 0);
+        command.Parameters.AddWithValue("$shortcutsExpanded", settings.ShortcutsExpanded ? 1 : 0);
+        command.Parameters.AddWithValue("$advancedExpanded", settings.AdvancedExpanded ? 1 : 0);
         if (await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
             throw new InvalidDataException("The authoritative application settings record is missing.");
 

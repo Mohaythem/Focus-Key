@@ -405,6 +405,32 @@ public sealed class SettingsPageControllerTests
         Assert.Equal(SettingsField.OverlayPosition, settledField);
     }
 
+    [Fact]
+    public async Task UpdateSectionExpandedAsync_SavesAndSettles()
+    {
+        var repo = new FakeRepository();
+        var page = new SettingsPageController(new(repo), () => Task.CompletedTask, _ => { });
+        await page.LoadAsync();
+
+        var settledFields = new List<SettingsField>();
+        page.Settled += (field, _) => settledFields.Add(field);
+
+        await page.UpdateAppearanceExpandedAsync(true);
+        Assert.True(page.Saved!.AppearanceExpanded);
+        Assert.True(repo.Value.AppearanceExpanded);
+        Assert.Contains(SettingsField.AppearanceExpanded, settledFields);
+
+        await page.UpdateShortcutsExpandedAsync(true);
+        Assert.True(page.Saved.ShortcutsExpanded);
+        Assert.True(repo.Value.ShortcutsExpanded);
+        Assert.Contains(SettingsField.ShortcutsExpanded, settledFields);
+
+        await page.UpdateAdvancedExpandedAsync(true);
+        Assert.True(page.Saved.AdvancedExpanded);
+        Assert.True(repo.Value.AdvancedExpanded);
+        Assert.Contains(SettingsField.AdvancedExpanded, settledFields);
+    }
+
     private sealed class FakeRepository : ISettingsRepository
     {
         public ApplicationSettings Value = ApplicationSettings.Default;

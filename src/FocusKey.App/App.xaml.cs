@@ -129,6 +129,10 @@ public partial class App : Application
                 {
                     await _window.OpenReportsAsync();
                 }
+                else if (cmdArgs.Any(a => a.Equals("--settings", StringComparison.OrdinalIgnoreCase)))
+                {
+                    await _window.OpenSettingsAsync();
+                }
                 else
                 {
                     _window.OpenToday();

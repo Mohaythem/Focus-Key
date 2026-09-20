@@ -18,6 +18,9 @@ public sealed class ApplicationSettingsTests
         Assert.Equal(TimeFormat.TwentyFourHour, settings.TimeFormat);
         Assert.Null(settings.OverlayPositionX);
         Assert.Null(settings.OverlayPositionY);
+        Assert.False(settings.AppearanceExpanded);
+        Assert.False(settings.ShortcutsExpanded);
+        Assert.False(settings.AdvancedExpanded);
     }
 
     [Theory]

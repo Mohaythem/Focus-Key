@@ -14,17 +14,29 @@ This document serves as the persistent repository-level source of truth for all 
 
 ## Active Work (Current Roadmap Task)
 
-*None currently active.*
-
----
-
-## Approved Pending Work
-
-*None currently pending.*
+*None currently active. Awaiting user acceptance of implemented work or new goal assignment.*
 
 ---
 
 ## Implemented Work Awaiting Final User Acceptance
+
+### Settings Information Architecture & Collapsible Sections Redesign (Implemented — Awaiting Final User Acceptance)
+**Status:** Implemented — Awaiting Final User Acceptance
+**Scope & Deliverables:**
+1. **Reorganized Top-Level Hierarchy**:
+   - `SESSION` (Always visible, top priority): Work duration, Break duration, Session sounds.
+   - `APPEARANCE` (Collapsible): Color scheme, Contrast, Light Theme palette/presets, Dark Theme palette/presets, Time format, Session colors.
+   - `SHORTCUTS` (Collapsible): Quick Overlay global shortcut, Open Focus Key global shortcut.
+   - `ADVANCED` (Collapsible): Launch with Windows, Reset Overlay Position, Import history, Export history.
+2. **Persistent Collapsible Section States**:
+   - Persist `AppearanceExpanded`, `ShortcutsExpanded`, `AdvancedExpanded` preferences via SQLite `application_settings` (Migration 12).
+   - Default state on first launch: Session always visible, Appearance collapsed (`false`), Shortcuts collapsed (`false`), Advanced collapsed (`false`).
+   - Persists across page navigation and application restarts.
+3. **Native WinUI 3 Restrained Collapsible Headers**:
+   - Clean, keyboard-accessible header buttons with chevron indicators (`\uE76C` collapsed, `\uE70E` expanded), appropriate automation names, and high-visibility Fluent focus indicators.
+   - Collapsed controls are completely removed from the tab order.
+4. **Preserve 100% of Existing Settings & Logic**:
+   - Zero dropped features (all 15 settings preserved), zero regressed behaviors (transactional shortcuts, live theme switching, SQLite duration validation).
 
 ### Post-Today UX Refinement Pass (Implemented — Awaiting Final User Acceptance)
 Implemented a focused UX refinement pass after the accepted Today adaptive redesign:

@@ -97,6 +97,9 @@ internal sealed class SettingsView : UserControl
     private bool _isListeningForMainWindowShortcut;
     private Action? _refreshWorkSwatches;
     private Action? _refreshBreakSwatches;
+    private Action<bool>? _setAppearanceExpanded;
+    private Action<bool>? _setShortcutsExpanded;
+    private Action<bool>? _setAdvancedExpanded;
 
     internal SettingsView(
         SettingsService settings,
@@ -143,79 +146,89 @@ internal sealed class SettingsView : UserControl
 
         HorizontalAlignment = HorizontalAlignment.Stretch;
 
-        // 1. APPEARANCE
-        var appearance = new StackPanel { Spacing = 0 };
-        appearance.Children.Add(Row("Color scheme", "Controls whether the application uses light, dark, or system theme", _appearance, false));
-        appearance.Children.Add(Row("Contrast", "Enhances text legibility and border definition across the interface", _contrast, true));
-        _fields.Children.Add(Section("APPEARANCE", appearance));
-
-        // 2. LIGHT THEME
-        var lightTheme = new StackPanel { Spacing = 0 };
-        ConfigureColor(_lightBgButton, _lightBgColor, "Light background");
-        ConfigureColor(_lightFgButton, _lightFgColor, "Light foreground");
-        ConfigureColor(_lightAccentButton, _lightAccentColor, "Light accent");
-        lightTheme.Children.Add(Row("Preset", "Curated light theme palette", _lightPreset));
-        lightTheme.Children.Add(Row("Background", "Light page and window background", _lightBgButton));
-        lightTheme.Children.Add(Row("Foreground", "Light primary text and icons", _lightFgButton));
-        lightTheme.Children.Add(Row("Accent", "Light interactive accent and highlights", _lightAccentButton, true));
-        _fields.Children.Add(Section("LIGHT THEME", lightTheme));
-
-        // 3. DARK THEME
-        var darkTheme = new StackPanel { Spacing = 0 };
-        ConfigureColor(_darkBgButton, _darkBgColor, "Dark background");
-        ConfigureColor(_darkFgButton, _darkFgColor, "Dark foreground");
-        ConfigureColor(_darkAccentButton, _darkAccentColor, "Dark accent");
-        darkTheme.Children.Add(Row("Preset", "Curated dark theme palette", _darkPreset));
-        darkTheme.Children.Add(Row("Background", "Dark page and window background", _darkBgButton));
-        darkTheme.Children.Add(Row("Foreground", "Dark primary text and icons", _darkFgButton));
-        darkTheme.Children.Add(Row("Accent", "Dark interactive accent and highlights", _darkAccentButton, true));
-        _fields.Children.Add(Section("DARK THEME", darkTheme));
-
-        // 4. TIME FORMAT
-        var timeFormatSection = new StackPanel { Spacing = 0 };
-        timeFormatSection.Children.Add(Row("Clock format", "Display time in 24-hour (09:05) or 12-hour (9:05 AM) format", _timeFormat, true));
-        _fields.Children.Add(Section("TIME FORMAT", timeFormatSection));
-
-        // 5. SESSION COLORS
-        var colors = new StackPanel { Spacing = 0 };
-        ConfigureColor(_workButton, _workColor, "Work color");
-        ConfigureColor(_breakButton, _breakColor, "Break color");
-        var workSelector = BuildColorSelector(_workButton, _workColor, WorkColorPresets, true);
-        var breakSelector = BuildColorSelector(_breakButton, _breakColor, BreakColorPresets, false);
-        colors.Children.Add(Row("Work color", "Used for work session indicators and timer", workSelector));
-        colors.Children.Add(Row("Break color", "Used for break session indicators and timer", breakSelector, true));
-        _fields.Children.Add(Section("SESSION COLORS", colors));
-
-        // 6. SESSIONS
+        // 1. SESSION (Permanent)
         var sessions = new StackPanel { Spacing = 0 };
         sessions.Children.Add(Row("Work duration", null, DurationFields(_workMinutes, _workSeconds)));
         sessions.Children.Add(Row("Break duration", null, DurationFields(_breakMinutes, _breakSeconds)));
         sessions.Children.Add(Row("Session sounds", "Play a soft tick on start and a chime on completion", _sessionSounds, true));
-        _fields.Children.Add(Section("SESSIONS", sessions));
+        _fields.Children.Add(Section("SESSION", sessions));
 
-        // 7. SHORTCUTS
+        // 2. APPEARANCE (Collapsible)
+        var appearance = new StackPanel { Spacing = 0 };
+        appearance.Children.Add(Row("Color scheme", "Controls whether the application uses light, dark, or system theme", _appearance, false));
+        appearance.Children.Add(Row("Contrast", "Enhances text legibility and border definition across the interface", _contrast, false));
+
+        ConfigureColor(_lightBgButton, _lightBgColor, "Light background");
+        ConfigureColor(_lightFgButton, _lightFgColor, "Light foreground");
+        ConfigureColor(_lightAccentButton, _lightAccentColor, "Light accent");
+        appearance.Children.Add(Row("Light theme preset", "Curated light theme palette", _lightPreset, false));
+        appearance.Children.Add(Row("Light background", "Light page and window background", _lightBgButton, false));
+        appearance.Children.Add(Row("Light foreground", "Light primary text and icons", _lightFgButton, false));
+        appearance.Children.Add(Row("Light accent", "Light interactive accent and highlights", _lightAccentButton, false));
+
+        ConfigureColor(_darkBgButton, _darkBgColor, "Dark background");
+        ConfigureColor(_darkFgButton, _darkFgColor, "Dark foreground");
+        ConfigureColor(_darkAccentButton, _darkAccentColor, "Dark accent");
+        appearance.Children.Add(Row("Dark theme preset", "Curated dark theme palette", _darkPreset, false));
+        appearance.Children.Add(Row("Dark background", "Dark page and window background", _darkBgButton, false));
+        appearance.Children.Add(Row("Dark foreground", "Dark primary text and icons", _darkFgButton, false));
+        appearance.Children.Add(Row("Dark accent", "Dark interactive accent and highlights", _darkAccentButton, false));
+
+        appearance.Children.Add(Row("Clock format", "Display time in 24-hour (09:05) or 12-hour (9:05 AM) format", _timeFormat, false));
+
+        ConfigureColor(_workButton, _workColor, "Work color");
+        ConfigureColor(_breakButton, _breakColor, "Break color");
+        var workSelector = BuildColorSelector(_workButton, _workColor, WorkColorPresets, true);
+        var breakSelector = BuildColorSelector(_breakButton, _breakColor, BreakColorPresets, false);
+        appearance.Children.Add(Row("Work color", "Used for work session indicators and timer", workSelector, false));
+        appearance.Children.Add(Row("Break color", "Used for break session indicators and timer", breakSelector, true));
+
+        _fields.Children.Add(BuildCollapsibleSection(
+            "APPEARANCE",
+            appearance,
+            _controller.Saved?.AppearanceExpanded ?? false,
+            async expanded =>
+            {
+                await FlushPendingColorSaveAsync();
+                await _controller.UpdateAppearanceExpandedAsync(expanded);
+            },
+            out _setAppearanceExpanded));
+
+        // 3. SHORTCUTS (Collapsible)
         var shortcuts = new StackPanel { Spacing = 0 };
         var overlayShortcutControl = BuildShortcutControl();
         var mainWindowShortcutControl = BuildMainWindowShortcutControl();
         shortcuts.Children.Add(Row("Quick Overlay", "Global shortcut to toggle quick overlay (default Shift + F3)", overlayShortcutControl, false));
         shortcuts.Children.Add(Row("Open Focus Key", "Global shortcut to open and focus the main window (default Shift + F4)", mainWindowShortcutControl, true));
-        _fields.Children.Add(Section("SHORTCUTS", shortcuts));
 
-        // 8. QUICK OVERLAY
-        var quickOverlay = new StackPanel { Spacing = 0 };
-        quickOverlay.Children.Add(Row("Reset position", "Reset overlay window position to the center of your screen", _resetOverlayPositionButton, true));
-        _fields.Children.Add(Section("QUICK OVERLAY", quickOverlay));
+        _fields.Children.Add(BuildCollapsibleSection(
+            "SHORTCUTS",
+            shortcuts,
+            _controller.Saved?.ShortcutsExpanded ?? false,
+            async expanded =>
+            {
+                await FlushPendingColorSaveAsync();
+                await _controller.UpdateShortcutsExpandedAsync(expanded);
+            },
+            out _setShortcutsExpanded));
 
-        // 9. SYSTEM
-        var system = new StackPanel { Spacing = 0 };
-        system.Children.Add(Row("Start with Windows", "Launch Focus Key automatically when you sign in.", _startWithWindows, true));
-        _fields.Children.Add(Section("SYSTEM", system));
+        // 4. ADVANCED (Collapsible)
+        var advanced = new StackPanel { Spacing = 0 };
+        advanced.Children.Add(Row("Start with Windows", "Launch Focus Key automatically when you sign in.", _startWithWindows, false));
+        advanced.Children.Add(Row("Reset position", "Reset overlay window position to the center of your screen", _resetOverlayPositionButton, false));
+        advanced.Children.Add(Row("Import history", "Import website-compatible focus history (tab-delimited CSV)", _importHistoryButton, false));
+        advanced.Children.Add(Row("Export history", "Export all focus history to website-compatible tab-delimited CSV", _exportHistoryButton, true));
 
-        // 10. DATA
-        var data = new StackPanel { Spacing = 0 };
-        data.Children.Add(Row("Import history", "Import website-compatible focus history (tab-delimited CSV)", _importHistoryButton));
-        data.Children.Add(Row("Export history", "Export all focus history to website-compatible tab-delimited CSV", _exportHistoryButton, true));
-        _fields.Children.Add(Section("DATA", data));
+        _fields.Children.Add(BuildCollapsibleSection(
+            "ADVANCED",
+            advanced,
+            _controller.Saved?.AdvancedExpanded ?? false,
+            async expanded =>
+            {
+                await FlushPendingColorSaveAsync();
+                await _controller.UpdateAdvancedExpandedAsync(expanded);
+            },
+            out _setAdvancedExpanded));
 
         var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
         actions.Children.Add(_reload);
@@ -550,6 +563,15 @@ internal sealed class SettingsView : UserControl
                     _timeFormat.SelectedIndex = (int)saved.TimeFormat;
                     break;
                 case SettingsField.OverlayPosition:
+                    break;
+                case SettingsField.AppearanceExpanded:
+                    _setAppearanceExpanded?.Invoke(saved.AppearanceExpanded);
+                    break;
+                case SettingsField.ShortcutsExpanded:
+                    _setShortcutsExpanded?.Invoke(saved.ShortcutsExpanded);
+                    break;
+                case SettingsField.AdvancedExpanded:
+                    _setAdvancedExpanded?.Invoke(saved.AdvancedExpanded);
                     break;
             }
         }
@@ -1140,8 +1162,86 @@ internal sealed class SettingsView : UserControl
         var section = new StackPanel { Spacing = 8, HorizontalAlignment = HorizontalAlignment.Stretch };
         var heading = Presentation.DimText(title);
         if (Application.Current?.Resources["FkSectionText"] is Style style) heading.Style = style;
+        heading.Margin = new Thickness(2, 4, 2, 4);
         section.Children.Add(heading);
         section.Children.Add(Presentation.Card(content, 0));
+        return section;
+    }
+
+    private FrameworkElement BuildCollapsibleSection(
+        string title,
+        UIElement content,
+        bool isExpanded,
+        Func<bool, Task> onToggleExpanded,
+        out Action<bool> setExpandedVisual)
+    {
+        var section = new StackPanel { Spacing = 8, HorizontalAlignment = HorizontalAlignment.Stretch };
+
+        var chevron = new FontIcon
+        {
+            Glyph = isExpanded ? "\uE70E" : "\uE76C",
+            FontSize = 11,
+            Foreground = Presentation.ThemeBrush("FkSecondary", this),
+            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Right
+        };
+
+        var heading = Presentation.DimText(title);
+        if (Application.Current?.Resources["FkSectionText"] is Style style) heading.Style = style;
+        heading.VerticalAlignment = VerticalAlignment.Center;
+        heading.HorizontalAlignment = HorizontalAlignment.Left;
+
+        var headerGrid = new Grid
+        {
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        Grid.SetColumn(heading, 0);
+        Grid.SetColumn(chevron, 1);
+        headerGrid.Children.Add(heading);
+        headerGrid.Children.Add(chevron);
+
+        var headerButton = new Button
+        {
+            Content = headerGrid,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
+            BorderThickness = new Thickness(0),
+            CornerRadius = new CornerRadius(4),
+            Padding = new Thickness(2, 2, 2, 2),
+            MinHeight = 28
+        };
+
+        var card = Presentation.Card(content, 0);
+        card.Visibility = isExpanded ? Visibility.Visible : Visibility.Collapsed;
+
+        bool currentExpanded = isExpanded;
+
+        void ApplyVisual(bool expanded)
+        {
+            currentExpanded = expanded;
+            chevron.Glyph = expanded ? "\uE70E" : "\uE76C";
+            card.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
+            AutomationProperties.SetName(headerButton, $"{title}, {(expanded ? "expanded" : "collapsed")}");
+        }
+
+        ApplyVisual(isExpanded);
+        setExpandedVisual = ApplyVisual;
+
+        headerButton.Click += async (_, _) =>
+        {
+            if (_applying) return;
+            bool next = !currentExpanded;
+            ApplyVisual(next);
+            await onToggleExpanded(next);
+        };
+
+        section.Children.Add(headerButton);
+        section.Children.Add(card);
         return section;
     }
 

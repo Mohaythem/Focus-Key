@@ -14,7 +14,7 @@ This document serves as the persistent repository-level source of truth for all 
 
 ## Active Work (Current Roadmap Task)
 
-*None (all currently planned milestones implemented, verified, and awaiting final user acceptance).*
+*None currently active.*
 
 ---
 
@@ -25,6 +25,43 @@ This document serves as the persistent repository-level source of truth for all 
 ---
 
 ## Implemented Work Awaiting Final User Acceptance
+
+### Today Native Windows Adaptive Redesign (Implemented — Awaiting Final User Acceptance)
+Redesigned and implemented the Today page as a true adaptive native Windows 11 desktop experience inspired by the Windows Clock app adaptive behavior:
+1. **Desktop-First Composition**: Today uses a desktop-first Hero + Summary + Activity composition.
+2. **Wide Layout (>= 1060 DIP)**:
+   - Expanded navigation pane (220 DIP) with icons + text labels.
+   - Hero on the left column (~62%).
+   - Summary below Hero on the left column.
+   - Today's Activity as a dedicated right-side vertical surface (~38%).
+3. **Medium Layout (740 to 1059 DIP)**:
+   - Compact navigation rail (54 DIP) with centered icons only.
+   - Preserves the two-column Today composition (Hero + Summary on left, Activity on right).
+4. **Narrow Layout (< 740 DIP)**:
+   - Navigation pane collapsed (0 DIP) behind top-left hamburger button (`\uE700`).
+   - Clicking hamburger opens a sliding drawer navigation pane over a backdrop.
+   - Content adapts to a single vertical stack: Hero first → Daily Summary below Hero → Today's Activity below Summary.
+5. **Work / Break Selection**:
+   - Integrated compact Work / Break selector exists ONLY when Idle (`[ • Work · X min ]  [ • Break · Y min ]`).
+6. **Session Identity**:
+   - Running and Paused show session identity (`• WORK SESSION` / `• BREAK SESSION` with `RUNNING` or `PAUSED` badge), not a selectable Work/Break control.
+7. **No Circular Ring**:
+   - Eliminated giant circular progress timer ring.
+8. **Timer & Progress Language**:
+   - Large bold countdown timer + 6 DIP thin linear progress bar.
+   - Zero-layout-jump across Idle, Running, and Paused states.
+9. **Daily Summary Surface**:
+   - Daily Summary is ONE coherent 2×2 surface (Focus Time, Work Sessions, Break Time, Completion Rate with subtle horizontal divider).
+10. **Activity Placement & Scrolling**:
+    - Activity is a dedicated right-side surface on wide/medium layouts and stacks below on narrow layouts, using internal native `ScrollViewer` when session rows exceed container height.
+11. **Active-Session Navigation Indicator**:
+    - Shows a restrained status dot on the Today navigation item (expanded label dot, compact rail icon dot, hamburger button dot, and drawer dot) when a session is Running or Paused.
+    - Uses active session color (teal for work, purple for break).
+    - No extra text such as "Running" in navigation chrome.
+    - Hidden when there is no active session.
+12. **Timer Digit Glyph Integrity**:
+    - Large countdown digits render completely without left/right edge clipping (`CharacterSpacing="0"`, container horizontal padding, `TextWrapping="NoWrap"`, `TextTrimming="None"`, responsive font sizing 72pt Wide/Medium, 56pt Narrow).
+
 
 ### Quick Overlay Surgical Visual Restore (Implemented — Awaiting Final User Acceptance)
 Surgically restored Quick Overlay visual presentation, proportions, geometry, and layout to the approved `a19b522` baseline:

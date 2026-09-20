@@ -71,8 +71,8 @@ internal sealed class SettingsView : UserControl
     private readonly ToggleSwitch _sessionSounds = new() { OnContent = "On", OffContent = "Off", MinWidth = 0 };
     private readonly ToggleSwitch _startSound = new() { OnContent = "On", OffContent = "Off", MinWidth = 0 };
     private readonly ToggleSwitch _completionSound = new() { OnContent = "On", OffContent = "Off", MinWidth = 0 };
-    private readonly Button _startSoundPreviewButton = new() { Content = "Preview", FontSize = 12, Padding = new Thickness(10, 5, 10, 5), CornerRadius = new CornerRadius(4) };
-    private readonly Button _completionSoundPreviewButton = new() { Content = "Preview", FontSize = 12, Padding = new Thickness(10, 5, 10, 5), CornerRadius = new CornerRadius(4) };
+    private readonly Button _startSoundPreviewButton = new() { Content = "Preview", FontSize = 12, Padding = new Thickness(10, 5, 10, 5), CornerRadius = new CornerRadius(4), BorderThickness = new Thickness(1) };
+    private readonly Button _completionSoundPreviewButton = new() { Content = "Preview", FontSize = 12, Padding = new Thickness(10, 5, 10, 5), CornerRadius = new CornerRadius(4), BorderThickness = new Thickness(1) };
     private readonly ToggleSwitch _startWithWindows = new() { OnContent = "On", OffContent = "Off", MinWidth = 0 };
     private readonly Button _importHistoryButton = new() { Content = "Import history…", FontSize = 12, Padding = new Thickness(12, 6, 12, 6) };
     private readonly Button _exportHistoryButton = new() { Content = "Export history…", FontSize = 12, Padding = new Thickness(12, 6, 12, 6) };
@@ -517,7 +517,8 @@ internal sealed class SettingsView : UserControl
         };
         _controller.Settled += SetField;
         _controller.Changed += Render;
-        ActualThemeChanged += (_, _) => Render();
+        ActualThemeChanged += (_, _) => { RefreshVisuals(); Render(); };
+        RefreshVisuals();
         Render();
         RefreshStartupToggle();
     }
@@ -1305,7 +1306,7 @@ internal sealed class SettingsView : UserControl
         return panel;
     }
 
-    private static Border BuildSessionSection(UIElement content)
+    private Border BuildSessionSection(UIElement content)
     {
         var card = new Border
         {
@@ -1320,8 +1321,9 @@ internal sealed class SettingsView : UserControl
 
         var divider = new Border
         {
+            Style = Application.Current?.Resources["FkCardDivider"] as Style,
             Height = 1,
-            Background = Application.Current?.Resources["CardStrokeColorDefaultBrush"] as Brush,
+            Background = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", this),
             Opacity = 0.6,
             HorizontalAlignment = HorizontalAlignment.Stretch
         };
@@ -1338,7 +1340,7 @@ internal sealed class SettingsView : UserControl
         return card;
     }
 
-    private static Border SubCard(string? title, UIElement content)
+    private Border SubCard(string? title, UIElement content)
     {
         var border = new Border
         {
@@ -1364,8 +1366,9 @@ internal sealed class SettingsView : UserControl
 
         var divider = new Border
         {
+            Style = Application.Current?.Resources["FkSubCardDivider"] as Style,
             Height = 1,
-            Background = Application.Current?.Resources["CardStrokeColorDefaultBrush"] as Brush,
+            Background = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", this),
             Opacity = 0.4,
             HorizontalAlignment = HorizontalAlignment.Stretch
         };
@@ -1431,8 +1434,9 @@ internal sealed class SettingsView : UserControl
 
         var divider = new Border
         {
+            Style = Application.Current?.Resources["FkCardDivider"] as Style,
             Height = 1,
-            Background = Application.Current?.Resources["CardStrokeColorDefaultBrush"] as Brush,
+            Background = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", this),
             Opacity = 0.6,
             HorizontalAlignment = HorizontalAlignment.Stretch,
             Visibility = isExpanded ? Visibility.Visible : Visibility.Collapsed

@@ -24,9 +24,8 @@ public sealed class TodayAdaptiveLayoutTests
     [InlineData(1400.0, TodayCompositionMode.TwoColumn)]
     [InlineData(1000.0, TodayCompositionMode.TwoColumn)]
     [InlineData(800.0, TodayCompositionMode.TwoColumn)]
-    [InlineData(780.0, TodayCompositionMode.TwoColumn)]
-    [InlineData(779.0, TodayCompositionMode.VerticalStack)]
-    [InlineData(650.0, TodayCompositionMode.VerticalStack)]
+    [InlineData(620.0, TodayCompositionMode.TwoColumn)]
+    [InlineData(619.0, TodayCompositionMode.VerticalStack)]
     [InlineData(500.0, TodayCompositionMode.VerticalStack)]
     [InlineData(350.0, TodayCompositionMode.VerticalStack)]
     public void ResolveTodayComposition(double availableContentWidth, TodayCompositionMode expectedMode)

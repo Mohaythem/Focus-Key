@@ -65,21 +65,72 @@ public sealed class ReportsServiceTests
         Assert.Equal(2, snapshot.Totals.Started);
     }
 
-    [Fact]
-    public async Task MonthlyTrendIsCalendarWeeksClippedToMonth()
+    [Theory]
+    [InlineData(2026, 2, 28, "2026-02-01 – 2026-02-07", "2026-02-08 – 2026-02-14", "2026-02-15 – 2026-02-21", "2026-02-22 – 2026-02-28")] // 28-day February
+    [InlineData(2024, 2, 29, "2024-02-01 – 2024-02-07", "2024-02-08 – 2024-02-14", "2024-02-15 – 2024-02-21", "2024-02-22 – 2024-02-29")] // 29-day Leap February
+    [InlineData(2026, 4, 30, "2026-04-01 – 2026-04-07", "2026-04-08 – 2026-04-14", "2026-04-15 – 2026-04-21", "2026-04-22 – 2026-04-30")] // 30-day Month (April)
+    [InlineData(2026, 1, 31, "2026-01-01 – 2026-01-07", "2026-01-08 – 2026-01-14", "2026-01-15 – 2026-01-21", "2026-01-22 – 2026-01-31")] // 31-day Month (January)
+    public async Task MonthlyReportAlwaysProducesExactlyFourWeeklyBuckets(
+        int year, int month, int lastDay, string w1Expected, string w2Expected, string w3Expected, string w4Expected)
     {
         using var store = new SessionStore();
         var zone = TimeZoneInfo.Utc;
-        foreach (var date in new[] { new DateTimeOffset(2026, 2, 1, 12, 0, 0, TimeSpan.Zero), new DateTimeOffset(2026, 2, 2, 12, 0, 0, TimeSpan.Zero), new DateTimeOffset(2026, 3, 1, 12, 0, 0, TimeSpan.Zero) })
-            await store.Repository.AddAsync(Finished(date, SessionType.Work, SessionStatus.Completed, 5));
-        var snapshot = await Service(store, zone).ReadAsync(ReportPeriod.Monthly, new DateOnly(2026, 2, 15));
-        Assert.Equal(new DateOnly(2026, 2, 1), snapshot.Range.Start);
-        Assert.Equal(new DateOnly(2026, 3, 1), snapshot.Range.End);
-        Assert.Equal(5, snapshot.Trend.Count);
-        Assert.Equal("2026-02-01 – 2026-02-01", snapshot.Trend[0].Label);
-        Assert.Equal(1, snapshot.Trend[0].Totals.Started);
-        Assert.Equal(1, snapshot.Trend[1].Totals.Started);
+
+        // Add sessions across weeks and at month boundaries
+        var d1 = new DateTimeOffset(year, month, 1, 10, 0, 0, TimeSpan.Zero); // Week 1
+        var d8 = new DateTimeOffset(year, month, 8, 10, 0, 0, TimeSpan.Zero); // Week 2
+        var d15 = new DateTimeOffset(year, month, 15, 10, 0, 0, TimeSpan.Zero); // Week 3
+        var d22 = new DateTimeOffset(year, month, 22, 10, 0, 0, TimeSpan.Zero); // Week 4 start
+        var dLast = new DateTimeOffset(year, month, lastDay, 18, 0, 0, TimeSpan.Zero); // Week 4 end
+
+        foreach (var d in new[] { d1, d8, d15, d22, dLast })
+        {
+            await store.Repository.AddAsync(Finished(d, SessionType.Work, SessionStatus.Completed, 10));
+        }
+
+        var snapshot = await Service(store, zone).ReadAsync(ReportPeriod.Monthly, new DateOnly(year, month, 15));
+
+        Assert.Equal(new DateOnly(year, month, 1), snapshot.Range.Start);
+        Assert.Equal(new DateOnly(year, month, 1).AddMonths(1), snapshot.Range.End);
+
+        // Assert exactly 4 buckets (never 5)
+        Assert.Equal(4, snapshot.Trend.Count);
+        Assert.Equal(w1Expected, snapshot.Trend[0].Label);
+        Assert.Equal(w2Expected, snapshot.Trend[1].Label);
+        Assert.Equal(w3Expected, snapshot.Trend[2].Label);
+        Assert.Equal(w4Expected, snapshot.Trend[3].Label);
+
+        // Check bucket counts
+        Assert.Equal(1, snapshot.Trend[0].Totals.Started); // day 1
+        Assert.Equal(1, snapshot.Trend[1].Totals.Started); // day 8
+        Assert.Equal(1, snapshot.Trend[2].Totals.Started); // day 15
+        Assert.Equal(2, snapshot.Trend[3].Totals.Started); // day 22 + lastDay
+        Assert.Equal(5, snapshot.Totals.Started);
+    }
+
+    [Fact]
+    public async Task MonthlyReportExcludesSessionsOutsideMonthBoundaries()
+    {
+        using var store = new SessionStore();
+        var zone = TimeZoneInfo.Utc;
+
+        var prevMonth = new DateTimeOffset(2026, 1, 31, 23, 59, 59, TimeSpan.Zero);
+        var inMonthFirst = new DateTimeOffset(2026, 2, 1, 0, 0, 0, TimeSpan.Zero);
+        var inMonthLast = new DateTimeOffset(2026, 2, 28, 23, 59, 59, TimeSpan.Zero);
+        var nextMonth = new DateTimeOffset(2026, 3, 1, 0, 0, 0, TimeSpan.Zero);
+
+        foreach (var d in new[] { prevMonth, inMonthFirst, inMonthLast, nextMonth })
+        {
+            await store.Repository.AddAsync(Finished(d, SessionType.Work, SessionStatus.Completed, 10));
+        }
+
+        var snapshot = await Service(store, zone).ReadAsync(ReportPeriod.Monthly, new DateOnly(2026, 2, 10));
+        Assert.Equal(4, snapshot.Trend.Count);
         Assert.Equal(2, snapshot.Totals.Started);
+        Assert.Equal(1, snapshot.Trend[0].Totals.Started); // Feb 1
+        Assert.Equal(0, snapshot.Trend[1].Totals.Started);
+        Assert.Equal(0, snapshot.Trend[2].Totals.Started);
+        Assert.Equal(1, snapshot.Trend[3].Totals.Started); // Feb 28
     }
 
     [Fact]
@@ -213,7 +264,7 @@ public sealed class ReportsServiceTests
         var report = await Service(store, TimeZoneInfo.Utc).ReadAsync(ReportPeriod.Monthly, new(2028, 2, 29));
         Assert.Equal(29, report.Totals.CompletedWork);
         Assert.Equal(29, report.Trend.Sum(b => b.Totals.CompletedWork));
-        Assert.Equal(new[] { 6, 7, 7, 7, 2 }, report.Trend.Select(b => b.Totals.CompletedWork));
+        Assert.Equal(new[] { 7, 7, 7, 8 }, report.Trend.Select(b => b.Totals.CompletedWork));
         Assert.Equal(new DateOnly(2028, 3, 1), report.Range.End);
     }
 

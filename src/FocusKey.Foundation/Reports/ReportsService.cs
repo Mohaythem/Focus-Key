@@ -191,15 +191,24 @@ public sealed class ReportsService
         }
         else if (period == ReportPeriod.Monthly)
         {
-            for (var start = range.Start; start < range.End;)
+            // Monthly view: exactly 4 weekly buckets
+            // Week 1: days 1–7
+            // Week 2: days 8–14
+            // Week 3: days 15–21
+            // Week 4: days 22 through the final day of that month
+            var weekRanges = new[]
             {
-                var nextMonday = ReportRange.WeekStart(start).AddDays(7);
-                var end = nextMonday < range.End ? nextMonday : range.End;
-                var slice = new ReportRange(start, end);
+                new ReportRange(range.Start, range.Start.AddDays(7)),
+                new ReportRange(range.Start.AddDays(7), range.Start.AddDays(14)),
+                new ReportRange(range.Start.AddDays(14), range.Start.AddDays(21)),
+                new ReportRange(range.Start.AddDays(21), range.End)
+            };
+
+            foreach (var slice in weekRanges)
+            {
                 var nativeBucket = ReportTotals.From(selected.Where(s => slice.Contains(DateOnly.FromDateTime(s.Local.DateTime))).Select(s => s.Session));
                 var sliceHistoryTime = rangeHistory.Where(h => slice.Contains(h.Date)).Aggregate(TimeSpan.Zero, (acc, h) => acc + h.Duration);
-                buckets.Add(new($"{start:yyyy-MM-dd} – {end.AddDays(-1):yyyy-MM-dd}", nativeBucket with { FocusTime = nativeBucket.FocusTime + sliceHistoryTime }));
-                start = end;
+                buckets.Add(new($"{slice.Start:yyyy-MM-dd} – {slice.End.AddDays(-1):yyyy-MM-dd}", nativeBucket with { FocusTime = nativeBucket.FocusTime + sliceHistoryTime }));
             }
         }
         else // Yearly: 12 monthly buckets across the calendar year (Jan through Dec)

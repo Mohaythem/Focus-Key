@@ -26,6 +26,36 @@ This document serves as the persistent repository-level source of truth for all 
 
 ## Implemented Work Awaiting Final User Acceptance
 
+### Post-Today UX Refinement Pass (Implemented — Awaiting Final User Acceptance)
+Implemented a focused UX refinement pass after the accepted Today adaptive redesign:
+1. **Keyboard Navigation & Activation**:
+   - **Idle Work / Break Selector**: Left Arrow selects Work, Right Arrow selects Break, Enter/Space activates. Distinguishable selected vs focused states with clean WinUI focus borders.
+   - **Session Actions**: Tab navigation reaches Work/Break selector and Start in Idle; Pause in Running; Continue and Start New in Paused. Enter/Space activates the focused action. Hidden/collapsed controls are never keyboard focusable.
+   - **App Navigation**: Up / Down moves focus between navigation items in Expanded pane, Compact rail, and Narrow drawer. Enter/Space opens destination. Esc closes narrow drawer without hiding main window or quitting app, and focus returns to Hamburger button.
+   - **Focus Visuals**: Clean, visible native WinUI/Fluent focus visuals in Dark and Light themes.
+2. **Preserve Session-Colored Today Dot**:
+   - Work active/paused session: teal Today status dot.
+   - Break active/paused session: violet Today status dot.
+   - Idle: no dot. No extra text in navigation chrome.
+   - Preserved across Expanded, Compact rail, Narrow/collapsed, and Drawer.
+3. **Today's Activity Overflow Scrolling**:
+   - On Wide and Medium layouts, Activity surface retains stable page geometry and uses internal `ScrollViewer` (capped at 420 DIP) when row count exceeds container height (Hero and Summary remain stable, page does not stretch infinitely).
+   - On Narrow layouts, content reflows into single vertical stack with natural page scrolling.
+4. **Reports Month Four Weekly Buckets**:
+   - Every month uses EXACTLY 4 weekly buckets in domain aggregation, chart data, labels, tooltips, and summaries:
+     - Week 1: Days 1–7 (`YYYY-MM-01 – YYYY-MM-07`)
+     - Week 2: Days 8–14 (`YYYY-MM-08 – YYYY-MM-14`)
+     - Week 3: Days 15–21 (`YYYY-MM-15 – YYYY-MM-21`)
+     - Week 4: Days 22 through end of month (28, 29, 30, or 31).
+   - Never produces a Week 5.
+   - Comprehensive tests for 28-day Feb, 29-day Feb, 30-day month, 31-day month, and month boundaries.
+5. **Quick Overlay Drag Usability**:
+   - Draggable region covers the entire upper header background, empty chrome space, and non-interactive header text.
+   - Interactive controls (Close button, Work/Break selector, Start, Pause, Continue, Start New) remain responsive and do not trigger window dragging.
+   - Preserves native Windows dragging (`WM_NCLBUTTONDOWN`), position persistence, multi-monitor clamping, and Settings reset.
+
+---
+
 ### Today Native Windows Adaptive Redesign (Implemented — Awaiting Final User Acceptance)
 Redesigned and implemented the Today page as a true adaptive native Windows 11 desktop experience inspired by the Windows Clock app adaptive behavior:
 1. **Desktop-First Composition**: Today uses a desktop-first Hero + Summary + Activity composition.

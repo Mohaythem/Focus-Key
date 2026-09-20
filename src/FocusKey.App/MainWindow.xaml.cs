@@ -14,6 +14,8 @@ using FocusKey.Shell;
 using FocusKey.Foundation.Shell;
 using WinRT.Interop;
 using Microsoft.UI.Xaml.Media.Animation;
+using VirtualKey = Windows.System.VirtualKey;
+using Microsoft.UI.Xaml.Input;
 
 namespace FocusKey;
 
@@ -261,7 +263,10 @@ public sealed partial class MainWindow : Window
     private void OnHamburgerClick(object sender, RoutedEventArgs args)
     {
         if (NavDrawerOverlay is not null)
+        {
             NavDrawerOverlay.Visibility = Visibility.Visible;
+            DrawerTodayNav?.Focus(FocusState.Keyboard);
+        }
     }
 
     private void OnNavDrawerBackdropTapped(object sender, Microsoft.UI.Xaml.Input.TappedRoutedEventArgs e)
@@ -276,8 +281,88 @@ public sealed partial class MainWindow : Window
 
     private void CloseNavDrawer()
     {
-        if (NavDrawerOverlay is not null)
+        if (NavDrawerOverlay is not null && NavDrawerOverlay.Visibility == Visibility.Visible)
+        {
             NavDrawerOverlay.Visibility = Visibility.Collapsed;
+            if (HamburgerButton is not null && HamburgerButton.Visibility == Visibility.Visible)
+            {
+                HamburgerButton.Focus(FocusState.Keyboard);
+            }
+        }
+    }
+
+    private void OnNavDrawerOverlayPreviewKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (e.Key == VirtualKey.Escape)
+        {
+            e.Handled = true;
+            CloseNavDrawer();
+        }
+    }
+
+    private void OnNavKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (e.Key == VirtualKey.Down)
+        {
+            if (ReferenceEquals(sender, TodayNav)) { ReportsNav?.Focus(FocusState.Keyboard); e.Handled = true; }
+            else if (ReferenceEquals(sender, ReportsNav)) { OverlayNavButton?.Focus(FocusState.Keyboard); e.Handled = true; }
+            else if (ReferenceEquals(sender, OverlayNavButton)) { SettingsNav?.Focus(FocusState.Keyboard); e.Handled = true; }
+            else if (ReferenceEquals(sender, SettingsNav)) { ExitButton?.Focus(FocusState.Keyboard); e.Handled = true; }
+        }
+        else if (e.Key == VirtualKey.Up)
+        {
+            if (ReferenceEquals(sender, ExitButton)) { SettingsNav?.Focus(FocusState.Keyboard); e.Handled = true; }
+            else if (ReferenceEquals(sender, SettingsNav)) { OverlayNavButton?.Focus(FocusState.Keyboard); e.Handled = true; }
+            else if (ReferenceEquals(sender, OverlayNavButton)) { ReportsNav?.Focus(FocusState.Keyboard); e.Handled = true; }
+            else if (ReferenceEquals(sender, ReportsNav)) { TodayNav?.Focus(FocusState.Keyboard); e.Handled = true; }
+        }
+    }
+
+    private void OnDrawerNavKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (e.Key == VirtualKey.Escape)
+        {
+            e.Handled = true;
+            CloseNavDrawer();
+            return;
+        }
+
+        if (e.Key == VirtualKey.Down)
+        {
+            if (ReferenceEquals(sender, DrawerCloseButton)) { DrawerTodayNav?.Focus(FocusState.Keyboard); e.Handled = true; }
+            else if (ReferenceEquals(sender, DrawerTodayNav)) { DrawerReportsNav?.Focus(FocusState.Keyboard); e.Handled = true; }
+            else if (ReferenceEquals(sender, DrawerReportsNav)) { DrawerOverlayButton?.Focus(FocusState.Keyboard); e.Handled = true; }
+            else if (ReferenceEquals(sender, DrawerOverlayButton)) { DrawerSettingsNav?.Focus(FocusState.Keyboard); e.Handled = true; }
+            else if (ReferenceEquals(sender, DrawerSettingsNav)) { DrawerExitButton?.Focus(FocusState.Keyboard); e.Handled = true; }
+        }
+        else if (e.Key == VirtualKey.Up)
+        {
+            if (ReferenceEquals(sender, DrawerExitButton)) { DrawerSettingsNav?.Focus(FocusState.Keyboard); e.Handled = true; }
+            else if (ReferenceEquals(sender, DrawerSettingsNav)) { DrawerOverlayButton?.Focus(FocusState.Keyboard); e.Handled = true; }
+            else if (ReferenceEquals(sender, DrawerOverlayButton)) { DrawerReportsNav?.Focus(FocusState.Keyboard); e.Handled = true; }
+            else if (ReferenceEquals(sender, DrawerReportsNav)) { DrawerTodayNav?.Focus(FocusState.Keyboard); e.Handled = true; }
+            else if (ReferenceEquals(sender, DrawerTodayNav)) { DrawerCloseButton?.Focus(FocusState.Keyboard); e.Handled = true; }
+        }
+    }
+
+    private void OnWorkChoiceKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (e.Key == VirtualKey.Right)
+        {
+            e.Handled = true;
+            SelectIdleType(SessionType.Break);
+            BreakChoiceCard?.Focus(FocusState.Keyboard);
+        }
+    }
+
+    private void OnBreakChoiceKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (e.Key == VirtualKey.Left)
+        {
+            e.Handled = true;
+            SelectIdleType(SessionType.Work);
+            WorkChoiceCard?.Focus(FocusState.Keyboard);
+        }
     }
 
     private void SelectIdleType(SessionType type)
@@ -511,6 +596,11 @@ public sealed partial class MainWindow : Window
             BreakChoiceMode.Foreground = Presentation.ThemeBrush("FkSecondary", isDark);
             BreakChoiceDuration.Foreground = Presentation.ThemeBrush("FkSecondary", isDark);
         }
+
+        string workDur = WorkChoiceDuration?.Text ?? "25 min";
+        string breakDur = BreakChoiceDuration?.Text ?? "10 min";
+        AutomationProperties.SetName(WorkChoiceCard, isWorkSelected ? $"Work Session, {workDur}, Selected" : $"Select Work Session, {workDur}");
+        AutomationProperties.SetName(BreakChoiceCard, !isWorkSelected ? $"Break Session, {breakDur}, Selected" : $"Select Break Session, {breakDur}");
 
         // 3. Durations & Subtitles in Idle Hero Body
         var durations = _today?.Snapshot?.Durations ?? SessionDurations.Default;

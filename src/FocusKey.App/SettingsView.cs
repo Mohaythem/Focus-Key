@@ -146,46 +146,62 @@ internal sealed class SettingsView : UserControl
 
         HorizontalAlignment = HorizontalAlignment.Stretch;
 
-        // 1. SESSION (Permanent)
+        // 1. SESSION (Permanent Top-Level Card)
         var sessions = new StackPanel { Spacing = 0 };
-        sessions.Children.Add(Row("Work duration", null, DurationFields(_workMinutes, _workSeconds)));
-        sessions.Children.Add(Row("Break duration", null, DurationFields(_breakMinutes, _breakSeconds)));
+        sessions.Children.Add(Row("Work duration", null, DurationFields(_workMinutes, _workSeconds), false));
+        sessions.Children.Add(Row("Break duration", null, DurationFields(_breakMinutes, _breakSeconds), false));
         sessions.Children.Add(Row("Session sounds", "Play a soft tick on start and a chime on completion", _sessionSounds, true));
-        _fields.Children.Add(Section("SESSION", sessions));
+        _fields.Children.Add(BuildSessionSection(sessions));
 
-        // 2. APPEARANCE (Collapsible)
-        var appearance = new StackPanel { Spacing = 0 };
-        appearance.Children.Add(Row("Color scheme", "Controls whether the application uses light, dark, or system theme", _appearance, false));
-        appearance.Children.Add(Row("Contrast", "Enhances text legibility and border definition across the interface", _contrast, false));
+        // 2. APPEARANCE (Collapsible Top-Level Card)
+        var appearanceLayout = new StackPanel { Spacing = 12 };
 
+        // Sub-card A: SYSTEM APPEARANCE
+        var systemAppearance = new StackPanel { Spacing = 0 };
+        systemAppearance.Children.Add(Row("Color scheme", "Controls whether the application uses light, dark, or system theme", _appearance, false));
+        systemAppearance.Children.Add(Row("Contrast", "Enhances text legibility and border definition across the interface", _contrast, true));
+        appearanceLayout.Children.Add(SubCard("SYSTEM APPEARANCE", systemAppearance));
+
+        // Sub-card B: LIGHT THEME
+        var lightTheme = new StackPanel { Spacing = 0 };
         ConfigureColor(_lightBgButton, _lightBgColor, "Light background");
         ConfigureColor(_lightFgButton, _lightFgColor, "Light foreground");
         ConfigureColor(_lightAccentButton, _lightAccentColor, "Light accent");
-        appearance.Children.Add(Row("Light theme preset", "Curated light theme palette", _lightPreset, false));
-        appearance.Children.Add(Row("Light background", "Light page and window background", _lightBgButton, false));
-        appearance.Children.Add(Row("Light foreground", "Light primary text and icons", _lightFgButton, false));
-        appearance.Children.Add(Row("Light accent", "Light interactive accent and highlights", _lightAccentButton, false));
+        lightTheme.Children.Add(Row("Preset", "Curated light theme palette", _lightPreset, false));
+        lightTheme.Children.Add(Row("Background", "Light page and window background", _lightBgButton, false));
+        lightTheme.Children.Add(Row("Foreground", "Light primary text and icons", _lightFgButton, false));
+        lightTheme.Children.Add(Row("Accent", "Light interactive accent and highlights", _lightAccentButton, true));
+        appearanceLayout.Children.Add(SubCard("LIGHT THEME", lightTheme));
 
+        // Sub-card C: DARK THEME
+        var darkTheme = new StackPanel { Spacing = 0 };
         ConfigureColor(_darkBgButton, _darkBgColor, "Dark background");
         ConfigureColor(_darkFgButton, _darkFgColor, "Dark foreground");
         ConfigureColor(_darkAccentButton, _darkAccentColor, "Dark accent");
-        appearance.Children.Add(Row("Dark theme preset", "Curated dark theme palette", _darkPreset, false));
-        appearance.Children.Add(Row("Dark background", "Dark page and window background", _darkBgButton, false));
-        appearance.Children.Add(Row("Dark foreground", "Dark primary text and icons", _darkFgButton, false));
-        appearance.Children.Add(Row("Dark accent", "Dark interactive accent and highlights", _darkAccentButton, false));
+        darkTheme.Children.Add(Row("Preset", "Curated dark theme palette", _darkPreset, false));
+        darkTheme.Children.Add(Row("Background", "Dark page and window background", _darkBgButton, false));
+        darkTheme.Children.Add(Row("Foreground", "Dark primary text and icons", _darkFgButton, false));
+        darkTheme.Children.Add(Row("Accent", "Dark interactive accent and highlights", _darkAccentButton, true));
+        appearanceLayout.Children.Add(SubCard("DARK THEME", darkTheme));
 
-        appearance.Children.Add(Row("Clock format", "Display time in 24-hour (09:05) or 12-hour (9:05 AM) format", _timeFormat, false));
-
+        // Sub-card D: SESSION COLORS
+        var sessionColors = new StackPanel { Spacing = 0 };
         ConfigureColor(_workButton, _workColor, "Work color");
         ConfigureColor(_breakButton, _breakColor, "Break color");
         var workSelector = BuildColorSelector(_workButton, _workColor, WorkColorPresets, true);
         var breakSelector = BuildColorSelector(_breakButton, _breakColor, BreakColorPresets, false);
-        appearance.Children.Add(Row("Work color", "Used for work session indicators and timer", workSelector, false));
-        appearance.Children.Add(Row("Break color", "Used for break session indicators and timer", breakSelector, true));
+        sessionColors.Children.Add(Row("Work color", "Used for work session indicators and timer", workSelector, false));
+        sessionColors.Children.Add(Row("Break color", "Used for break session indicators and timer", breakSelector, true));
+        appearanceLayout.Children.Add(SubCard("SESSION COLORS", sessionColors));
+
+        // Sub-card E: DISPLAY
+        var display = new StackPanel { Spacing = 0 };
+        display.Children.Add(Row("Clock format", "Display time in 24-hour (09:05) or 12-hour (9:05 AM) format", _timeFormat, true));
+        appearanceLayout.Children.Add(SubCard("DISPLAY", display));
 
         _fields.Children.Add(BuildCollapsibleSection(
             "APPEARANCE",
-            appearance,
+            appearanceLayout,
             _controller.Saved?.AppearanceExpanded ?? false,
             async expanded =>
             {
@@ -194,16 +210,24 @@ internal sealed class SettingsView : UserControl
             },
             out _setAppearanceExpanded));
 
-        // 3. SHORTCUTS (Collapsible)
-        var shortcuts = new StackPanel { Spacing = 0 };
+        // 3. SHORTCUTS (Collapsible Top-Level Card)
+        var shortcutsLayout = new StackPanel { Spacing = 12 };
+
+        // Sub-card A: QUICK OVERLAY
+        var overlayShortcutPanel = new StackPanel { Spacing = 0 };
         var overlayShortcutControl = BuildShortcutControl();
+        overlayShortcutPanel.Children.Add(Row("Quick Overlay", "Global shortcut to toggle quick overlay (default Shift + F3)", overlayShortcutControl, true));
+        shortcutsLayout.Children.Add(SubCard("QUICK OVERLAY", overlayShortcutPanel));
+
+        // Sub-card B: OPEN FOCUS KEY
+        var mainWindowShortcutPanel = new StackPanel { Spacing = 0 };
         var mainWindowShortcutControl = BuildMainWindowShortcutControl();
-        shortcuts.Children.Add(Row("Quick Overlay", "Global shortcut to toggle quick overlay (default Shift + F3)", overlayShortcutControl, false));
-        shortcuts.Children.Add(Row("Open Focus Key", "Global shortcut to open and focus the main window (default Shift + F4)", mainWindowShortcutControl, true));
+        mainWindowShortcutPanel.Children.Add(Row("Open Focus Key", "Global shortcut to open and focus the main window (default Shift + F4)", mainWindowShortcutControl, true));
+        shortcutsLayout.Children.Add(SubCard("OPEN FOCUS KEY", mainWindowShortcutPanel));
 
         _fields.Children.Add(BuildCollapsibleSection(
             "SHORTCUTS",
-            shortcuts,
+            shortcutsLayout,
             _controller.Saved?.ShortcutsExpanded ?? false,
             async expanded =>
             {
@@ -212,16 +236,28 @@ internal sealed class SettingsView : UserControl
             },
             out _setShortcutsExpanded));
 
-        // 4. ADVANCED (Collapsible)
-        var advanced = new StackPanel { Spacing = 0 };
-        advanced.Children.Add(Row("Start with Windows", "Launch Focus Key automatically when you sign in.", _startWithWindows, false));
-        advanced.Children.Add(Row("Reset position", "Reset overlay window position to the center of your screen", _resetOverlayPositionButton, false));
-        advanced.Children.Add(Row("Import history", "Import website-compatible focus history (tab-delimited CSV)", _importHistoryButton, false));
-        advanced.Children.Add(Row("Export history", "Export all focus history to website-compatible tab-delimited CSV", _exportHistoryButton, true));
+        // 4. ADVANCED (Collapsible Top-Level Card)
+        var advancedLayout = new StackPanel { Spacing = 12 };
+
+        // Sub-card A: STARTUP
+        var startupPanel = new StackPanel { Spacing = 0 };
+        startupPanel.Children.Add(Row("Start with Windows", "Launch Focus Key automatically when you sign in.", _startWithWindows, true));
+        advancedLayout.Children.Add(SubCard("STARTUP", startupPanel));
+
+        // Sub-card B: QUICK OVERLAY POSITION
+        var overlayPosPanel = new StackPanel { Spacing = 0 };
+        overlayPosPanel.Children.Add(Row("Reset position", "Reset overlay window position to the center of your screen", _resetOverlayPositionButton, true));
+        advancedLayout.Children.Add(SubCard("QUICK OVERLAY", overlayPosPanel));
+
+        // Sub-card C: DATA
+        var dataPanel = new StackPanel { Spacing = 0 };
+        dataPanel.Children.Add(Row("Import history", "Import website-compatible focus history (tab-delimited CSV)", _importHistoryButton, false));
+        dataPanel.Children.Add(Row("Export history", "Export all focus history to website-compatible tab-delimited CSV", _exportHistoryButton, true));
+        advancedLayout.Children.Add(SubCard("DATA", dataPanel));
 
         _fields.Children.Add(BuildCollapsibleSection(
             "ADVANCED",
-            advanced,
+            advancedLayout,
             _controller.Saved?.AdvancedExpanded ?? false,
             async expanded =>
             {
@@ -230,14 +266,22 @@ internal sealed class SettingsView : UserControl
             },
             out _setAdvancedExpanded));
 
-        var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-        actions.Children.Add(_reload);
-        var panel = new StackPanel { Spacing = 16, HorizontalAlignment = HorizontalAlignment.Stretch };
+        _fields.Spacing = 16;
         _editor.Content = _fields;
         _editor.HorizontalContentAlignment = HorizontalAlignment.Stretch;
+
+        var footer = new StackPanel
+        {
+            Spacing = 8,
+            Margin = new Thickness(4, 20, 4, 16),
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        footer.Children.Add(_reload);
+        footer.Children.Add(_status);
+
+        var panel = new StackPanel { Spacing = 0, HorizontalAlignment = HorizontalAlignment.Stretch };
         panel.Children.Add(_editor);
-        panel.Children.Add(actions);
-        panel.Children.Add(_status);
+        panel.Children.Add(footer);
         Content = panel;
 
         _reload.Click += async (_, _) =>
@@ -1157,15 +1201,60 @@ internal sealed class SettingsView : UserControl
         return panel;
     }
 
-    private static StackPanel Section(string title, UIElement content)
+    private static Border BuildSessionSection(UIElement content)
     {
-        var section = new StackPanel { Spacing = 8, HorizontalAlignment = HorizontalAlignment.Stretch };
-        var heading = Presentation.DimText(title);
-        if (Application.Current?.Resources["FkSectionText"] is Style style) heading.Style = style;
-        heading.Margin = new Thickness(2, 4, 2, 4);
-        section.Children.Add(heading);
-        section.Children.Add(Presentation.Card(content, 0));
-        return section;
+        var card = new Border
+        {
+            Style = Application.Current?.Resources["FkCard"] as Style,
+            Padding = new Thickness(0)
+        };
+
+        var panel = new StackPanel { Spacing = 0 };
+        var heading = Presentation.BodyStrong("SESSION", 13);
+        heading.Margin = new Thickness(16, 14, 16, 10);
+        panel.Children.Add(heading);
+
+        var divider = new Border
+        {
+            Height = 1,
+            Background = Application.Current?.Resources["CardStrokeColorDefaultBrush"] as Brush,
+            Opacity = 0.6,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        panel.Children.Add(divider);
+        panel.Children.Add(content);
+
+        card.Child = panel;
+        return card;
+    }
+
+    private static Border SubCard(string? title, UIElement content)
+    {
+        var border = new Border
+        {
+            Style = Application.Current?.Resources["FkCardSubtle"] as Style,
+            CornerRadius = new CornerRadius(6),
+            Padding = new Thickness(0)
+        };
+
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            border.Child = content;
+            return border;
+        }
+
+        var panel = new StackPanel { Spacing = 0 };
+        var heading = Presentation.DimText(title, 11);
+        if (Application.Current?.Resources["FkSectionText"] is Style style)
+        {
+            heading.Style = style;
+        }
+        heading.Margin = new Thickness(16, 12, 16, 6);
+        panel.Children.Add(heading);
+        panel.Children.Add(content);
+
+        border.Child = panel;
+        return border;
     }
 
     private FrameworkElement BuildCollapsibleSection(
@@ -1175,7 +1264,13 @@ internal sealed class SettingsView : UserControl
         Func<bool, Task> onToggleExpanded,
         out Action<bool> setExpandedVisual)
     {
-        var section = new StackPanel { Spacing = 8, HorizontalAlignment = HorizontalAlignment.Stretch };
+        var card = new Border
+        {
+            Style = Application.Current?.Resources["FkCard"] as Style,
+            Padding = new Thickness(0)
+        };
+
+        var rootPanel = new StackPanel { Spacing = 0, HorizontalAlignment = HorizontalAlignment.Stretch };
 
         var chevron = new FontIcon
         {
@@ -1186,8 +1281,7 @@ internal sealed class SettingsView : UserControl
             HorizontalAlignment = HorizontalAlignment.Right
         };
 
-        var heading = Presentation.DimText(title);
-        if (Application.Current?.Resources["FkSectionText"] is Style style) heading.Style = style;
+        var heading = Presentation.BodyStrong(title, 13);
         heading.VerticalAlignment = VerticalAlignment.Center;
         heading.HorizontalAlignment = HorizontalAlignment.Left;
 
@@ -1211,13 +1305,26 @@ internal sealed class SettingsView : UserControl
             HorizontalContentAlignment = HorizontalAlignment.Stretch,
             Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
             BorderThickness = new Thickness(0),
-            CornerRadius = new CornerRadius(4),
-            Padding = new Thickness(2, 2, 2, 2),
-            MinHeight = 28
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(16, 14, 16, 14),
+            MinHeight = 48
         };
 
-        var card = Presentation.Card(content, 0);
-        card.Visibility = isExpanded ? Visibility.Visible : Visibility.Collapsed;
+        var divider = new Border
+        {
+            Height = 1,
+            Background = Application.Current?.Resources["CardStrokeColorDefaultBrush"] as Brush,
+            Opacity = 0.6,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            Visibility = isExpanded ? Visibility.Visible : Visibility.Collapsed
+        };
+
+        var contentContainer = new Border
+        {
+            Padding = new Thickness(14, 14, 14, 14),
+            Child = content,
+            Visibility = isExpanded ? Visibility.Visible : Visibility.Collapsed
+        };
 
         bool currentExpanded = isExpanded;
 
@@ -1225,7 +1332,8 @@ internal sealed class SettingsView : UserControl
         {
             currentExpanded = expanded;
             chevron.Glyph = expanded ? "\uE70E" : "\uE76C";
-            card.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
+            divider.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
+            contentContainer.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
             AutomationProperties.SetName(headerButton, $"{title}, {(expanded ? "expanded" : "collapsed")}");
         }
 
@@ -1240,9 +1348,12 @@ internal sealed class SettingsView : UserControl
             await onToggleExpanded(next);
         };
 
-        section.Children.Add(headerButton);
-        section.Children.Add(card);
-        return section;
+        rootPanel.Children.Add(headerButton);
+        rootPanel.Children.Add(divider);
+        rootPanel.Children.Add(contentContainer);
+
+        card.Child = rootPanel;
+        return card;
     }
 
     private static Grid Row(string label, string? description, FrameworkElement control, bool last = false)

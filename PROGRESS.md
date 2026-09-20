@@ -1,24 +1,27 @@
 # Focus Key — Project Progress & State Checkpoint
 
 ## Current Goal
-Settings Information Architecture & Collapsible Sections Redesign implemented and verified with 816/816 passing tests and zero build warnings/errors.
+Settings Visual Hierarchy & Nested Card Refinement implemented and verified with 816/816 passing tests and zero build warnings/errors.
 
 ## Current Checkpoint
 Implemented and verified:
-- **1. Settings 4-Section Information Architecture**:
-  - **SESSION (Permanent, Top Priority)**: Work duration, Break duration, Session sounds.
-  - **APPEARANCE (Collapsible, Default Collapsed)**: Color scheme, Contrast, Light theme preset/colors, Dark theme preset/colors, Clock format, Session colors.
-  - **SHORTCUTS (Collapsible, Default Collapsed)**: Quick Overlay global shortcut, Open Focus Key global shortcut.
-  - **ADVANCED (Collapsible, Default Collapsed)**: Launch with Windows, Reset Overlay Position, Import history, Export history.
-- **2. Persistent SQLite Section Expansion (Migration 12)**:
-  - Columns `appearance_expanded`, `shortcuts_expanded`, `advanced_expanded` added to `application_settings`.
+- **1. Top-Level Sections as Prominent Native Fluent Cards**:
+  - **SESSION (Permanent)**: Outer `FkCard` container (8px corner radius, 1px stroke), `"SESSION"` SemiBold 13px title header, 1px divider (`CardStrokeColorDefaultBrush`, opacity 0.6), and 3 session duration/sound rows.
+  - **APPEARANCE (Collapsible)**: Outer `FkCard` container, full-width 48px header button with SemiBold 13px title and animated chevron (`\uE76C` collapsed / `\uE70E` expanded), 1px divider, and nested sub-cards.
+  - **SHORTCUTS (Collapsible)**: Outer `FkCard` container, full-width 48px header button + chevron, 1px divider, and nested sub-cards.
+  - **ADVANCED (Collapsible)**: Outer `FkCard` container, full-width 48px header button + chevron, 1px divider, and nested sub-cards.
+- **2. Nested Sub-Cards**:
+  - Expanded content cleanly organized into sub-cards (`FkCardSubtle` surface, 6px corner radius, subtle uppercase title headings with `FkSectionText` style and 60 character spacing).
+  - **APPEARANCE Sub-Cards**: `SYSTEM APPEARANCE` (Color scheme, Contrast), `LIGHT THEME` (Preset, Bg, Fg, Accent), `DARK THEME` (Preset, Bg, Fg, Accent), `SESSION COLORS` (Work color, Break color), `DISPLAY` (Clock format).
+  - **SHORTCUTS Sub-Cards**: `QUICK OVERLAY` (Shortcut button + reset), `OPEN FOCUS KEY` (Shortcut button + reset).
+  - **ADVANCED Sub-Cards**: `STARTUP` (Start with Windows), `QUICK OVERLAY` (Reset position), `DATA` (Import history, Export history).
+- **3. Relocated Administrative Footer**:
+  - Auto-save feedback note (`_status`) and reload button (`_reload`) placed at the true bottom of the Settings page with clear vertical margin separation from the cards (`Margin = 4, 20, 4, 16`).
+- **4. Persistent SQLite Section Expansion (Migration 12)**:
+  - Columns `appearance_expanded`, `shortcuts_expanded`, `advanced_expanded` in `application_settings`.
   - Expansion states survive page navigation and application restarts.
-- **3. Native WinUI 3 Restrained Collapsible Headers**:
-  - Clean, full-width headers with fluent chevron icons (`\uE76C` collapsed, `\uE70E` expanded).
-  - Full keyboard accessibility (`Enter`/`Space`), screen reader state announcements (`"{Section}, expanded"` / `"{Section}, collapsed"`).
-  - Proper tab-focus hygiene: collapsed content is set to `Visibility.Collapsed` removing children from the keyboard focus cycle.
-- **4. Zero Feature Loss & Scope Discipline**:
-  - 100% of the 15 existing settings preserved.
+- **5. Zero Feature Loss & Scope Discipline**:
+  - 100% of the 15 existing settings preserved with full bidirectional binding.
   - No changes to Today, Reports, Quick Overlay, or Close dialog surfaces.
 - **Automated Tests**: 816/816 unit tests passing (`dotnet test -c Release`), 0 failed, 0 skipped.
 - **Build**: 0 Warning(s), 0 Error(s) (`dotnet build src/FocusKey.App/FocusKey.App.csproj -c Release`).
@@ -40,6 +43,7 @@ Implemented and verified:
 - **Stage 9b (Quick Overlay Surgical Visual Restore)**: Surgically restored Quick Overlay visual presentation and geometry to approved `a19b522` baseline (480 DIP width, 432 DIP progress bar, left-aligned 52 DIP timer, persistent header dot + title, right-aligned buttons).
 - **Stage 10 (Today Native Windows Adaptive Redesign)**: Adaptive navigation shell (Expanded 220 DIP, Compact rail 54 DIP, Collapsed 0 DIP with drawer), 2-column desktop composition on Wide/Medium and single vertical stack on Narrow, zero-layout-jump Session Hero with integrated idle switcher, restrained active-session navigation status dot, and unclipped timer digit typography.
 - **Stage 10b (Post-Today UX Refinement Pass)**: Keyboard navigation & activation (Left/Right arrows for idle selector, Up/Down for nav, Esc for drawer), preserved session-colored Today status dot, stable Today activity overflow scrolling (420 DIP max height internal viewer), 4 fixed weekly buckets in monthly reports, and enlarged draggable Quick Overlay header.
+- **Stage 14 (Settings Information Architecture & Nested Card Hierarchy)**: Restructured 4 top-level sections as native Fluent cards (`SESSION`, `APPEARANCE`, `SHORTCUTS`, `ADVANCED`), sub-card grouping (`FkCardSubtle`), 48px button headers with chevron toggle and full keyboard accessibility, SQLite expansion persistence, and bottom-anchored reload footer.
 
 ## Remaining Work
 - **Stage 11: Final Consistency QA & Windows Packaging**
@@ -47,33 +51,15 @@ Implemented and verified:
   - Package clean standalone Release installer (`FocusKeySetup.exe`).
 
 ## Important Active Decisions
-- **Adaptive Breakpoints & Helper**: `TodayAdaptiveLayoutHelper.ResolveNavMode` and `ResolveCompositionMode` provide pure, deterministic layout calculations for unit testing (Expanded >= 1060 DIP, Compact 740..1059 DIP, Collapsed < 740 DIP).
-- **Glyph Integrity**: Setting `CharacterSpacing="0"` on Consolas timer text and adding horizontal padding (`Padding="16,0,16,0"`) ensures glyph edges are never clipped by the rendering engine without expanding card boundaries.
-- **Restrained Active Dot**: Active session status dot is bound directly to `ActiveIndicatorBrush` and toggled via `Visibility` without introducing text shifts or layout inflation.
-- **Slide-Out Drawer Overlay**: Implemented via a z-indexed `Grid` overlay with backdrop dismissal (`PointerPressed`) and animated translation/visibility.
+- **Top-Level Card Consistency**: Top-level sections wrap both header and content in an outer `FkCard` border, maintaining clear visual boundaries regardless of expanded/collapsed state.
+- **Sub-Card Grouping**: Nested groups within expanded sections use `FkCardSubtle` surfaces with 6px corner radius and `FkSectionText` headings to provide clear secondary hierarchy without visual clutter.
+- **Header Button Affordance**: Header buttons use 48px height, 16px horizontal padding, and transparent background to ensure the entire card top is clickable and responds with native hover/press states.
+- **Tab Focus Hygiene**: Collapsed section content is set to `Visibility = Visibility.Collapsed` to completely remove offscreen/collapsed controls from keyboard focus.
 
 ## Last Verification
-- **Build**: `dotnet build -c Release` (0 Warnings, 0 Errors).
-- **Test Suite**: `dotnet test -c Release` (809 passed, 0 failed, 0 skipped).
-- **Visual Captures Inspected**:
-  - `today_wide_running_work_dark.png`
-  - `today_wide_paused_work_dark.png`
-  - `today_wide_idle_work_dark.png`
-  - `today_wide_running_break_dark.png`
-  - `today_medium_running_dark.png`
-  - `today_medium_idle_dark.png`
-  - `today_medium_paused_dark.png`
-  - `today_narrow_running_dark.png`
-  - `today_narrow_idle_dark.png`
-  - `today_narrow_paused_dark.png`
-  - `today_narrow_drawer_open_dark.png`
-  - `today_wide_running_work_light.png`
-  - `today_wide_idle_light.png`
-  - `today_wide_paused_work_light.png`
-  - `reports_wide_dark.png`
-  - `settings_wide_dark.png`
+- **Build**: `dotnet build src/FocusKey.App/FocusKey.App.csproj -c Release` (0 Warnings, 0 Errors).
+- **Test Suite**: `dotnet test -c Release` (816 passed, 0 failed, 0 skipped).
 
 ## Current Git State
 - Branch: `native/phased-rewrite`
-- Working tree contains complete, verified Today Native Windows Adaptive Redesign.
-
+- Working tree contains verified Settings visual hierarchy & nested card refinement.

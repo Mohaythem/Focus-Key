@@ -20,22 +20,26 @@ This document serves as the persistent repository-level source of truth for all 
 
 ## Implemented Work Awaiting Final User Acceptance
 
-### Settings Information Architecture & Collapsible Sections Redesign (Implemented — Awaiting Final User Acceptance)
+### Settings Visual Hierarchy & Nested Card Refinement (Implemented — Awaiting Final User Acceptance)
 **Status:** Implemented — Awaiting Final User Acceptance
 **Scope & Deliverables:**
-1. **Reorganized Top-Level Hierarchy**:
-   - `SESSION` (Always visible, top priority): Work duration, Break duration, Session sounds.
-   - `APPEARANCE` (Collapsible): Color scheme, Contrast, Light Theme palette/presets, Dark Theme palette/presets, Time format, Session colors.
-   - `SHORTCUTS` (Collapsible): Quick Overlay global shortcut, Open Focus Key global shortcut.
-   - `ADVANCED` (Collapsible): Launch with Windows, Reset Overlay Position, Import history, Export history.
-2. **Persistent Collapsible Section States**:
-   - Persist `AppearanceExpanded`, `ShortcutsExpanded`, `AdvancedExpanded` preferences via SQLite `application_settings` (Migration 12).
+1. **Top-Level Sections as Prominent Native Fluent Cards**:
+   - `SESSION` (Permanent): Outer `FkCard` container (8px corner radius, 1px stroke), `"SESSION"` SemiBold 13px title header, 1px divider, and 3 session duration/sound rows.
+   - `APPEARANCE` (Collapsible): Outer `FkCard` container, full-width 48px header button with SemiBold 13px title and animated chevron (`\uE76C` collapsed / `\uE70E` expanded), 1px divider, and nested sub-cards.
+   - `SHORTCUTS` (Collapsible): Outer `FkCard` container, full-width 48px header button + chevron, 1px divider, and nested sub-cards.
+   - `ADVANCED` (Collapsible): Outer `FkCard` container, full-width 48px header button + chevron, 1px divider, and nested sub-cards.
+2. **Nested Sub-Cards**:
+   - Expanded content grouped into clean sub-cards (`FkCardSubtle` surface, 6px corner radius, subtle uppercase title headings with `FkSectionText` style and 60 character spacing).
+   - `APPEARANCE`: `SYSTEM APPEARANCE`, `LIGHT THEME`, `DARK THEME`, `SESSION COLORS`, `DISPLAY`.
+   - `SHORTCUTS`: `QUICK OVERLAY`, `OPEN FOCUS KEY`.
+   - `ADVANCED`: `STARTUP`, `QUICK OVERLAY`, `DATA`.
+3. **Relocated Administrative Footer**:
+   - Auto-save feedback note (`_status`) and reload button (`_reload`) placed at the true bottom of the Settings page with clear vertical margin separation from the cards (`Margin = 4, 20, 4, 16`).
+4. **Persistent SQLite Section Expansion (Migration 12)**:
+   - Persist `AppearanceExpanded`, `ShortcutsExpanded`, `AdvancedExpanded` preferences via SQLite `application_settings`.
    - Default state on first launch: Session always visible, Appearance collapsed (`false`), Shortcuts collapsed (`false`), Advanced collapsed (`false`).
    - Persists across page navigation and application restarts.
-3. **Native WinUI 3 Restrained Collapsible Headers**:
-   - Clean, keyboard-accessible header buttons with chevron indicators (`\uE76C` collapsed, `\uE70E` expanded), appropriate automation names, and high-visibility Fluent focus indicators.
-   - Collapsed controls are completely removed from the tab order.
-4. **Preserve 100% of Existing Settings & Logic**:
+5. **Preserve 100% of Existing Settings & Logic**:
    - Zero dropped features (all 15 settings preserved), zero regressed behaviors (transactional shortcuts, live theme switching, SQLite duration validation).
 
 ### Post-Today UX Refinement Pass (Implemented — Awaiting Final User Acceptance)

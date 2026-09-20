@@ -56,6 +56,25 @@ Implemented a focused UX refinement pass after the accepted Today adaptive redes
 
 ---
 
+#### Keyboard-First + Quick Overlay Drag Correction (Implemented — Awaiting Final User Acceptance)
+Implemented focused keyboard-first UX, directional arrow navigation, continuous pointer-capture Quick Overlay dragging, and Activity scrollbar breathing room:
+1. **Today Keyboard-First Experience (No Tab Required)**:
+   - **Idle State**: When Today is active, keyboard navigation immediately targets the session selection context without requiring Tab first. Left Arrow selects Work, Right Arrow selects Break, Enter/Space starts the session.
+   - **Running State**: Enter or Space immediately pauses the session without requiring Tab first.
+   - **Paused State**: Continue is focused by default; Left/Right moves between Continue and Start New; Enter/Space activates the focused button.
+   - Tab navigation remains available as a standard alternative without focus trapping.
+2. **Deterministic Navigation Arrow Keys**:
+   - Up/Down arrows move focus cleanly through navigation destinations in Expanded pane, Compact rail, and Narrow drawer (`OnNavGridPreviewKeyDown`, `OnNavDrawerPanePreviewKeyDown`). Enter/Space activates destination; Esc closes the drawer and returns focus to Hamburger button.
+3. **Quick Overlay Drag Correction**:
+   - Replaced modal `WM_NCLBUTTONDOWN` non-client loop with standard WinUI 3 pointer capture (`CapturePointer`, `GetCursorPos`, `AppWindow.Move`).
+   - True press-drag-release behavior: Left button down $\rightarrow$ hold and move mouse $\rightarrow$ window follows continuously $\rightarrow$ release mouse button $\rightarrow$ drag terminates immediately with zero toggle stickiness.
+   - Interactive controls (Close `X`, Work, Break, Start, Pause, Continue, Start New) do NOT trigger window dragging.
+   - Preserves SQLite position persistence and multi-monitor bounds clamping.
+4. **Activity Overflow Scrollbar Padding**:
+   - Added safe right padding (`Padding="0,0,10,0"`) and row column spacing with `CharacterEllipsis` so "Completed" and all status text are never clipped or hidden beneath the vertical scrollbar.
+
+---
+
 ### Today Native Windows Adaptive Redesign (Implemented — Awaiting Final User Acceptance)
 Redesigned and implemented the Today page as a true adaptive native Windows 11 desktop experience inspired by the Windows Clock app adaptive behavior:
 1. **Desktop-First Composition**: Today uses a desktop-first Hero + Summary + Activity composition.

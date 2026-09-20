@@ -37,6 +37,9 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
     private int? _persistedPositionX;
     private int? _persistedPositionY;
     private bool _positionLoaded;
+    private bool _isDragging;
+    private NativeMethods.POINT _dragStartCursorPos;
+    private PointInt32 _dragStartWindowPos;
 
     internal void ApplyColors(SessionColors colors) { _colors = colors; Render(_state); }
     internal void ApplyPosition(int? x, int? y)
@@ -533,11 +536,49 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
 
     private void OnHeaderPointerPressed(object sender, PointerRoutedEventArgs e)
     {
-        if (e.GetCurrentPoint(Surface).Properties.IsLeftButtonPressed)
+        var pt = e.GetCurrentPoint(HeaderGrid);
+        if (pt.Properties.IsLeftButtonPressed)
         {
-            IntPtr hwnd = WindowNative.GetWindowHandle(this);
-            NativeMethods.ReleaseCapture();
-            NativeMethods.SendMessage(hwnd, NativeMethods.WM_NCLBUTTONDOWN, (IntPtr)NativeMethods.HTCAPTION, IntPtr.Zero);
+            _isDragging = true;
+            HeaderGrid.CapturePointer(e.Pointer);
+            NativeMethods.GetCursorPos(out _dragStartCursorPos);
+            _dragStartWindowPos = AppWindow.Position;
+            e.Handled = true;
+        }
+    }
+
+    private void OnHeaderPointerMoved(object sender, PointerRoutedEventArgs e)
+    {
+        if (_isDragging)
+        {
+            if (NativeMethods.GetCursorPos(out var currentCursorPos))
+            {
+                int deltaX = currentCursorPos.X - _dragStartCursorPos.X;
+                int deltaY = currentCursorPos.Y - _dragStartCursorPos.Y;
+                int newX = _dragStartWindowPos.X + deltaX;
+                int newY = _dragStartWindowPos.Y + deltaY;
+                AppWindow.Move(new PointInt32(newX, newY));
+            }
+            e.Handled = true;
+        }
+    }
+
+    private void OnHeaderPointerReleased(object sender, PointerRoutedEventArgs e)
+    {
+        if (_isDragging)
+        {
+            _isDragging = false;
+            HeaderGrid.ReleasePointerCapture(e.Pointer);
+            SaveCurrentPosition();
+            e.Handled = true;
+        }
+    }
+
+    private void OnHeaderPointerCaptureLost(object sender, PointerRoutedEventArgs e)
+    {
+        if (_isDragging)
+        {
+            _isDragging = false;
             SaveCurrentPosition();
         }
     }
@@ -569,17 +610,53 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
                 DismissRequested?.Invoke();
                 break;
             case VirtualKey.Left:
+                args.Handled = true;
+                if (_state.Active is { Status: SessionStatus.Paused })
+                {
+                    PauseButton.Focus(FocusState.Keyboard);
+                }
+                else if (_state.Active is null)
+                {
+                    SelectionRequested?.Invoke(SessionType.Work);
+                    FocusSelection();
+                }
+                break;
             case VirtualKey.Right:
                 args.Handled = true;
-                if (_state.Active is not null) break;
-                SelectionRequested?.Invoke(args.Key == VirtualKey.Left ? SessionType.Work : SessionType.Break);
-                FocusSelection();
+                if (_state.Active is { Status: SessionStatus.Paused })
+                {
+                    StartNewButton.Focus(FocusState.Keyboard);
+                }
+                else if (_state.Active is null)
+                {
+                    SelectionRequested?.Invoke(SessionType.Break);
+                    FocusSelection();
+                }
                 break;
             case VirtualKey.Enter:
-                args.Handled = true;
+            case VirtualKey.Space:
                 if (args.KeyStatus.WasKeyDown) break;
-                if (_state.Active is { Status: SessionStatus.Running }) PauseRequested?.Invoke();
-                else StartRequested?.Invoke();
+                args.Handled = true;
+                if (_state.Active is { Status: SessionStatus.Running })
+                {
+                    PauseRequested?.Invoke();
+                }
+                else if (_state.Active is { Status: SessionStatus.Paused })
+                {
+                    var focused = FocusManager.GetFocusedElement(Surface.XamlRoot);
+                    if (ReferenceEquals(focused, StartNewButton))
+                    {
+                        StartNewRequested?.Invoke();
+                    }
+                    else
+                    {
+                        StartRequested?.Invoke();
+                    }
+                }
+                else if (_state.Active is null)
+                {
+                    StartRequested?.Invoke();
+                }
                 break;
         }
     }

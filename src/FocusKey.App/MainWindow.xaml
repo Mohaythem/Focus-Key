@@ -1,12 +1,12 @@
 <Window x:Class="FocusKey.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Focus Key">
- <Grid x:Name="MainSurface" Background="{ThemeResource FkBackground}" FlowDirection="LeftToRight" Language="en-US">
+ <Grid x:Name="MainSurface" Background="{ThemeResource FkBackground}" FlowDirection="LeftToRight" Language="en-US" PreviewKeyDown="OnMainSurfacePreviewKeyDown">
   <Grid.ColumnDefinitions>
    <ColumnDefinition x:Name="NavColumn" Width="220"/>
    <ColumnDefinition Width="*"/>
   </Grid.ColumnDefinitions>
 
   <!-- DOCKED NAVIGATION SIDEBAR / RAIL -->
-  <Grid x:Name="NavGrid" Background="{ThemeResource FkSidebar}" Padding="10,20,10,16" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,0,1,0">
+  <Grid x:Name="NavGrid" Background="{ThemeResource FkSidebar}" Padding="10,20,10,16" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,0,1,0" PreviewKeyDown="OnNavGridPreviewKeyDown">
    <Grid.Resources>
     <SolidColorBrush x:Key="ToggleButtonBackgroundChecked" Color="{ThemeResource ControlFillColorSecondary}"/>
     <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPointerOver" Color="{ThemeResource ControlFillColorTertiary}"/>
@@ -30,7 +30,7 @@
     <!-- Top Destination Items -->
     <StackPanel x:Name="TopNavItems" Spacing="3">
      <!-- Today Nav with active status dot -->
-     <ToggleButton x:Name="TodayNav" Style="{StaticResource FkNav}" Click="OnTodayClick" KeyDown="OnNavKeyDown" ToolTipService.ToolTip="Today" AutomationProperties.Name="Today">
+     <ToggleButton x:Name="TodayNav" Style="{StaticResource FkNav}" Click="OnTodayClick" ToolTipService.ToolTip="Today" AutomationProperties.Name="Today">
       <Grid HorizontalAlignment="Stretch">
        <Grid.ColumnDefinitions>
         <ColumnDefinition Width="Auto"/>
@@ -47,7 +47,7 @@
        <Ellipse Grid.Column="2" x:Name="TodayExpandedDot" Width="6" Height="6" VerticalAlignment="Center" Margin="6,0,4,0" Visibility="Collapsed"/>
       </Grid>
      </ToggleButton>
-     <ToggleButton x:Name="ReportsNav" Style="{StaticResource FkNav}" Click="OnReportsClick" KeyDown="OnNavKeyDown" ToolTipService.ToolTip="Reports" AutomationProperties.Name="Reports">
+     <ToggleButton x:Name="ReportsNav" Style="{StaticResource FkNav}" Click="OnReportsClick" ToolTipService.ToolTip="Reports" AutomationProperties.Name="Reports">
       <StackPanel x:Name="ReportsNavContent" Orientation="Horizontal" Spacing="10">
        <Border x:Name="ReportsIconContainer" Width="28" Height="28" HorizontalAlignment="Center" VerticalAlignment="Center">
         <FontIcon x:Name="ReportsIcon" Glyph="&#xE9D9;" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
@@ -60,7 +60,7 @@
 
    <!-- Bottom Nav Section -->
    <StackPanel x:Name="BottomNavSection" Grid.Row="2" Spacing="3">
-    <Button x:Name="OverlayNavButton" Style="{StaticResource FkSidebarButton}" Click="OnOverlayClick" KeyDown="OnNavKeyDown" ToolTipService.ToolTip="Quick Overlay (Shift + F3)" AutomationProperties.Name="Quick Overlay">
+    <Button x:Name="OverlayNavButton" Style="{StaticResource FkSidebarButton}" Click="OnOverlayClick" ToolTipService.ToolTip="Quick Overlay (Shift + F3)" AutomationProperties.Name="Quick Overlay">
      <StackPanel x:Name="OverlayNavContent" Orientation="Horizontal" Spacing="10">
       <Border x:Name="OverlayIconContainer" Width="28" Height="28" HorizontalAlignment="Center" VerticalAlignment="Center">
        <FontIcon x:Name="OverlayIcon" Glyph="&#xE8A7;" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
@@ -68,7 +68,7 @@
       <TextBlock x:Name="OverlayLabel" Text="Quick Overlay" FontSize="13" VerticalAlignment="Center"/>
      </StackPanel>
     </Button>
-    <ToggleButton x:Name="SettingsNav" Style="{StaticResource FkNav}" Click="OnSettingsClick" KeyDown="OnNavKeyDown" ToolTipService.ToolTip="Settings" AutomationProperties.Name="Settings">
+    <ToggleButton x:Name="SettingsNav" Style="{StaticResource FkNav}" Click="OnSettingsClick" ToolTipService.ToolTip="Settings" AutomationProperties.Name="Settings">
      <StackPanel x:Name="SettingsNavContent" Orientation="Horizontal" Spacing="10">
       <Border x:Name="SettingsIconContainer" Width="28" Height="28" HorizontalAlignment="Center" VerticalAlignment="Center">
        <FontIcon x:Name="SettingsIcon" Glyph="&#xE713;" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
@@ -76,7 +76,7 @@
       <TextBlock x:Name="SettingsLabel" Text="Settings" FontSize="13" VerticalAlignment="Center"/>
      </StackPanel>
     </ToggleButton>
-    <Button x:Name="ExitButton" Style="{StaticResource FkSidebarButton}" Click="OnExitClick" KeyDown="OnNavKeyDown" ToolTipService.ToolTip="Exit App" AutomationProperties.Name="Exit App">
+    <Button x:Name="ExitButton" Style="{StaticResource FkSidebarButton}" Click="OnExitClick" ToolTipService.ToolTip="Exit App" AutomationProperties.Name="Exit App">
      <StackPanel x:Name="ExitNavContent" Orientation="Horizontal" Spacing="10">
       <Border x:Name="ExitIconContainer" Width="28" Height="28" HorizontalAlignment="Center" VerticalAlignment="Center">
        <FontIcon x:Name="ExitIcon" Glyph="&#xE7E8;" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
@@ -90,7 +90,7 @@
   <!-- OVERLAY NAVIGATION DRAWER (For Narrow mode when Hamburger is opened) -->
   <Grid x:Name="NavDrawerOverlay" Grid.ColumnSpan="2" Canvas.ZIndex="1000" Visibility="Collapsed" PreviewKeyDown="OnNavDrawerOverlayPreviewKeyDown">
    <Border x:Name="NavDrawerBackdrop" Background="#66000000" Tapped="OnNavDrawerBackdropTapped"/>
-   <Grid x:Name="NavDrawerPane" Width="240" HorizontalAlignment="Left" Background="{ThemeResource FkSidebar}" Padding="12,16,12,16" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,0,1,0">
+   <Grid x:Name="NavDrawerPane" Width="240" HorizontalAlignment="Left" Background="{ThemeResource FkSidebar}" Padding="12,16,12,16" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,0,1,0" PreviewKeyDown="OnNavDrawerPanePreviewKeyDown">
     <Grid.RowDefinitions>
      <RowDefinition Height="Auto"/>
      <RowDefinition Height="*"/>
@@ -102,12 +102,12 @@
       <ColumnDefinition Width="Auto"/>
      </Grid.ColumnDefinitions>
      <TextBlock Text="Focus Key" Style="{StaticResource FkText}" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center" Margin="6,0,0,0"/>
-     <Button x:Name="DrawerCloseButton" Grid.Column="1" Click="OnNavDrawerCloseClick" KeyDown="OnDrawerNavKeyDown" Padding="6" Background="Transparent" BorderThickness="0" CornerRadius="{StaticResource FkControlRadius}" AutomationProperties.Name="Close navigation">
+     <Button x:Name="DrawerCloseButton" Grid.Column="1" Click="OnNavDrawerCloseClick" Padding="6" Background="Transparent" BorderThickness="0" CornerRadius="{StaticResource FkControlRadius}" AutomationProperties.Name="Close navigation">
       <FontIcon Glyph="&#xE711;" FontSize="12"/>
      </Button>
     </Grid>
     <StackPanel Grid.Row="1" Spacing="4">
-     <ToggleButton x:Name="DrawerTodayNav" Style="{StaticResource FkNav}" Click="OnTodayClick" KeyDown="OnDrawerNavKeyDown" AutomationProperties.Name="Today">
+     <ToggleButton x:Name="DrawerTodayNav" Style="{StaticResource FkNav}" Click="OnTodayClick" AutomationProperties.Name="Today">
       <Grid HorizontalAlignment="Stretch">
        <Grid.ColumnDefinitions>
         <ColumnDefinition Width="Auto"/>
@@ -119,7 +119,7 @@
        <Ellipse Grid.Column="2" x:Name="DrawerTodayDot" Width="6" Height="6" VerticalAlignment="Center" Margin="6,0,4,0" Visibility="Collapsed"/>
       </Grid>
      </ToggleButton>
-     <ToggleButton x:Name="DrawerReportsNav" Style="{StaticResource FkNav}" Click="OnReportsClick" KeyDown="OnDrawerNavKeyDown" AutomationProperties.Name="Reports">
+     <ToggleButton x:Name="DrawerReportsNav" Style="{StaticResource FkNav}" Click="OnReportsClick" AutomationProperties.Name="Reports">
       <StackPanel Orientation="Horizontal" Spacing="12">
        <FontIcon Glyph="&#xE9D9;" FontSize="18"/>
        <TextBlock Text="Reports" FontSize="13" VerticalAlignment="Center"/>
@@ -127,19 +127,19 @@
      </ToggleButton>
     </StackPanel>
     <StackPanel Grid.Row="2" Spacing="4">
-     <Button x:Name="DrawerOverlayButton" Style="{StaticResource FkSidebarButton}" Click="OnOverlayClick" KeyDown="OnDrawerNavKeyDown" AutomationProperties.Name="Quick Overlay">
+     <Button x:Name="DrawerOverlayButton" Style="{StaticResource FkSidebarButton}" Click="OnOverlayClick" AutomationProperties.Name="Quick Overlay">
       <StackPanel Orientation="Horizontal" Spacing="12">
        <FontIcon Glyph="&#xE8A7;" FontSize="18"/>
        <TextBlock Text="Quick Overlay" FontSize="13" VerticalAlignment="Center"/>
       </StackPanel>
      </Button>
-     <ToggleButton x:Name="DrawerSettingsNav" Style="{StaticResource FkNav}" Click="OnSettingsClick" KeyDown="OnDrawerNavKeyDown" AutomationProperties.Name="Settings">
+     <ToggleButton x:Name="DrawerSettingsNav" Style="{StaticResource FkNav}" Click="OnSettingsClick" AutomationProperties.Name="Settings">
       <StackPanel Orientation="Horizontal" Spacing="12">
        <FontIcon Glyph="&#xE713;" FontSize="18"/>
        <TextBlock Text="Settings" FontSize="13" VerticalAlignment="Center"/>
       </StackPanel>
      </ToggleButton>
-     <Button x:Name="DrawerExitButton" Style="{StaticResource FkSidebarButton}" Click="OnExitClick" KeyDown="OnDrawerNavKeyDown" AutomationProperties.Name="Exit App">
+     <Button x:Name="DrawerExitButton" Style="{StaticResource FkSidebarButton}" Click="OnExitClick" AutomationProperties.Name="Exit App">
       <StackPanel Orientation="Horizontal" Spacing="12">
        <FontIcon Glyph="&#xE7E8;" FontSize="18"/>
        <TextBlock Text="Exit App" FontSize="13" VerticalAlignment="Center"/>
@@ -265,7 +265,7 @@
           <Grid Grid.Row="0" HorizontalAlignment="Center">
            <StackPanel x:Name="IdleSelectorContainer" Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
             <!-- WORK Selection Button -->
-            <Button x:Name="WorkChoiceCard" Click="OnWorkCardClick" KeyDown="OnWorkChoiceKeyDown"
+            <Button x:Name="WorkChoiceCard" Click="OnWorkCardClick"
                     PointerEntered="OnWorkCardPointerEntered" PointerExited="OnWorkCardPointerExited"
                     Padding="16,7" CornerRadius="{StaticResource FkControlRadius}"
                     BorderThickness="1" AutomationProperties.Name="Select Work Session"
@@ -279,7 +279,7 @@
             </Button>
 
             <!-- BREAK Selection Button -->
-            <Button x:Name="BreakChoiceCard" Click="OnBreakCardClick" KeyDown="OnBreakChoiceKeyDown"
+            <Button x:Name="BreakChoiceCard" Click="OnBreakCardClick"
                     PointerEntered="OnBreakCardPointerEntered" PointerExited="OnBreakCardPointerExited"
                     Padding="16,7" CornerRadius="{StaticResource FkControlRadius}"
                     BorderThickness="1" AutomationProperties.Name="Select Break Session"
@@ -385,7 +385,7 @@
         </StackPanel>
 
         <!-- Activity Rows Scrollable Container -->
-        <ScrollViewer Grid.Row="1" x:Name="ActivityScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <ScrollViewer Grid.Row="1" x:Name="ActivityScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,10,0">
          <ItemsControl x:Name="ActivityRows" HorizontalContentAlignment="Stretch"/>
         </ScrollViewer>
        </Grid>

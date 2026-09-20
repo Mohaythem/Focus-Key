@@ -173,9 +173,21 @@ public sealed partial class MainWindow : Window
         _displayTimer.IsRepeating = false;
         _displayTimer.Tick += OnDisplayTick;
         Closed += (_, _) => { _visible = false; _displayTimer.Stop(); _today.Dispose(); _reports.Dispose(); };
+        Activated += (_, args) =>
+        {
+            if (args.WindowActivationState != WindowActivationState.Deactivated)
+            {
+                if (_today.Page == MainPage.Today) FocusTodayContext();
+            }
+        };
+        MainSurface.Loaded += (_, _) =>
+        {
+            if (_today.Page == MainPage.Today) FocusTodayContext();
+        };
         Render();
         UpdateSidebarDimensions(MainSurface.ActualWidth > 0 ? MainSurface.ActualWidth : 880);
         UpdatePageWidths();
+        FocusTodayContext();
         startup.Logger.Info("Today main window created.");
     }
 
@@ -187,6 +199,7 @@ public sealed partial class MainWindow : Window
         CloseNavDrawer();
         UpdatePageWidths();
         await _today.OpenAsync();
+        FocusTodayContext();
     }
 
     internal void HideToday()
@@ -240,6 +253,7 @@ public sealed partial class MainWindow : Window
         _reports.Hide();
         UpdatePageWidths();
         await _today.NavigateAsync(MainPage.Today);
+        FocusTodayContext();
     }
 
     private async void OnReportsClick(object sender, RoutedEventArgs args)
@@ -300,25 +314,73 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void OnNavKeyDown(object sender, KeyRoutedEventArgs e)
+    private void OnNavGridPreviewKeyDown(object sender, KeyRoutedEventArgs e)
     {
+        var focused = FocusManager.GetFocusedElement(MainSurface.XamlRoot);
+        Control?[] items = [TodayNav, ReportsNav, OverlayNavButton, SettingsNav, ExitButton];
+        int currentIndex = -1;
+        for (int i = 0; i < items.Length; i++)
+        {
+            if (items[i] is not null && ReferenceEquals(focused, items[i]))
+            {
+                currentIndex = i;
+                break;
+            }
+        }
+
         if (e.Key == VirtualKey.Down)
         {
-            if (ReferenceEquals(sender, TodayNav)) { ReportsNav?.Focus(FocusState.Keyboard); e.Handled = true; }
-            else if (ReferenceEquals(sender, ReportsNav)) { OverlayNavButton?.Focus(FocusState.Keyboard); e.Handled = true; }
-            else if (ReferenceEquals(sender, OverlayNavButton)) { SettingsNav?.Focus(FocusState.Keyboard); e.Handled = true; }
-            else if (ReferenceEquals(sender, SettingsNav)) { ExitButton?.Focus(FocusState.Keyboard); e.Handled = true; }
+            e.Handled = true;
+            if (currentIndex == -1)
+            {
+                TodayNav?.Focus(FocusState.Keyboard);
+            }
+            else if (currentIndex < items.Length - 1)
+            {
+                items[currentIndex + 1]?.Focus(FocusState.Keyboard);
+            }
         }
         else if (e.Key == VirtualKey.Up)
         {
-            if (ReferenceEquals(sender, ExitButton)) { SettingsNav?.Focus(FocusState.Keyboard); e.Handled = true; }
-            else if (ReferenceEquals(sender, SettingsNav)) { OverlayNavButton?.Focus(FocusState.Keyboard); e.Handled = true; }
-            else if (ReferenceEquals(sender, OverlayNavButton)) { ReportsNav?.Focus(FocusState.Keyboard); e.Handled = true; }
-            else if (ReferenceEquals(sender, ReportsNav)) { TodayNav?.Focus(FocusState.Keyboard); e.Handled = true; }
+            e.Handled = true;
+            if (currentIndex == -1)
+            {
+                ExitButton?.Focus(FocusState.Keyboard);
+            }
+            else if (currentIndex > 0)
+            {
+                items[currentIndex - 1]?.Focus(FocusState.Keyboard);
+            }
+        }
+        else if (e.Key is VirtualKey.Enter or VirtualKey.Space)
+        {
+            if (e.KeyStatus.WasKeyDown) return;
+            e.Handled = true;
+            if (currentIndex != -1 && items[currentIndex] is { } target)
+            {
+                ActivateNavItem(target);
+            }
+        }
+        else if (e.Key == VirtualKey.Right)
+        {
+            e.Handled = true;
+            if (_today.Page == MainPage.Today)
+            {
+                FocusTodayContext();
+            }
         }
     }
 
-    private void OnDrawerNavKeyDown(object sender, KeyRoutedEventArgs e)
+    private void ActivateNavItem(Control item)
+    {
+        if (ReferenceEquals(item, TodayNav)) OnTodayClick(TodayNav, new RoutedEventArgs());
+        else if (ReferenceEquals(item, ReportsNav)) OnReportsClick(ReportsNav, new RoutedEventArgs());
+        else if (ReferenceEquals(item, OverlayNavButton)) OnOverlayClick(OverlayNavButton, new RoutedEventArgs());
+        else if (ReferenceEquals(item, SettingsNav)) OnSettingsClick(SettingsNav, new RoutedEventArgs());
+        else if (ReferenceEquals(item, ExitButton)) OnExitClick(ExitButton, new RoutedEventArgs());
+    }
+
+    private void OnNavDrawerPanePreviewKeyDown(object sender, KeyRoutedEventArgs e)
     {
         if (e.Key == VirtualKey.Escape)
         {
@@ -327,42 +389,191 @@ public sealed partial class MainWindow : Window
             return;
         }
 
+        var focused = FocusManager.GetFocusedElement(MainSurface.XamlRoot);
+        Control?[] items = [DrawerCloseButton, DrawerTodayNav, DrawerReportsNav, DrawerOverlayButton, DrawerSettingsNav, DrawerExitButton];
+        int currentIndex = -1;
+        for (int i = 0; i < items.Length; i++)
+        {
+            if (items[i] is not null && ReferenceEquals(focused, items[i]))
+            {
+                currentIndex = i;
+                break;
+            }
+        }
+
         if (e.Key == VirtualKey.Down)
         {
-            if (ReferenceEquals(sender, DrawerCloseButton)) { DrawerTodayNav?.Focus(FocusState.Keyboard); e.Handled = true; }
-            else if (ReferenceEquals(sender, DrawerTodayNav)) { DrawerReportsNav?.Focus(FocusState.Keyboard); e.Handled = true; }
-            else if (ReferenceEquals(sender, DrawerReportsNav)) { DrawerOverlayButton?.Focus(FocusState.Keyboard); e.Handled = true; }
-            else if (ReferenceEquals(sender, DrawerOverlayButton)) { DrawerSettingsNav?.Focus(FocusState.Keyboard); e.Handled = true; }
-            else if (ReferenceEquals(sender, DrawerSettingsNav)) { DrawerExitButton?.Focus(FocusState.Keyboard); e.Handled = true; }
+            e.Handled = true;
+            if (currentIndex == -1)
+            {
+                DrawerTodayNav?.Focus(FocusState.Keyboard);
+            }
+            else if (currentIndex < items.Length - 1)
+            {
+                items[currentIndex + 1]?.Focus(FocusState.Keyboard);
+            }
         }
         else if (e.Key == VirtualKey.Up)
         {
-            if (ReferenceEquals(sender, DrawerExitButton)) { DrawerSettingsNav?.Focus(FocusState.Keyboard); e.Handled = true; }
-            else if (ReferenceEquals(sender, DrawerSettingsNav)) { DrawerOverlayButton?.Focus(FocusState.Keyboard); e.Handled = true; }
-            else if (ReferenceEquals(sender, DrawerOverlayButton)) { DrawerReportsNav?.Focus(FocusState.Keyboard); e.Handled = true; }
-            else if (ReferenceEquals(sender, DrawerReportsNav)) { DrawerTodayNav?.Focus(FocusState.Keyboard); e.Handled = true; }
-            else if (ReferenceEquals(sender, DrawerTodayNav)) { DrawerCloseButton?.Focus(FocusState.Keyboard); e.Handled = true; }
+            e.Handled = true;
+            if (currentIndex == -1)
+            {
+                DrawerExitButton?.Focus(FocusState.Keyboard);
+            }
+            else if (currentIndex > 0)
+            {
+                items[currentIndex - 1]?.Focus(FocusState.Keyboard);
+            }
+        }
+        else if (e.Key is VirtualKey.Enter or VirtualKey.Space)
+        {
+            if (e.KeyStatus.WasKeyDown) return;
+            e.Handled = true;
+            if (currentIndex != -1 && items[currentIndex] is { } target)
+            {
+                ActivateDrawerNavItem(target);
+            }
         }
     }
 
-    private void OnWorkChoiceKeyDown(object sender, KeyRoutedEventArgs e)
+    private void ActivateDrawerNavItem(Control item)
     {
-        if (e.Key == VirtualKey.Right)
+        if (ReferenceEquals(item, DrawerCloseButton)) CloseNavDrawer();
+        else if (ReferenceEquals(item, DrawerTodayNav)) OnTodayClick(DrawerTodayNav, new RoutedEventArgs());
+        else if (ReferenceEquals(item, DrawerReportsNav)) OnReportsClick(DrawerReportsNav, new RoutedEventArgs());
+        else if (ReferenceEquals(item, DrawerOverlayButton)) OnOverlayClick(DrawerOverlayButton, new RoutedEventArgs());
+        else if (ReferenceEquals(item, DrawerSettingsNav)) OnSettingsClick(DrawerSettingsNav, new RoutedEventArgs());
+        else if (ReferenceEquals(item, DrawerExitButton)) OnExitClick(DrawerExitButton, new RoutedEventArgs());
+    }
+
+    private void OnMainSurfacePreviewKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (NavDrawerOverlay is not null && NavDrawerOverlay.Visibility == Visibility.Visible)
         {
-            e.Handled = true;
-            SelectIdleType(SessionType.Break);
-            BreakChoiceCard?.Focus(FocusState.Keyboard);
+            return;
+        }
+
+        var focused = FocusManager.GetFocusedElement(MainSurface.XamlRoot);
+
+        if (IsDescendantOf(focused as DependencyObject, NavGrid))
+        {
+            return;
+        }
+
+        if (focused is TextBox or PasswordBox)
+        {
+            return;
+        }
+
+        if (_today.Page != MainPage.Today)
+        {
+            return;
+        }
+
+        if (_today.Snapshot?.Active is not { } active)
+        {
+            switch (e.Key)
+            {
+                case VirtualKey.Left:
+                    e.Handled = true;
+                    SelectIdleType(SessionType.Work);
+                    WorkChoiceCard?.Focus(FocusState.Keyboard);
+                    break;
+                case VirtualKey.Right:
+                    e.Handled = true;
+                    SelectIdleType(SessionType.Break);
+                    BreakChoiceCard?.Focus(FocusState.Keyboard);
+                    break;
+                case VirtualKey.Enter:
+                case VirtualKey.Space:
+                    if (e.KeyStatus.WasKeyDown) break;
+                    e.Handled = true;
+                    _ = _today.StartAsync(_selectedIdleType);
+                    break;
+            }
+        }
+        else if (active.Status == SessionStatus.Running)
+        {
+            switch (e.Key)
+            {
+                case VirtualKey.Enter:
+                case VirtualKey.Space:
+                    if (e.KeyStatus.WasKeyDown) break;
+                    e.Handled = true;
+                    _ = _today.PauseAsync();
+                    break;
+            }
+        }
+        else if (active.Status == SessionStatus.Paused)
+        {
+            switch (e.Key)
+            {
+                case VirtualKey.Left:
+                    e.Handled = true;
+                    ContinueButton?.Focus(FocusState.Keyboard);
+                    break;
+                case VirtualKey.Right:
+                    e.Handled = true;
+                    StartNewButton?.Focus(FocusState.Keyboard);
+                    break;
+                case VirtualKey.Enter:
+                case VirtualKey.Space:
+                    if (e.KeyStatus.WasKeyDown) break;
+                    e.Handled = true;
+                    if (ReferenceEquals(focused, StartNewButton))
+                    {
+                        _ = _today.StartNewAsync();
+                    }
+                    else
+                    {
+                        _ = _today.ContinueAsync();
+                    }
+                    break;
+            }
         }
     }
 
-    private void OnBreakChoiceKeyDown(object sender, KeyRoutedEventArgs e)
+    private static bool IsDescendantOf(DependencyObject? element, DependencyObject parent)
     {
-        if (e.Key == VirtualKey.Left)
+        while (element is not null)
         {
-            e.Handled = true;
-            SelectIdleType(SessionType.Work);
-            WorkChoiceCard?.Focus(FocusState.Keyboard);
+            if (ReferenceEquals(element, parent)) return true;
+            element = VisualTreeHelper.GetParent(element);
         }
+        return false;
+    }
+
+    private void FocusTodayContext()
+    {
+        if (!_visible || _today.Page != MainPage.Today) return;
+
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            if (!_visible || _today.Page != MainPage.Today) return;
+
+            if (_today.Snapshot?.Active is { } active)
+            {
+                if (active.Status == SessionStatus.Paused)
+                {
+                    ContinueButton?.Focus(FocusState.Keyboard);
+                }
+                else
+                {
+                    PauseButton?.Focus(FocusState.Keyboard);
+                }
+            }
+            else
+            {
+                if (_selectedIdleType == SessionType.Work)
+                {
+                    WorkChoiceCard?.Focus(FocusState.Keyboard);
+                }
+                else
+                {
+                    BreakChoiceCard?.Focus(FocusState.Keyboard);
+                }
+            }
+        });
     }
 
     private void SelectIdleType(SessionType type)
@@ -371,8 +582,18 @@ public sealed partial class MainWindow : Window
         PaintLauncherCards(IsCurrentThemeDark());
     }
 
-    private void OnWorkCardClick(object sender, RoutedEventArgs args) => SelectIdleType(SessionType.Work);
-    private void OnBreakCardClick(object sender, RoutedEventArgs args) => SelectIdleType(SessionType.Break);
+    private void OnWorkCardClick(object sender, RoutedEventArgs args)
+    {
+        SelectIdleType(SessionType.Work);
+        WorkChoiceCard?.Focus(FocusState.Keyboard);
+    }
+
+    private void OnBreakCardClick(object sender, RoutedEventArgs args)
+    {
+        SelectIdleType(SessionType.Break);
+        BreakChoiceCard?.Focus(FocusState.Keyboard);
+    }
+
     private async void OnStartIdleClick(object sender, RoutedEventArgs args) => await _today.StartAsync(_selectedIdleType);
     private async void OnPauseClick(object sender, RoutedEventArgs args) => await _today.PauseAsync();
     private async void OnContinueClick(object sender, RoutedEventArgs args) => await _today.ContinueAsync();
@@ -694,8 +915,8 @@ public sealed partial class MainWindow : Window
                 {
                     string started = TodayFormatting.FormatClockTime(session.StartedAt, snapshot.TimeZone, _timeFormat);
                     string duration = session.ActualDuration is { } actual ? Presentation.Duration(actual) : $"{Presentation.Duration(session.PlannedDuration)} planned";
-                    var row = new Grid { ColumnSpacing = 12, Padding = new Thickness(0, 8, 0, 8) };
-                    foreach (var width in new[] { new GridLength(42), new GridLength(6), new GridLength(1, GridUnitType.Star), GridLength.Auto, new GridLength(68) })
+                    var row = new Grid { ColumnSpacing = 10, Padding = new Thickness(0, 7, 8, 7) };
+                    foreach (var width in new[] { new GridLength(42), new GridLength(6), new GridLength(1, GridUnitType.Star), GridLength.Auto, new GridLength(72) })
                         row.ColumnDefinitions.Add(new ColumnDefinition { Width = width });
 
                     var color = session.Type == SessionType.Work ? _colors.Work : _colors.Break;
@@ -720,7 +941,9 @@ public sealed partial class MainWindow : Window
                         FontSize = 12,
                         FontWeight = Microsoft.UI.Text.FontWeights.Medium,
                         VerticalAlignment = VerticalAlignment.Center,
-                        Style = (Style)Application.Current.Resources["FkText"]
+                        Style = (Style)Application.Current.Resources["FkText"],
+                        TextTrimming = TextTrimming.CharacterEllipsis,
+                        TextWrapping = TextWrapping.NoWrap
                     };
                     Grid.SetColumn(type, 2); row.Children.Add(type);
 
@@ -730,6 +953,8 @@ public sealed partial class MainWindow : Window
 
                     var status = Presentation.StatusText(session.Status, 11);
                     status.VerticalAlignment = VerticalAlignment.Center;
+                    status.TextTrimming = TextTrimming.CharacterEllipsis;
+                    status.TextWrapping = TextWrapping.NoWrap;
                     Grid.SetColumn(status, 4); row.Children.Add(status);
                     return row;
                 }).ToArray();
@@ -815,6 +1040,7 @@ public sealed partial class MainWindow : Window
             if (stateChanged)
             {
                 AnimateTransition(IdleContent);
+                FocusTodayContext();
             }
             return;
         }
@@ -879,6 +1105,7 @@ public sealed partial class MainWindow : Window
         if (stateChanged)
         {
             AnimateTransition(ActiveContent);
+            FocusTodayContext();
         }
     }
 

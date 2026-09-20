@@ -1,43 +1,24 @@
 # Focus Key — Project Progress & State Checkpoint
 
 ## Current Goal
-Post-Today UX Refinement Pass completed and verified across all target states (Keyboard Navigation & Activation, Session-Colored Today Dot, Activity Overflow Scrolling, Reports Month 4 Weekly Buckets, and Quick Overlay Header Draggability), with 812/812 passing tests and zero build warnings/errors.
+Keyboard-First UX + Quick Overlay Drag Correction + Activity Scrollbar Breathing Room implemented and verified with 812/812 passing tests and zero build warnings/errors.
 
 ## Current Checkpoint
-Implemented and verified the 5 approved UX refinements following the Today adaptive redesign:
-- **1. Keyboard Navigation & Activation**:
-  - **Idle Work / Break Selector**: Left Arrow selects Work, Right Arrow selects Break, Enter/Space activates choice/action. Selected vs focused states are clearly distinguishable with clean WinUI focus visuals.
-  - **Session Actions**: Tab navigation smoothly moves between Work/Break selector & Start in Idle; Pause in Running; Continue and Start New in Paused. Enter/Space activates the focused button. Collapsed/hidden controls (e.g. Stop) are never keyboard-focusable.
-  - **App Navigation**: Up/Down arrow keys navigate between navigation items in Expanded pane, Compact rail, and Narrow drawer (`OnNavKeyDown`, `OnDrawerNavKeyDown`). Enter/Space opens destination. Esc in Narrow drawer closes the drawer cleanly without hiding the main window or quitting the app, and focus returns to the Hamburger button.
-  - **Focus Visuals**: Visible native WinUI / Fluent focus rectangles across all interactive elements in both Dark and Light themes.
-- **2. Preserve Session-Colored Today Activity Dot**:
-  - Work active/paused session: teal Today status dot.
-  - Break active/paused session: violet Today status dot.
-  - Idle: no dot. No extra text in navigation chrome ("Running").
-  - Preserved consistently across Expanded pane (`TodayExpandedDot`), Compact rail (`TodayCompactDot`), Collapsed hamburger button (`HamburgerActiveDot`), and Drawer (`DrawerTodayDot`).
-- **3. Activity Overflow Scrolling**:
-  - On Wide (>= 1060 DIP) and Medium (740 to 1059 DIP) layouts, Activity surface uses an internal `ScrollViewer` capped at 420 DIP max height when rows exceed the visible area. The Session Hero and Daily Summary cards remain rock-solid and stable with zero layout distortion.
-  - On Narrow (< 740 DIP), content reflows into a single vertical stack with natural page scrolling without awkward nested scrollbars.
-- **4. Reports Month Four Weekly Buckets**:
-  - Every month uses EXACTLY 4 weekly buckets in domain aggregation, chart data, labels, tooltips, and summaries:
-    - Week 1: Days 1–7 (`YYYY-MM-01 – YYYY-MM-07`)
-    - Week 2: Days 8–14 (`YYYY-MM-08 – YYYY-MM-14`)
-    - Week 3: Days 15–21 (`YYYY-MM-15 – YYYY-MM-21`)
-    - Week 4: Days 22 through end of month (28, 29, 30, or 31).
-  - Never produces a 5th week bucket across all calendar months (28-day Feb, 29-day Leap Feb, 30-day, and 31-day months).
-- **5. Quick Overlay Drag Usability**:
-  - Draggable region expanded to include the upper header background, empty chrome space, and non-interactive title text.
-  - Interactive controls (Close button `X`, Work/Break cards, Start, Pause, Continue, Start New) remain responsive and do not trigger window dragging.
-  - Preserves native Win32 window dragging (`WM_NCLBUTTONDOWN`), position persistence in SQLite, multi-monitor clamping, and Settings reset.
+Implemented and verified:
+- **1. Today Keyboard-First Experience (No Tab First)**:
+  - **Idle State**: Automatically targets the session selection context on window activation / open. Left Arrow selects Work, Right Arrow selects Break, Enter/Space starts the session immediately without requiring Tab first.
+  - **Running State**: Enter or Space pauses the session immediately without requiring Tab first.
+  - **Paused State**: Continue is focused by default; Left/Right arrows toggle between Continue and Start New; Enter/Space activates the selected button.
+  - Tab cycling preserved cleanly without focus traps.
+- **2. Navigation Direct Arrow Keys**:
+  - Up/Down arrows traverse navigation destinations in Expanded pane, Compact rail, and Narrow drawer (`OnNavGridPreviewKeyDown`, `OnNavDrawerPanePreviewKeyDown`). Enter/Space activates destination; Esc closes the drawer and returns focus to Hamburger button.
+- **3. Quick Overlay Press-Drag-Release**:
+  - Continuous pointer capture (`CapturePointer`, `GetCursorPos`, `AppWindow.Move`) provides standard press-drag-release movement.
+  - Zero toggle stickiness, no modal non-client move loop locking. Interactive controls remain responsive.
+- **4. Activity Scrollbar Padding**:
+  - Right padding (`Padding="0,0,10,0"`) and row column spacing with `CharacterEllipsis` prevent vertical scrollbar from overlapping "Completed" or other status text.
 - **Automated Tests**: 812/812 unit tests passing (`dotnet test -c Release`), 0 failed, 0 skipped.
 - **Build**: 0 Warning(s), 0 Error(s) (`dotnet build src/FocusKey.App/FocusKey.App.csproj -c Release`).
-- **Visual Captures Inspected**:
-  - `today_wide_overflow_dark.png` (Wide 2-column layout with 14 scrollable sessions in internal viewer)
-  - `today_medium_overflow_dark.png` (Medium 2-column layout with 54 DIP compact rail + internal scrollviewer)
-  - `today_narrow_overflow_dark.png` (Narrow single-stack layout with natural page scrolling)
-  - `reports_month_4buckets_dark.png` & `reports_month_4buckets_light.png` (Exactly 4 weekly bars `W1`, `W2`, `W3`, `W4`, 0 repeating metrics, dynamic insights)
-  - `quick_overlay_idle_dark.png`, `quick_overlay_running_dark.png`, `quick_overlay_paused_dark.png` (All 3 overlay modes with expanded draggable header)
-  - `overlay_idle_light.png`, `overlay_paused_work_light.png` (Light theme overlay verification)
 
 ## Completed Work
 - **Visual & UX Audit**: Comprehensive desktop/full-screen audit documented in `VISUAL_AUDIT.md`.

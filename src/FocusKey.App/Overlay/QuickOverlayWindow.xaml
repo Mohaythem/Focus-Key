@@ -26,6 +26,9 @@
                 Height="28"
                 Background="Transparent"
                 PointerPressed="OnHeaderPointerPressed"
+                PointerMoved="OnHeaderPointerMoved"
+                PointerReleased="OnHeaderPointerReleased"
+                PointerCaptureLost="OnHeaderPointerCaptureLost"
                 VerticalAlignment="Center">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />

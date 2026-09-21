@@ -65,4 +65,4 @@ Integrity mode: development
 - [ ] Unit tests pass for discrete scale clamping, stepping up/down, resetting to 100%, invalid value fallback, effective width calculation, and SQLite Migration 14 persistence.
 - [ ] Full test suite passes (`dotnet test -c Release`) with 0 failures.
 - [ ] Release build compiles cleanly (`dotnet build src/FocusKey.App/FocusKey.App.csproj -c Release`) with 0 warnings and 0 errors.
-- [ ] Documentation updated in `FUTURE_PLAN.md`, `PROGRESS.md`, and new `Phase 15.md`.
+- [ ] Documentation updated in `FUTURE_PLAN.md`, `PROGRESS.md`, and `PHASES.md`.

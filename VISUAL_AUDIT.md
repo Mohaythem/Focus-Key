@@ -355,7 +355,7 @@ This roadmap organizes the resolution of all audit findings into six strictly se
 
 ### 8.1 Zero Code Changes Verification
 - **Source Code Alteration:** Exactly ZERO lines of C# source code, XAML, project files, or database schema were modified.
-- **Phase Integrity:** No new numbered phase document (e.g. `Phase 14.md`) was created. Existing phase documents (`Phase 13.md`, etc.) remain completely untouched.
+- **Phase Integrity:** No new numbered phase document was created. Historical phase documentation is maintained in `PHASES.md`.
 - **Engine Preservation:** The single authoritative session engine, background timer, SQLite persistence, and transactional hotkey registration were strictly unmolested.
 
 ### 8.2 Git Status & Repository Hygiene

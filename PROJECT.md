@@ -34,7 +34,7 @@ Every feature identified during the Survey phase is assigned to a milestone belo
 | 11 | Reports Chart Native Scaling | Dynamic recalculation of native XAML bar widths, grid lines, and labels in `ReportsChart.cs` under scaled viewports | M4 | DONE | ORIGINAL_REQUEST §R5 |
 | 12 | Quick Overlay Strict 100% Exclusion | Verified 100% geometry (480 DIP width, 432 DIP progress track, 52 DIP timer) and zero scale contamination | M5 | DONE | ORIGINAL_REQUEST §R6 |
 | 13 | MainWindow Caption Controls Standard | Verify standard OS DWM caption controls remain unaffected by XAML layout scaling | M5 | DONE | ORIGINAL_REQUEST §R6 |
-| 14 | Final Verification, Build & Documentation | 100% test pass (`dotnet test -c Release`), 0 warnings Release build, documentation in `FUTURE_PLAN.md`, `PROGRESS.md`, `Phase 15.md` | M6 | DONE | ORIGINAL_REQUEST §Acceptance |
+| 14 | Final Verification, Build & Documentation | 100% test pass (`dotnet test -c Release`), 0 warnings Release build, documentation in `FUTURE_PLAN.md`, `PROGRESS.md`, `PHASES.md` | M6 | DONE | ORIGINAL_REQUEST §Acceptance |
 
 ---
 

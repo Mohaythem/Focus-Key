@@ -147,7 +147,7 @@ public sealed class SettingsPersistenceTests
 
         Assert.Equal(10, result.SchemaVersionBefore);
         Assert.Equal(SchemaMigrations.TargetVersion, result.SchemaVersionAfter);
-        Assert.Equal([11, 12, 13], result.AppliedMigrations);
+        Assert.Equal([11, 12, 13, 14], result.AppliedMigrations);
 
         var repo = new SqliteSettingsRepository(connections);
         ApplicationSettings settings = await repo.LoadAsync();
@@ -159,6 +159,7 @@ public sealed class SettingsPersistenceTests
         Assert.False(settings.AdvancedExpanded);
         Assert.True(settings.StartSoundEnabled);
         Assert.True(settings.CompletionSoundEnabled);
+        Assert.Equal(100, settings.UiScalePercent);
         ClearPool(connections);
     }
 
@@ -174,7 +175,7 @@ public sealed class SettingsPersistenceTests
 
         Assert.Equal(11, result.SchemaVersionBefore);
         Assert.Equal(SchemaMigrations.TargetVersion, result.SchemaVersionAfter);
-        Assert.Equal([12, 13], result.AppliedMigrations);
+        Assert.Equal([12, 13, 14], result.AppliedMigrations);
 
         var repo = new SqliteSettingsRepository(connections);
         ApplicationSettings settings = await repo.LoadAsync();
@@ -183,6 +184,7 @@ public sealed class SettingsPersistenceTests
         Assert.False(settings.AdvancedExpanded);
         Assert.True(settings.StartSoundEnabled);
         Assert.True(settings.CompletionSoundEnabled);
+        Assert.Equal(100, settings.UiScalePercent);
         ClearPool(connections);
     }
 
@@ -198,13 +200,58 @@ public sealed class SettingsPersistenceTests
 
         Assert.Equal(12, result.SchemaVersionBefore);
         Assert.Equal(SchemaMigrations.TargetVersion, result.SchemaVersionAfter);
-        Assert.Equal([13], result.AppliedMigrations);
+        Assert.Equal([13, 14], result.AppliedMigrations);
 
         var repo = new SqliteSettingsRepository(connections);
         ApplicationSettings settings = await repo.LoadAsync();
         Assert.True(settings.StartSoundEnabled);
         Assert.True(settings.CompletionSoundEnabled);
+        Assert.Equal(100, settings.UiScalePercent);
         ClearPool(connections);
+    }
+
+    [Fact]
+    public async Task SchemaThirteenDatabaseMigratesToFourteenWithUiScalePreference()
+    {
+        using var temp = new TempDirectory();
+        string file = Path.Combine(temp.Path, "focus_key.db");
+        var connections = new SqliteConnectionFactory(file);
+        CreateSchemaThirteen(connections);
+
+        DatabaseInitializationResult result = new DatabaseBootstrapper(connections).Initialize();
+
+        Assert.Equal(13, result.SchemaVersionBefore);
+        Assert.Equal(SchemaMigrations.TargetVersion, result.SchemaVersionAfter);
+        Assert.Equal([14], result.AppliedMigrations);
+
+        var repo = new SqliteSettingsRepository(connections);
+        ApplicationSettings settings = await repo.LoadAsync();
+        Assert.Equal(100, settings.UiScalePercent);
+        ClearPool(connections);
+    }
+
+    [Fact]
+    public async Task SqliteSettingsRepository_SavesAndLoads_UiScalePercent()
+    {
+        using var fixture = new Fixture();
+        var changed = ApplicationSettings.Default with { UiScalePercent = 125 };
+        await fixture.Repository.SaveAsync(changed);
+
+        var reopened = new SqliteSettingsRepository(new SqliteConnectionFactory(fixture.File));
+        ApplicationSettings loaded = await reopened.LoadAsync();
+        Assert.Equal(125, loaded.UiScalePercent);
+    }
+
+    [Fact]
+    public async Task SettingsService_UpdatesUiScaleAndSurvivesRestart()
+    {
+        using var fixture = new Fixture();
+        var service = new SettingsService(fixture.Repository);
+        await service.UpdateUiScalePercentAsync(150);
+
+        var reopened = new SqliteSettingsRepository(new SqliteConnectionFactory(fixture.File));
+        ApplicationSettings loaded = await reopened.LoadAsync();
+        Assert.Equal(150, loaded.UiScalePercent);
     }
 
     [Fact]
@@ -404,6 +451,18 @@ public sealed class SettingsPersistenceTests
                 $"INSERT INTO schema_migrations VALUES ({migration.Version}, '{migration.Name}', '{UtcTimestamp.Format(TestSessions.Anchor)}');");
         }
         Execute(connection, "PRAGMA user_version = 12;");
+    }
+
+    private static void CreateSchemaThirteen(SqliteConnectionFactory connections)
+    {
+        using SqliteConnection connection = connections.OpenConnection();
+        foreach (SchemaMigration migration in SchemaMigrations.All.Where(m => m.Version <= 13))
+        {
+            Execute(connection, migration.Sql);
+            Execute(connection,
+                $"INSERT INTO schema_migrations VALUES ({migration.Version}, '{migration.Name}', '{UtcTimestamp.Format(TestSessions.Anchor)}');");
+        }
+        Execute(connection, "PRAGMA user_version = 13;");
     }
 
     private static void Execute(SqliteConnection connection, string sql)

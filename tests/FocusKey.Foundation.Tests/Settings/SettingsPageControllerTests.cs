@@ -431,6 +431,29 @@ public sealed class SettingsPageControllerTests
         Assert.Contains(SettingsField.AdvancedExpanded, settledFields);
     }
 
+    [Fact]
+    public async Task UpdateUiScaleAsync_SavesAndSettles()
+    {
+        var repo = new FakeRepository();
+        var page = new SettingsPageController(new(repo), () => Task.CompletedTask, _ => { });
+        await page.LoadAsync();
+
+        SettingsField? settledField = null;
+        page.Settled += (field, _) => settledField = field;
+
+        await page.UpdateUiScaleAsync(125);
+
+        Assert.Equal(125, page.Saved!.UiScalePercent);
+        Assert.Equal(125, repo.Value.UiScalePercent);
+        Assert.Equal(SettingsField.UiScale, settledField);
+
+        await page.UpdateUiScaleAsync(80);
+
+        Assert.Equal(80, page.Saved.UiScalePercent);
+        Assert.Equal(80, repo.Value.UiScalePercent);
+        Assert.Equal(SettingsField.UiScale, settledField);
+    }
+
     private sealed class FakeRepository : ISettingsRepository
     {
         public ApplicationSettings Value = ApplicationSettings.Default;

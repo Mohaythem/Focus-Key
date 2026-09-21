@@ -58,6 +58,8 @@ public sealed class SettingsService(ISettingsRepository repository)
         UpdateAsync(current => current with { ShortcutsExpanded = value }, cancellationToken);
     public Task<ApplicationSettings> UpdateAdvancedExpandedAsync(bool value, CancellationToken cancellationToken = default) =>
         UpdateAsync(current => current with { AdvancedExpanded = value }, cancellationToken);
+    public Task<ApplicationSettings> UpdateUiScalePercentAsync(int value, CancellationToken cancellationToken = default) =>
+        UpdateAsync(current => current with { UiScalePercent = value }, cancellationToken);
 
     private async Task<ApplicationSettings> UpdateAsync(
         Func<ApplicationSettings, ApplicationSettings> change, CancellationToken cancellationToken)

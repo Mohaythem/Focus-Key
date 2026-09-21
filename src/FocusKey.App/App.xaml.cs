@@ -90,6 +90,7 @@ public partial class App : Application
             _window.GlobalShortcutUpdated += shortcut => _quickOverlayWindow?.ApplyShortcut(shortcut);
             _window.SetActivityCollapsed(initialSettings.ActivityCollapsed);
             _window.ApplyTimeFormat(initialSettings.TimeFormat);
+            _window.ApplyUiScale(initialSettings.UiScalePercent, persist: false);
             _startup.Appearance.Changed += OnAppearanceChanged;
             _startup.Appearance.ColorsChanged += OnColorsChanged;
             _startup.Appearance.PalettesChanged += OnPalettesChanged;
@@ -316,6 +317,7 @@ public partial class App : Application
         _startSoundEnabled = currentSettings.StartSoundEnabled;
         _completionSoundEnabled = currentSettings.CompletionSoundEnabled;
         _window?.ApplyTimeFormat(currentSettings.TimeFormat);
+        _window?.ApplyUiScale(currentSettings.UiScalePercent, persist: false);
         _quickOverlayWindow?.ApplyPosition(currentSettings.OverlayPositionX, currentSettings.OverlayPositionY);
         await Task.Run(() => startup.Appearance.RefreshAsync());
         if (_startup is null || _isExiting) return;

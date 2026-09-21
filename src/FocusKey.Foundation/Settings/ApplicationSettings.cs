@@ -25,6 +25,7 @@ public sealed record ApplicationSettings
         AppearanceExpanded = false,
         ShortcutsExpanded = false,
         AdvancedExpanded = false,
+        UiScalePercent = 100,
     };
 
     public required TimeSpan WorkDuration { get; init; }
@@ -47,6 +48,7 @@ public sealed record ApplicationSettings
     public bool AppearanceExpanded { get; init; } = false;
     public bool ShortcutsExpanded { get; init; } = false;
     public bool AdvancedExpanded { get; init; } = false;
+    public int UiScalePercent { get; init; } = 100;
 
     public void Validate()
     {
@@ -58,6 +60,8 @@ public sealed record ApplicationSettings
             throw new ArgumentException($"Unsupported contrast '{Contrast}'.", nameof(Contrast));
         if (!Enum.IsDefined(TimeFormat))
             throw new ArgumentException($"Unsupported time format '{TimeFormat}'.", nameof(TimeFormat));
+        if (!UiScaleLevels.IsValid(UiScalePercent))
+            throw new ArgumentException($"Unsupported UI scale percentage '{UiScalePercent}'.", nameof(UiScalePercent));
         if ((OverlayPositionX.HasValue && !OverlayPositionY.HasValue) || (!OverlayPositionX.HasValue && OverlayPositionY.HasValue))
             throw new ArgumentException("Overlay position X and Y must both be set or both be null.");
         ValidateColor(WorkColor, nameof(WorkColor));

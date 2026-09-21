@@ -21,6 +21,7 @@ public sealed class ApplicationSettingsTests
         Assert.False(settings.AppearanceExpanded);
         Assert.False(settings.ShortcutsExpanded);
         Assert.False(settings.AdvancedExpanded);
+        Assert.Equal(100, settings.UiScalePercent);
     }
 
     [Theory]
@@ -117,5 +118,129 @@ public sealed class ApplicationSettingsTests
     {
         Assert.Throws<ArgumentException>(() => (ApplicationSettings.Default with
             { WorkDuration = TimeSpan.MaxValue }).Validate());
+    }
+
+    [Theory]
+    [InlineData(80)]
+    [InlineData(90)]
+    [InlineData(100)]
+    [InlineData(110)]
+    [InlineData(125)]
+    [InlineData(150)]
+    public void ValidationAcceptsSupportedUiScalePercentages(int percent)
+    {
+        var settings = ApplicationSettings.Default with { UiScalePercent = percent };
+        settings.Validate();
+        Assert.Equal(percent, settings.UiScalePercent);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-10)]
+    [InlineData(50)]
+    [InlineData(75)]
+    [InlineData(85)]
+    [InlineData(95)]
+    [InlineData(105)]
+    [InlineData(120)]
+    [InlineData(130)]
+    [InlineData(175)]
+    [InlineData(200)]
+    public void ValidationRejectsUnsupportedUiScalePercentages(int percent)
+    {
+        var settings = ApplicationSettings.Default with { UiScalePercent = percent };
+        var ex = Assert.Throws<ArgumentException>(() => settings.Validate());
+        Assert.Equal("UiScalePercent", ex.ParamName);
+    }
+
+    [Fact]
+    public void UiScaleLevels_ConstantsAndCollectionsAreAccurate()
+    {
+        Assert.Equal(100, UiScaleLevels.DefaultPercent);
+        Assert.Equal(80, UiScaleLevels.MinPercent);
+        Assert.Equal(150, UiScaleLevels.MaxPercent);
+        Assert.Equal([80, 90, 100, 110, 125, 150], UiScaleLevels.All);
+        Assert.Equal(UiScaleLevels.All, UiScaleLevels.SupportedPercentages);
+    }
+
+    [Theory]
+    [InlineData(80, true)]
+    [InlineData(90, true)]
+    [InlineData(100, true)]
+    [InlineData(110, true)]
+    [InlineData(125, true)]
+    [InlineData(150, true)]
+    [InlineData(70, false)]
+    [InlineData(85, false)]
+    [InlineData(105, false)]
+    [InlineData(160, false)]
+    [InlineData(0, false)]
+    [InlineData(-80, false)]
+    public void UiScaleLevels_IsValid_ValidatesDiscreteLevels(int percent, bool expected)
+    {
+        Assert.Equal(expected, UiScaleLevels.IsValid(percent));
+    }
+
+    [Theory]
+    [InlineData(80, 0.80)]
+    [InlineData(90, 0.90)]
+    [InlineData(100, 1.00)]
+    [InlineData(110, 1.10)]
+    [InlineData(125, 1.25)]
+    [InlineData(150, 1.50)]
+    [InlineData(999, 1.00)]
+    public void UiScaleLevels_ToFactor_ConvertsAccurately(int percent, double expectedFactor)
+    {
+        Assert.Equal(expectedFactor, UiScaleLevels.ToFactor(percent), precision: 2);
+    }
+
+    [Theory]
+    [InlineData(80, 90)]
+    [InlineData(90, 100)]
+    [InlineData(100, 110)]
+    [InlineData(110, 125)]
+    [InlineData(125, 150)]
+    [InlineData(150, 150)]
+    [InlineData(70, 80)]
+    [InlineData(105, 110)]
+    [InlineData(160, 150)]
+    public void UiScaleLevels_NextLevel_StepsUpAndClamps(int current, int expectedNext)
+    {
+        Assert.Equal(expectedNext, UiScaleLevels.NextLevel(current));
+    }
+
+    [Theory]
+    [InlineData(150, 125)]
+    [InlineData(125, 110)]
+    [InlineData(110, 100)]
+    [InlineData(100, 90)]
+    [InlineData(90, 80)]
+    [InlineData(80, 80)]
+    [InlineData(200, 150)]
+    [InlineData(105, 100)]
+    [InlineData(50, 80)]
+    public void UiScaleLevels_PreviousLevel_StepsDownAndClamps(int current, int expectedPrevious)
+    {
+        Assert.Equal(expectedPrevious, UiScaleLevels.PreviousLevel(current));
+    }
+
+    [Theory]
+    [InlineData(1200, 1.50, 800)]
+    [InlineData(1000, 1.00, 1000)]
+    [InlineData(800, 0.80, 1000)]
+    [InlineData(1200, 0.0, 1200)]
+    [InlineData(1200, -1.0, 1200)]
+    public void UiScaleLevels_CalculateEffectiveWidth_ComputesCorrectly(double width, double factor, double expected)
+    {
+        Assert.Equal(expected, UiScaleLevels.CalculateEffectiveWidth(width, factor), precision: 2);
+    }
+
+    [Theory]
+    [InlineData(1200, 150, 800)]
+    [InlineData(1000, 100, 1000)]
+    [InlineData(800, 80, 1000)]
+    public void UiScaleLevels_CalculateEffectiveWidth_WithPercent_ComputesCorrectly(double width, int percent, double expected)
+    {
+        Assert.Equal(expected, UiScaleLevels.CalculateEffectiveWidth(width, percent), precision: 2);
     }
 }

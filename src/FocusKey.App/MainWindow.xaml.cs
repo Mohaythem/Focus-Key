@@ -36,6 +36,11 @@ public sealed partial class MainWindow : Window
     private bool _isWorkHovered;
     private bool _isBreakHovered;
     private SessionType _selectedIdleType = SessionType.Work;
+    private int _uiScalePercent = UiScaleLevels.DefaultPercent;
+    private DispatcherQueueTimer? _scaleHudTimer;
+    private Storyboard? _scaleHudFadeOut;
+
+    public int UiScalePercent => _uiScalePercent;
 
     internal void SetActivityCollapsed(bool collapsed)
     {
@@ -74,6 +79,96 @@ public sealed partial class MainWindow : Window
     {
         _timeFormat = format;
         if (_today is not null) Render();
+    }
+
+    public void ApplyUiScale(int percent, bool persist = true)
+    {
+        if (DispatcherQueue is not null && !DispatcherQueue.HasThreadAccess)
+        {
+            DispatcherQueue.TryEnqueue(() => ApplyUiScale(percent, persist));
+            return;
+        }
+
+        int clamped = UiScaleLevels.IsValid(percent)
+            ? percent
+            : (percent < UiScaleLevels.MinPercent ? UiScaleLevels.MinPercent : (percent > UiScaleLevels.MaxPercent ? UiScaleLevels.MaxPercent : UiScaleLevels.DefaultPercent));
+
+        _uiScalePercent = clamped;
+
+        ShowScaleHud(clamped);
+        UpdateSidebarDimensions(MainSurface?.ActualWidth > 0 ? MainSurface.ActualWidth : 880);
+        UpdatePageWidths();
+
+        _settings?.ApplyUiScale(clamped);
+
+        if (persist)
+        {
+            PersistUiScale(clamped);
+        }
+    }
+
+    private async void PersistUiScale(int percent)
+    {
+        try
+        {
+            if (_settings is not null)
+            {
+                await _settings.UpdateUiScaleAsync(percent);
+            }
+            else if (_settingsService is not null)
+            {
+                await _settingsService.UpdateUiScalePercentAsync(percent);
+            }
+        }
+        catch (Exception ex)
+        {
+            _startupReport?.Invoke(ex);
+        }
+    }
+
+    private void ShowScaleHud(int scalePercent)
+    {
+        if (ScaleHudOverlay is null || ScaleHudText is null) return;
+
+        ScaleHudText.Text = $"UI scale: {scalePercent}%";
+
+        _scaleHudFadeOut?.Stop();
+        _scaleHudTimer?.Stop();
+
+        ScaleHudOverlay.Visibility = Visibility.Visible;
+        ScaleHudOverlay.Opacity = 1.0;
+
+        if (_scaleHudTimer is null)
+        {
+            _scaleHudTimer = DispatcherQueue.CreateTimer();
+            _scaleHudTimer.Interval = TimeSpan.FromMilliseconds(1500);
+            _scaleHudTimer.IsRepeating = false;
+            _scaleHudTimer.Tick += (_, _) => StartHudFadeOut();
+        }
+
+        _scaleHudTimer.Start();
+    }
+
+    private void StartHudFadeOut()
+    {
+        if (ScaleHudOverlay is null || ScaleHudOverlay.Visibility != Visibility.Visible) return;
+
+        var animation = new DoubleAnimation
+        {
+            From = ScaleHudOverlay.Opacity,
+            To = 0.0,
+            Duration = new Duration(TimeSpan.FromMilliseconds(250))
+        };
+        var storyboard = new Storyboard();
+        storyboard.Children.Add(animation);
+        Storyboard.SetTarget(animation, ScaleHudOverlay);
+        Storyboard.SetTargetProperty(animation, "Opacity");
+        storyboard.Completed += (_, _) =>
+        {
+            ScaleHudOverlay.Visibility = Visibility.Collapsed;
+        };
+        _scaleHudFadeOut = storyboard;
+        storyboard.Begin();
     }
 
     internal void ApplyAppearance(Appearance appearance, ThemePalette? lightPalette = null, ThemePalette? darkPalette = null, Contrast contrast = Contrast.Standard)
@@ -151,7 +246,8 @@ public sealed partial class MainWindow : Window
                 // Main window shortcut updated
             },
             () => soundPlayer?.PreviewStartTick(),
-            () => soundPlayer?.PreviewCompletionBell());
+            () => soundPlayer?.PreviewCompletionBell(),
+            percent => ApplyUiScale(percent, persist: false));
         SettingsHost.Content = _settings;
         var hwnd = WindowNative.GetWindowHandle(this);
         startup.Logger.Info($"Main window HWND: {hwnd}.");
@@ -164,9 +260,11 @@ public sealed partial class MainWindow : Window
         MainSurface.SizeChanged += (_, _) =>
         {
             double w = MainSurface.ActualWidth;
-            bool narrow = w < TodayAdaptiveLayoutHelper.BreakpointNavCompact;
+            double factor = UiScaleLevels.ToFactor(_uiScalePercent);
+            double effectiveWidth = UiScaleLevels.CalculateEffectiveWidth(w, factor);
+            bool narrow = effectiveWidth < TodayAdaptiveLayoutHelper.BreakpointNavCompact;
             UpdateSidebarDimensions(w);
-            PageContent.Padding = new Thickness(narrow ? 20 : 32, 24, narrow ? 20 : 32, 32);
+            PageContent.Padding = new Thickness((narrow ? 20 : 32) * factor, 24 * factor, (narrow ? 20 : 32) * factor, 32 * factor);
             UpdatePageWidths();
         };
         PageScrollViewer.SizeChanged += (_, _) => UpdatePageWidths();
@@ -175,7 +273,7 @@ public sealed partial class MainWindow : Window
         _displayTimer = DispatcherQueue.CreateTimer();
         _displayTimer.IsRepeating = false;
         _displayTimer.Tick += OnDisplayTick;
-        Closed += (_, _) => { _visible = false; _displayTimer.Stop(); _today.Dispose(); _reports.Dispose(); };
+        Closed += (_, _) => { _visible = false; _displayTimer.Stop(); _scaleHudTimer?.Stop(); _scaleHudFadeOut?.Stop(); _today.Dispose(); _reports.Dispose(); };
         Activated += (_, args) =>
         {
             if (args.WindowActivationState != WindowActivationState.Deactivated)
@@ -456,19 +554,63 @@ public sealed partial class MainWindow : Window
 
     private void OnMainSurfacePreviewKeyDown(object sender, KeyRoutedEventArgs e)
     {
+        var focused = FocusManager.GetFocusedElement(MainSurface.XamlRoot);
+
+        if (IsTextInput(focused) || IsTextInput(e.OriginalSource))
+        {
+            return;
+        }
+
+        // Global UI scaling / zoom shortcuts across all pages
+        bool isCtrl = (NativeMethods.GetKeyState(0x11) & 0x8000) != 0;
+        bool isAlt = (NativeMethods.GetKeyState(0x12) & 0x8000) != 0;
+        bool isWin = (NativeMethods.GetKeyState(0x5B) & 0x8000) != 0 || (NativeMethods.GetKeyState(0x5C) & 0x8000) != 0;
+
+        if (isCtrl && !isAlt && !isWin)
+        {
+            int rawKey = (int)e.Key;
+            int rawOriginalKey = (int)e.OriginalKey;
+
+            bool isZoomIn = rawKey == 187 || rawOriginalKey == 187 ||
+                            rawKey == 0xBB || rawOriginalKey == 0xBB ||
+                            e.Key == VirtualKey.Add || rawKey == 0x6B || rawOriginalKey == 0x6B;
+
+            bool isZoomOut = rawKey == 189 || rawOriginalKey == 189 ||
+                             rawKey == 0xBD || rawOriginalKey == 0xBD ||
+                             e.Key == VirtualKey.Subtract || rawKey == 0x6D || rawOriginalKey == 0x6D;
+
+            bool isReset = e.Key == VirtualKey.Number0 || e.Key == VirtualKey.NumberPad0 ||
+                           rawKey == 0x30 || rawKey == 0x60 ||
+                           rawOriginalKey == 0x30 || rawOriginalKey == 0x60;
+
+            if (isZoomIn)
+            {
+                e.Handled = true;
+                int next = UiScaleLevels.NextLevel(_uiScalePercent);
+                ApplyUiScale(next, persist: true);
+                return;
+            }
+            if (isZoomOut)
+            {
+                e.Handled = true;
+                int prev = UiScaleLevels.PreviousLevel(_uiScalePercent);
+                ApplyUiScale(prev, persist: true);
+                return;
+            }
+            if (isReset)
+            {
+                e.Handled = true;
+                ApplyUiScale(UiScaleLevels.DefaultPercent, persist: true);
+                return;
+            }
+        }
+
         if (NavDrawerOverlay is not null && NavDrawerOverlay.Visibility == Visibility.Visible)
         {
             return;
         }
 
-        var focused = FocusManager.GetFocusedElement(MainSurface.XamlRoot);
-
         if (IsDescendantOf(focused as DependencyObject, NavGrid))
-        {
-            return;
-        }
-
-        if (focused is TextBox or PasswordBox)
         {
             return;
         }
@@ -548,6 +690,26 @@ public sealed partial class MainWindow : Window
             if (ReferenceEquals(element, parent)) return true;
             element = VisualTreeHelper.GetParent(element);
         }
+        return false;
+    }
+
+    private static bool IsTextInput(object? element)
+    {
+        if (element is TextBox or PasswordBox or RichEditBox or AutoSuggestBox)
+            return true;
+
+        if (element is DependencyObject d)
+        {
+            DependencyObject? current = d;
+            while (current is not null)
+            {
+                if (current is TextBox or PasswordBox or RichEditBox or AutoSuggestBox)
+                    return true;
+
+                current = VisualTreeHelper.GetParent(current);
+            }
+        }
+
         return false;
     }
 
@@ -666,15 +828,21 @@ public sealed partial class MainWindow : Window
         if (PageScrollViewer is null || PageContent is null) return;
         if (PageScrollViewer.ActualWidth > 0)
         {
+            double factor = UiScaleLevels.ToFactor(_uiScalePercent);
+            double w = MainSurface?.ActualWidth ?? PageScrollViewer.ActualWidth;
+            double effectiveWindow = UiScaleLevels.CalculateEffectiveWidth(w, factor);
+            bool narrow = effectiveWindow < TodayAdaptiveLayoutHelper.BreakpointNavCompact;
+            PageContent.Padding = new Thickness((narrow ? 20 : 32) * factor, 24 * factor, (narrow ? 20 : 32) * factor, 32 * factor);
             PageContent.Width = PageScrollViewer.ActualWidth;
             double available = PageScrollViewer.ActualWidth - PageContent.Padding.Left - PageContent.Padding.Right;
             if (available > 0)
             {
+                double effectiveAvailable = UiScaleLevels.CalculateEffectiveWidth(available, factor);
                 if (TodayPanel is not null)
                 {
-                    TodayPanel.Width = TodayAdaptiveLayoutHelper.ClampContentWidth(available);
+                    TodayPanel.Width = Math.Min(TodayAdaptiveLayoutHelper.MaxContentWidth * factor, available);
 
-                    var composition = TodayAdaptiveLayoutHelper.ResolveTodayComposition(available);
+                    var composition = TodayAdaptiveLayoutHelper.ResolveTodayComposition(effectiveAvailable);
                     bool isTwoColumn = composition == TodayCompositionMode.TwoColumn;
 
                     if (LeftColumnDef is not null && RightColumnDef is not null &&
@@ -696,12 +864,13 @@ public sealed partial class MainWindow : Window
                             Grid.SetRow(ActivityCard, 0);
                             Grid.SetColumnSpan(ActivityCard, 1);
 
-                            ActivityCard.MinHeight = 490;
+                            ActivityCard.MinHeight = Math.Round(490 * factor);
                             if (ActivityScrollViewer is not null)
-                                ActivityScrollViewer.MaxHeight = 420;
+                                ActivityScrollViewer.MaxHeight = Math.Round(420 * factor);
 
-                            if (RunningText is not null) RunningText.FontSize = 72;
-                            if (IdleDurationText is not null) IdleDurationText.FontSize = 72;
+                            double timerSize = Math.Round(72 * factor);
+                            if (RunningText is not null) RunningText.FontSize = timerSize;
+                            if (IdleDurationText is not null) IdleDurationText.FontSize = timerSize;
                         }
                         else
                         {
@@ -722,14 +891,68 @@ public sealed partial class MainWindow : Window
                             if (ActivityScrollViewer is not null)
                                 ActivityScrollViewer.MaxHeight = double.PositiveInfinity;
 
-                            double timerSize = available < 500 ? 52 : (available < 650 ? 60 : 68);
+                            double timerSize = Math.Round((effectiveAvailable < 500 ? 52 : (effectiveAvailable < 650 ? 60 : 68)) * factor);
                             if (RunningText is not null) RunningText.FontSize = timerSize;
                             if (IdleDurationText is not null) IdleDurationText.FontSize = timerSize;
                         }
+
+                        if (SessionHeroCard is not null)
+                        {
+                            SessionHeroCard.MinHeight = Math.Round(310 * factor);
+                            SessionHeroCard.Padding = new Thickness(28 * factor, 20 * factor, 28 * factor, 20 * factor);
+                        }
+                        if (TodaySummaryCard is not null)
+                        {
+                            TodaySummaryCard.Padding = new Thickness(24 * factor, 18 * factor, 24 * factor, 18 * factor);
+                        }
+                        if (ActivityCard is not null)
+                        {
+                            ActivityCard.Padding = new Thickness(22 * factor, 18 * factor, 22 * factor, 18 * factor);
+                        }
+                        if (StartIdleButton is not null)
+                        {
+                            StartIdleButton.Height = Math.Round(36 * factor);
+                            StartIdleButton.MinWidth = Math.Round(130 * factor);
+                            StartIdleButton.FontSize = 13.0 * factor;
+                        }
+                        if (PauseButton is not null)
+                        {
+                            PauseButton.Height = Math.Round(36 * factor);
+                            PauseButton.MinWidth = Math.Round(120 * factor);
+                            PauseButton.FontSize = 13.0 * factor;
+                        }
+                        if (ContinueButton is not null)
+                        {
+                            ContinueButton.Height = Math.Round(36 * factor);
+                            ContinueButton.MinWidth = Math.Round(120 * factor);
+                            ContinueButton.FontSize = 13.0 * factor;
+                        }
+                        if (StartNewButton is not null)
+                        {
+                            StartNewButton.Height = Math.Round(36 * factor);
+                            StartNewButton.MinWidth = Math.Round(110 * factor);
+                            StartNewButton.FontSize = 13.0 * factor;
+                        }
+                        if (WorkChoiceCard is not null)
+                        {
+                            WorkChoiceCard.Padding = new Thickness(16 * factor, 7 * factor, 16 * factor, 7 * factor);
+                        }
+                        if (BreakChoiceCard is not null)
+                        {
+                            BreakChoiceCard.Padding = new Thickness(16 * factor, 7 * factor, 16 * factor, 7 * factor);
+                        }
+                        if (WorkChoiceMode is not null) WorkChoiceMode.FontSize = 12.5 * factor;
+                        if (WorkChoiceDuration is not null) WorkChoiceDuration.FontSize = 12.0 * factor;
+                        if (BreakChoiceMode is not null) BreakChoiceMode.FontSize = 12.5 * factor;
+                        if (BreakChoiceDuration is not null) BreakChoiceDuration.FontSize = 12.0 * factor;
+                        if (FocusValue is not null) FocusValue.FontSize = Math.Round(24 * factor);
+                        if (WorkValue is not null) WorkValue.FontSize = Math.Round(24 * factor);
+                        if (BreakValue is not null) BreakValue.FontSize = Math.Round(24 * factor);
+                        if (CompletionValue is not null) CompletionValue.FontSize = Math.Round(24 * factor);
                     }
                 }
                 if (ReportsHost is not null)
-                    ReportsHost.Width = Math.Min(1220, available);
+                    ReportsHost.Width = Math.Min(1220 * factor, available);
             }
         }
     }
@@ -1147,11 +1370,13 @@ public sealed partial class MainWindow : Window
     {
         if (windowWidth <= 0 || NavColumn is null || NavGrid is null) return;
 
-        var navMode = TodayAdaptiveLayoutHelper.ResolveNavMode(windowWidth);
+        double factor = UiScaleLevels.ToFactor(_uiScalePercent);
+        double effectiveWidth = UiScaleLevels.CalculateEffectiveWidth(windowWidth, factor);
+        var navMode = TodayAdaptiveLayoutHelper.ResolveNavMode(effectiveWidth);
 
         if (navMode == AdaptiveNavMode.Collapsed)
         {
-            // 1. Narrow mode (< 740 DIP)
+            // 1. Narrow mode (< 740 DIP effective)
             NavColumn.Width = new GridLength(0);
             NavGrid.Visibility = Visibility.Collapsed;
             if (HamburgerButton is not null) HamburgerButton.Visibility = Visibility.Visible;
@@ -1164,68 +1389,73 @@ public sealed partial class MainWindow : Window
         if (HamburgerButton is not null) HamburgerButton.Visibility = Visibility.Collapsed;
         NavGrid.Visibility = Visibility.Visible;
 
+        if (NavDrawerPane is not null)
+        {
+            NavDrawerPane.Width = Math.Round(240 * factor);
+        }
+
         if (navMode == AdaptiveNavMode.Compact)
         {
-            // 2. Compact mode (740 to 1059 DIP): 54 DIP rail with centered icons only
-            NavColumn.Width = new GridLength(54);
-            NavGrid.Padding = new Thickness(4, 16, 4, 14);
+            // 2. Compact mode (740 to 1059 DIP effective): 54 DIP rail with centered icons only
+            NavColumn.Width = new GridLength(Math.Round(54 * factor));
+            NavGrid.Padding = new Thickness(4 * factor, 16 * factor, 4 * factor, 14 * factor);
 
-            if (TopNavSection is not null) TopNavSection.Spacing = 16;
-            if (TopNavItems is not null) TopNavItems.Spacing = 4;
-            if (BottomNavSection is not null) BottomNavSection.Spacing = 4;
+            if (TopNavSection is not null) TopNavSection.Spacing = 16 * factor;
+            if (TopNavItems is not null) TopNavItems.Spacing = 4 * factor;
+            if (BottomNavSection is not null) BottomNavSection.Spacing = 4 * factor;
 
             if (NavHeaderPanel is not null) NavHeaderPanel.Padding = new Thickness(0);
             if (NavBrandTitle is not null) NavBrandTitle.Visibility = Visibility.Collapsed;
 
-            ApplyCompactNavItem(TodayNav, TodayIconContainer, TodayIcon, TodayLabel);
-            ApplyCompactNavItem(ReportsNav, ReportsIconContainer, ReportsIcon, ReportsLabel);
-            ApplyCompactNavItem(OverlayNavButton, OverlayIconContainer, OverlayIcon, OverlayLabel);
-            ApplyCompactNavItem(SettingsNav, SettingsIconContainer, SettingsIcon, SettingsLabel);
-            ApplyCompactNavItem(ExitButton, ExitIconContainer, ExitIcon, ExitLabel);
+            ApplyCompactNavItem(TodayNav, TodayIconContainer, TodayIcon, TodayLabel, factor);
+            ApplyCompactNavItem(ReportsNav, ReportsIconContainer, ReportsIcon, ReportsLabel, factor);
+            ApplyCompactNavItem(OverlayNavButton, OverlayIconContainer, OverlayIcon, OverlayLabel, factor);
+            ApplyCompactNavItem(SettingsNav, SettingsIconContainer, SettingsIcon, SettingsLabel, factor);
+            ApplyCompactNavItem(ExitButton, ExitIconContainer, ExitIcon, ExitLabel, factor);
         }
         else
         {
-            // 3. Expanded mode (>= 1060 DIP): 220 DIP pane with icons + labels
-            NavColumn.Width = new GridLength(220);
-            NavGrid.Padding = new Thickness(10, 20, 10, 16);
+            // 3. Expanded mode (>= 1060 DIP effective): 220 DIP pane with icons + labels
+            NavColumn.Width = new GridLength(Math.Round(220 * factor));
+            NavGrid.Padding = new Thickness(10 * factor, 20 * factor, 10 * factor, 16 * factor);
 
-            if (TopNavSection is not null) TopNavSection.Spacing = 20;
-            if (TopNavItems is not null) TopNavItems.Spacing = 3;
-            if (BottomNavSection is not null) BottomNavSection.Spacing = 3;
+            if (TopNavSection is not null) TopNavSection.Spacing = 20 * factor;
+            if (TopNavItems is not null) TopNavItems.Spacing = 3 * factor;
+            if (BottomNavSection is not null) BottomNavSection.Spacing = 3 * factor;
 
-            if (NavHeaderPanel is not null) NavHeaderPanel.Padding = new Thickness(10, 0, 10, 0);
+            if (NavHeaderPanel is not null) NavHeaderPanel.Padding = new Thickness(10 * factor, 0, 10 * factor, 0);
             if (NavBrandTitle is not null)
             {
                 NavBrandTitle.Visibility = Visibility.Visible;
-                NavBrandTitle.FontSize = 13.0;
+                NavBrandTitle.FontSize = 13.0 * factor;
             }
 
-            ApplyExpandedNavItem(TodayNav, TodayIconContainer, TodayIcon, TodayLabel);
-            ApplyExpandedNavItem(ReportsNav, ReportsIconContainer, ReportsIcon, ReportsLabel);
-            ApplyExpandedNavItem(OverlayNavButton, OverlayIconContainer, OverlayIcon, OverlayLabel);
-            ApplyExpandedNavItem(SettingsNav, SettingsIconContainer, SettingsIcon, SettingsLabel);
-            ApplyExpandedNavItem(ExitButton, ExitIconContainer, ExitIcon, ExitLabel);
+            ApplyExpandedNavItem(TodayNav, TodayIconContainer, TodayIcon, TodayLabel, factor);
+            ApplyExpandedNavItem(ReportsNav, ReportsIconContainer, ReportsIcon, ReportsLabel, factor);
+            ApplyExpandedNavItem(OverlayNavButton, OverlayIconContainer, OverlayIcon, OverlayLabel, factor);
+            ApplyExpandedNavItem(SettingsNav, SettingsIconContainer, SettingsIcon, SettingsLabel, factor);
+            ApplyExpandedNavItem(ExitButton, ExitIconContainer, ExitIcon, ExitLabel, factor);
         }
 
         UpdateActiveNavIndicator();
     }
 
-    private static void ApplyCompactNavItem(Control? button, FrameworkElement? iconContainer, FontIcon? icon, TextBlock? label)
+    private static void ApplyCompactNavItem(Control? button, FrameworkElement? iconContainer, FontIcon? icon, TextBlock? label, double factor = 1.0)
     {
         if (button is not null)
         {
-            button.MinHeight = 38;
+            button.MinHeight = Math.Round(38 * factor);
             button.Padding = new Thickness(0);
             button.HorizontalContentAlignment = HorizontalAlignment.Center;
         }
         if (iconContainer is not null)
         {
-            iconContainer.Width = 36;
-            iconContainer.Height = 36;
+            iconContainer.Width = Math.Round(36 * factor);
+            iconContainer.Height = Math.Round(36 * factor);
         }
         if (icon is not null)
         {
-            icon.FontSize = 17.5;
+            icon.FontSize = 17.5 * factor;
         }
         if (label is not null)
         {
@@ -1233,27 +1463,27 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private static void ApplyExpandedNavItem(Control? button, FrameworkElement? iconContainer, FontIcon? icon, TextBlock? label)
+    private static void ApplyExpandedNavItem(Control? button, FrameworkElement? iconContainer, FontIcon? icon, TextBlock? label, double factor = 1.0)
     {
         if (button is not null)
         {
-            button.MinHeight = 40;
-            button.Padding = new Thickness(10, 6, 10, 6);
+            button.MinHeight = Math.Round(40 * factor);
+            button.Padding = new Thickness(10 * factor, 6 * factor, 10 * factor, 6 * factor);
             button.HorizontalContentAlignment = HorizontalAlignment.Stretch;
         }
         if (iconContainer is not null)
         {
-            iconContainer.Width = 28;
-            iconContainer.Height = 28;
+            iconContainer.Width = Math.Round(28 * factor);
+            iconContainer.Height = Math.Round(28 * factor);
         }
         if (icon is not null)
         {
-            icon.FontSize = 18.0;
+            icon.FontSize = 18.0 * factor;
         }
         if (label is not null)
         {
             label.Visibility = Visibility.Visible;
-            label.FontSize = 13.0;
+            label.FontSize = 13.0 * factor;
         }
     }
 }

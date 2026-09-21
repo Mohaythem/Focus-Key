@@ -15,10 +15,17 @@ public sealed class DatabaseBootstrapperTests
 
         Assert.True(result.DatabaseFileCreated);
         Assert.Equal(0, result.SchemaVersionBefore);
+        Assert.Equal(14, SchemaMigrations.TargetVersion);
         Assert.Equal(SchemaMigrations.TargetVersion, result.SchemaVersionAfter);
         Assert.Equal(SchemaMigrations.All.Select(migration => migration.Version), result.AppliedMigrations);
         Assert.Equal(databaseFile, result.DatabaseFile);
         Assert.True(File.Exists(databaseFile));
+    }
+
+    [Fact]
+    public void TargetVersionIsFourteen()
+    {
+        Assert.Equal(14, SchemaMigrations.TargetVersion);
     }
 
     [Fact]

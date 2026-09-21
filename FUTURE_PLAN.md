@@ -20,6 +20,21 @@ This document serves as the persistent repository-level source of truth for all 
 
 ## Implemented Work Awaiting Final User Acceptance
 
+### Application UI Scaling / Zoom System (Implemented — Awaiting Final User Acceptance)
+**Status:** Implemented — Awaiting Final User Acceptance
+**Scope & Deliverables:**
+1. **Discrete Scale Levels**: 6 supported levels (`80%`, `90%`, `100%`, `110%`, `125%`, `150%`).
+2. **Keyboard Shortcuts**: `Ctrl + Plus` (Zoom In), `Ctrl + Minus` (Zoom Out), `Ctrl + 0` (Reset to 100%) with TextInput suppression and AltGr defense.
+3. **Settings UI ComboBox**: Added under `APPEARANCE -> DISPLAY -> "UI scale"` with full bidirectional live sync and re-entrancy protection.
+4. **Transient HUD Overlay**: Auto-fadeout `ScaleHudOverlay` displaying `"UI scale: X%"` for 1.5 seconds upon scale changes.
+5. **Layout-Aware Visual Scaling (No Blurry Transform)**: Effective width math (`effectiveWidth = physicalWidth / factor`) driving responsive navigation and Today composition; proportional scaling of typography, timer digits, card paddings, button heights, and nav rail dimensions.
+6. **Quick Overlay Isolation**: Quick Overlay locked strictly at 100% (480 DIP width) and untouched.
+7. **Authoritative Persistence & Concurrency**: SQLite Migration 14 (`ui_scale_percent`) with single-queue serialization via `SettingsPageController` eliminating race conditions.
+
+---
+
+## Implemented Work Awaiting Final User Acceptance
+
 ### Settings Final Polish & Session Sounds Refinement (Implemented — Awaiting Final User Acceptance)
 **Status:** Implemented — Awaiting Final User Acceptance
 **Scope & Deliverables:**

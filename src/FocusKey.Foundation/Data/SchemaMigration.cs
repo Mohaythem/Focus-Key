@@ -261,5 +261,12 @@ public static class SchemaMigrations
                 ALTER TABLE application_settings ADD COLUMN start_sound_enabled INTEGER NOT NULL DEFAULT 1;
                 ALTER TABLE application_settings ADD COLUMN completion_sound_enabled INTEGER NOT NULL DEFAULT 1;
                 """),
+
+        new SchemaMigration(
+            Version: 14,
+            Name: "ui_scale_preference",
+            Sql: """
+                ALTER TABLE application_settings ADD COLUMN ui_scale_percent INTEGER NOT NULL DEFAULT 100;
+                """),
     ];
 }

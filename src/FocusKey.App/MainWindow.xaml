@@ -394,5 +394,31 @@
     </StackPanel>
    </StackPanel>
   </ScrollViewer>
+
+  <!-- TRANSIENT UI SCALE HUD OVERLAY -->
+  <Border x:Name="ScaleHudOverlay"
+          Grid.ColumnSpan="2"
+          Canvas.ZIndex="2000"
+          HorizontalAlignment="Center"
+          VerticalAlignment="Bottom"
+          Margin="0,0,0,56"
+          Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+          BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+          BorderThickness="1"
+          CornerRadius="8"
+          Padding="16,10,18,10"
+          Opacity="0"
+          IsHitTestVisible="False"
+          Visibility="Collapsed">
+   <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+    <FontIcon Glyph="&#xE71E;" FontSize="14" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+    <TextBlock x:Name="ScaleHudText"
+               Text="UI scale: 100%"
+               FontSize="13"
+               FontWeight="SemiBold"
+               Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+               VerticalAlignment="Center"/>
+   </StackPanel>
+  </Border>
  </Grid>
 </Window>

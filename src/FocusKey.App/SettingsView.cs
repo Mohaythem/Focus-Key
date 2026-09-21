@@ -26,6 +26,8 @@ internal sealed class SettingsView : UserControl
     private readonly ComboBox _contrast = new() { ItemsSource = ContrastOptions, MinWidth = 160, FontSize = 12 };
     private static readonly string[] TimeFormatOptions = ["24-hour (09:05)", "12-hour (9:05 AM)"];
     private readonly ComboBox _timeFormat = new() { ItemsSource = TimeFormatOptions, MinWidth = 160, FontSize = 12 };
+    private static readonly string[] UiScaleOptions = ["80%", "90%", "100%", "110%", "125%", "150%"];
+    private readonly ComboBox _uiScale = new() { ItemsSource = UiScaleOptions, MinWidth = 160, FontSize = 12 };
     private readonly Button _resetOverlayPositionButton = new() { Content = "Reset position", FontSize = 12, Padding = new Thickness(12, 6, 12, 6) };
     private readonly ColorPicker _workColor = Picker("Work color picker");
     private readonly ColorPicker _breakColor = Picker("Break color picker");
@@ -88,6 +90,8 @@ internal sealed class SettingsView : UserControl
     private readonly TryUpdateShortcutHandler? _tryUpdateMainWindowShortcut;
     private readonly Action<GlobalShortcut>? _onShortcutChanged;
     private readonly Action<GlobalShortcut>? _onMainWindowShortcutChanged;
+    private readonly Action<int>? _onUiScaleChanged;
+    internal event Action<int>? UiScaleChanged;
     private readonly Button _shortcutButton = new();
     private readonly TextBlock _shortcutText = new();
     private readonly Button _resetShortcutButton = new();
@@ -120,7 +124,8 @@ internal sealed class SettingsView : UserControl
         Action<GlobalShortcut>? onShortcutChanged = null,
         Action<GlobalShortcut>? onMainWindowShortcutChanged = null,
         Action? previewStart = null,
-        Action? previewCompletion = null)
+        Action? previewCompletion = null,
+        Action<int>? onUiScaleChanged = null)
     {
         _windowsStartup = windowsStartup ?? throw new ArgumentNullException(nameof(windowsStartup));
         _historyService = history ?? throw new ArgumentNullException(nameof(history));
@@ -133,17 +138,23 @@ internal sealed class SettingsView : UserControl
         _onMainWindowShortcutChanged = onMainWindowShortcutChanged;
         _previewStart = previewStart;
         _previewCompletion = previewCompletion;
+        _onUiScaleChanged = onUiScaleChanged;
         _controller = new(settings, refresh, report);
         _colorDebounceTimer = DispatcherQueue.CreateTimer();
         _colorDebounceTimer.Interval = TimeSpan.FromMilliseconds(250);
         _colorDebounceTimer.Tick += (_, _) => StartColorDrain();
         Unloaded += async (_, _) => await FlushPendingColorSaveAsync();
 
+        UpdateUiScaleSelection(UiScaleLevels.DefaultPercent);
+
         AutomationProperties.SetName(_appearance, "Color scheme");
         AutomationProperties.SetName(_contrast, "Contrast");
         AutomationProperties.SetName(_lightPreset, "Light theme preset");
         AutomationProperties.SetName(_darkPreset, "Dark theme preset");
         AutomationProperties.SetName(_timeFormat, "Clock format");
+        AutomationProperties.SetName(_uiScale, "UI scale");
+        AutomationProperties.SetAutomationId(_uiScale, "UiScaleComboBox");
+        ToolTipService.SetToolTip(_uiScale, "Adjust application user interface scale.");
         AutomationProperties.SetName(_resetOverlayPositionButton, "Reset overlay window position");
         AutomationProperties.SetName(_sessionSounds, "Session sounds");
         AutomationProperties.SetName(_startSound, "Start sound");
@@ -225,7 +236,8 @@ internal sealed class SettingsView : UserControl
 
         // Sub-card E: DISPLAY
         var display = new StackPanel { Spacing = 0 };
-        display.Children.Add(Row("Clock format", "Display time in 24-hour (09:05) or 12-hour (9:05 AM) format.", _timeFormat, true));
+        display.Children.Add(Row("Clock format", "Display time in 24-hour (09:05) or 12-hour (9:05 AM) format.", _timeFormat, false));
+        display.Children.Add(Row("UI scale", "Adjust application user interface scale.", _uiScale, true));
         appearanceLayout.Children.Add(SubCard("DISPLAY", display));
 
         _fields.Children.Add(BuildCollapsibleSection(
@@ -357,6 +369,30 @@ internal sealed class SettingsView : UserControl
                 await FlushPendingColorSaveAsync();
                 await _controller.UpdateTimeFormatAsync((TimeFormat)_timeFormat.SelectedIndex);
             }
+        };
+        _uiScale.SelectionChanged += async (_, _) =>
+        {
+            if (_applying) return;
+            if (_uiScale.SelectedIndex < 0) return;
+
+            int percent = UiScaleLevels.DefaultPercent;
+            if (_uiScale.SelectedItem is string text && text.EndsWith('%') && int.TryParse(text.TrimEnd('%'), out int parsed))
+            {
+                percent = parsed;
+            }
+            else if (_uiScale.SelectedIndex >= 0 && _uiScale.SelectedIndex < UiScaleOptions.Length &&
+                     int.TryParse(UiScaleOptions[_uiScale.SelectedIndex].TrimEnd('%'), out int optParsed))
+            {
+                percent = optParsed;
+            }
+
+            if (!UiScaleLevels.IsValid(percent))
+                percent = UiScaleLevels.DefaultPercent;
+
+            await FlushPendingColorSaveAsync();
+            _onUiScaleChanged?.Invoke(percent);
+            UiScaleChanged?.Invoke(percent);
+            await _controller.UpdateUiScaleAsync(percent);
         };
         _resetOverlayPositionButton.Click += async (_, _) =>
         {
@@ -691,6 +727,9 @@ internal sealed class SettingsView : UserControl
                 case SettingsField.TimeFormat:
                     _timeFormat.SelectedIndex = (int)saved.TimeFormat;
                     break;
+                case SettingsField.UiScale:
+                    UpdateUiScaleSelection(saved.UiScalePercent);
+                    break;
                 case SettingsField.OverlayPosition:
                     break;
                 case SettingsField.AppearanceExpanded:
@@ -705,6 +744,56 @@ internal sealed class SettingsView : UserControl
             }
         }
         finally { _applying = false; }
+    }
+
+    public void ApplyUiScale(int percent)
+    {
+        _applying = true;
+        try
+        {
+            UpdateUiScaleSelection(percent);
+        }
+        finally
+        {
+            _applying = false;
+        }
+    }
+
+    internal Task UpdateUiScaleAsync(int percent, CancellationToken cancellationToken = default) =>
+        _controller.UpdateUiScaleAsync(percent, cancellationToken);
+
+    public void ApplySettings(ApplicationSettings settings)
+    {
+        if (settings is null) return;
+        _applying = true;
+        try
+        {
+            UpdateUiScaleSelection(settings.UiScalePercent);
+        }
+        finally
+        {
+            _applying = false;
+        }
+    }
+
+    private void UpdateUiScaleSelection(int percent)
+    {
+        int clamped = UiScaleLevels.IsValid(percent)
+            ? percent
+            : (percent < UiScaleLevels.MinPercent ? UiScaleLevels.MinPercent : (percent > UiScaleLevels.MaxPercent ? UiScaleLevels.MaxPercent : UiScaleLevels.DefaultPercent));
+        string target = $"{clamped}%";
+        int idx = Array.IndexOf(UiScaleOptions, target);
+        if (idx >= 0)
+        {
+            if (_uiScale.SelectedIndex != idx)
+            {
+                _uiScale.SelectedIndex = idx;
+            }
+            if (!Equals(_uiScale.SelectedItem, UiScaleOptions[idx]))
+            {
+                _uiScale.SelectedItem = UiScaleOptions[idx];
+            }
+        }
     }
 
     private void SetThemeFields(ThemeConfiguration config, ComboBox presetCombo,

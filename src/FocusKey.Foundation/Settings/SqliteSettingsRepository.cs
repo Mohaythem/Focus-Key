@@ -13,7 +13,7 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
         await using SqliteCommand command = connection.CreateCommand();
         command.CommandText =
             """
-            SELECT work_duration_seconds, break_duration_seconds, appearance, work_color, break_color, session_sounds_enabled, activity_collapsed, global_shortcut, main_window_shortcut, overlay_position_x, overlay_position_y, time_format, appearance_expanded, shortcuts_expanded, advanced_expanded, start_sound_enabled, completion_sound_enabled
+            SELECT work_duration_seconds, break_duration_seconds, appearance, work_color, break_color, session_sounds_enabled, activity_collapsed, global_shortcut, main_window_shortcut, overlay_position_x, overlay_position_y, time_format, appearance_expanded, shortcuts_expanded, advanced_expanded, start_sound_enabled, completion_sound_enabled, ui_scale_percent
             FROM application_settings WHERE singleton = 1;
             """;
         await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
@@ -42,6 +42,7 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
             bool advancedExpanded = !reader.IsDBNull(14) && reader.GetInt64(14) != 0;
             bool startSoundEnabled = reader.IsDBNull(15) || reader.GetInt64(15) != 0;
             bool completionSoundEnabled = reader.IsDBNull(16) || reader.GetInt64(16) != 0;
+            int uiScalePercent = reader.IsDBNull(17) ? 100 : reader.GetInt32(17);
             if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
                 throw new InvalidDataException("More than one authoritative application settings record exists.");
             await reader.CloseAsync().ConfigureAwait(false);
@@ -70,6 +71,7 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
                 AppearanceExpanded = appearanceExpanded,
                 ShortcutsExpanded = shortcutsExpanded,
                 AdvancedExpanded = advancedExpanded,
+                UiScalePercent = uiScalePercent,
             };
             settings.Validate();
             return settings;
@@ -108,7 +110,8 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
                 time_format = $timeFormat,
                 appearance_expanded = $appearanceExpanded,
                 shortcuts_expanded = $shortcutsExpanded,
-                advanced_expanded = $advancedExpanded
+                advanced_expanded = $advancedExpanded,
+                ui_scale_percent = $uiScalePercent
             WHERE singleton = 1;
             """;
         var light = settings.LightTheme ?? ThemeConfiguration.DefaultLight;
@@ -130,6 +133,7 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connections
         command.Parameters.AddWithValue("$appearanceExpanded", settings.AppearanceExpanded ? 1 : 0);
         command.Parameters.AddWithValue("$shortcutsExpanded", settings.ShortcutsExpanded ? 1 : 0);
         command.Parameters.AddWithValue("$advancedExpanded", settings.AdvancedExpanded ? 1 : 0);
+        command.Parameters.AddWithValue("$uiScalePercent", settings.UiScalePercent);
         if (await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
             throw new InvalidDataException("The authoritative application settings record is missing.");
 

@@ -1,35 +1,31 @@
 # Focus Key — Project Progress & State Checkpoint
 
 ## Current Goal
-Settings Final Polish & Session Sounds Refinement implemented and verified with 825/825 passing tests and zero build warnings/errors.
+Application UI Scaling / Zoom System implemented and verified with 1,136/1,136 passing tests and 0 build warnings/errors.
 
 ## Current Checkpoint
 Implemented and verified:
-- **1. Settings Page Title & Visual Hierarchy**:
-  - Prominent "Settings" page heading matching Today/Reports typography (`FkPageTitle` style, 28px SemiBold, 0 DIP left margin).
-  - 16 DIP vertical spacing before `SESSION` card (`Margin = 0, 16, 0, 0`).
-- **2. Sub-Card Dividers & Border Definition**:
-  - Subtle theme-aware dividers inside all Settings sub-cards (`Rectangle` 1px height, `CardStrokeColorDefaultBrush`, `Opacity = 0.4`, `Margin = 0, 0, 0, 10`).
-  - Strengthened card and sub-card border definition in Dark mode (`#363636` border stroke) while keeping Light mode natural and soft (`#E5E5E5`).
-- **3. Normalized Right-Edge Alignment**:
-  - Normalized all trailing controls (`ToggleSwitch` controls use `MinWidth = 0`, shared right margin `Margin = 0, 0, 0, 0`, consistent action button sizing).
-- **4. Polished Settings Copy**:
-  - Sentence case across all section headings, sub-card titles, descriptions, and action buttons.
-  - Consistent periods on explanatory descriptions, clear and concise terminology.
-- **5. Session Sounds Architecture**:
-  - Master gate toggle (`Session sounds [On/Off]`) controlling playback permission without overwriting child preferences.
-  - Granular `Start sound` toggle + description + unconditional `Preview` action.
-  - Granular `Completion sound` toggle + description + unconditional `Preview` action.
-  - Child toggles subdued visually (`Opacity = 0.45`, `IsEnabled = false`) when master toggle is OFF.
-  - Preview buttons remain active and play audio unconditionally regardless of toggle states.
-- **6. Playback Semantics & Backward Compatibility**:
-  - Start sound plays strictly on new session start (never on resume/continue).
-  - Completion sound plays strictly on natural completion (never on stop/pause/interrupt).
-  - SQLite Migration 13 (`individual_session_sounds_settings`) adding `start_sound_enabled` (default 1) and `completion_sound_enabled` (default 1) with backward-compatible defaults.
-- **7. Zero Feature Loss & Scope Discipline**:
-  - 100% of existing settings preserved with full bidirectional binding and live theme refresh.
-  - Zero regressions across Today, Reports, Quick Overlay, or MainWindow drag/close logic.
-- **Automated Tests**: 825/825 unit tests passing (`dotnet test -c Release`), 0 failed, 0 skipped.
+- **1. Discrete UI Scale Levels & Conversion Math**:
+  - 6 supported levels: `80%`, `90%`, `100%`, `110%`, `125%`, `150%`.
+  - Factor conversion (`UiScaleLevels.ToFactor`), step up/down (`NextLevel`, `PreviousLevel`), integer clamping, and effective width calculation (`UiScaleLevels.CalculateEffectiveWidth`).
+- **2. Global Keyboard Shortcuts & Input Safety**:
+  - `Ctrl + Plus` (Zoom In), `Ctrl + Minus` (Zoom Out), `Ctrl + 0` (Reset to 100%).
+  - Text input hierarchy suppression (ignores shortcuts when typing in `TextBox`, `PasswordBox`, `RichEditBox`, `AutoSuggestBox`).
+  - AltGr defense (`!isAlt && !isWin`) preventing accidental zoom on international layouts.
+- **3. Settings Page UI ComboBox**:
+  - Added under **Settings $\rightarrow$ APPEARANCE $\rightarrow$ DISPLAY $\rightarrow$ "UI scale"**.
+  - Bidirectional live sync with `MainWindow` and `SettingsPageController` with re-entrancy prevention guard.
+- **4. Transient HUD Overlay**:
+  - Auto-fadeout `ScaleHudOverlay` displaying `"UI scale: X%"` for 1.5 seconds upon scale changes with smooth WinUI opacity animation.
+- **5. Layout-Aware Visual Scaling (No Blurry ScaleTransform)**:
+  - Effective width math (`effectiveWidth = physicalWidth / scaleFactor`) driving responsive layout breakpoints in navigation and Today page composition.
+  - Proportional scaling of typography, timer digits (`Math.Round(72 * factor)`), card paddings, button heights (`Math.Round(36 * factor)`), metric values (`Math.Round(24 * factor)`), and navigation rail dimensions.
+- **6. Quick Overlay Isolation**:
+  - Quick Overlay locked strictly at 100% (480 DIP width) and completely untouched.
+- **7. Authoritative Single-Queue Persistence & Concurrency**:
+  - SQLite Migration 14 (`ui_scale_percent INTEGER NOT NULL DEFAULT 100`).
+  - All shortcut and ComboBox persistence requests serialized through `SettingsPageController.UpdateUiScaleAsync`, eliminating race conditions and lock contention.
+- **Automated Tests**: 1,136/1,136 unit and stress tests passing (`dotnet test -c Release`), 0 failed, 0 skipped.
 - **Build**: 0 Warning(s), 0 Error(s) (`dotnet build src/FocusKey.App/FocusKey.App.csproj -c Release`).
 
 ## Completed Work
@@ -51,6 +47,7 @@ Implemented and verified:
 - **Stage 10b (Post-Today UX Refinement Pass)**: Keyboard navigation & activation (Left/Right arrows for idle selector, Up/Down for nav, Esc for drawer), preserved session-colored Today status dot, stable Today activity overflow scrolling (420 DIP max height internal viewer), 4 fixed weekly buckets in monthly reports, and enlarged draggable Quick Overlay header.
 - **Stage 14 (Settings Information Architecture & Nested Card Hierarchy)**: Restructured 4 top-level sections as native Fluent cards (`SESSION`, `APPEARANCE`, `SHORTCUTS`, `ADVANCED`), sub-card grouping (`FkCardSubtle`), 48px button headers with chevron toggle and full keyboard accessibility, SQLite expansion persistence, and bottom-anchored reload footer.
 - **Settings Final Polish & Session Sounds Refinement**: Prominent Settings page header, 16 DIP top vertical spacing, sub-card title dividers, darkened `#363636` borders, normalized right-edge alignment, full copy audit, master + granular session sounds with unconditional previews, Continue non-retriggering start sound, and SQLite Migration 13.
+- **Stage 15 (Application UI Scaling / Zoom System)**: Native, persistent, layout-aware UI scaling system (80% to 150%), global zoom keyboard shortcuts, Settings ComboBox, HUD overlay, effective width adaptive layout, single-queue authoritative synchronization, and SQLite Migration 14.
 
 ## Remaining Work
 - **Stage 11: Final Consistency QA & Windows Packaging**
@@ -58,15 +55,14 @@ Implemented and verified:
   - Package clean standalone Release installer (`FocusKeySetup.exe`).
 
 ## Important Active Decisions
-- **Master Gate vs Granular Sound Preferences**: The master `SessionSoundsEnabled` gate controls playback permission without mutating individual `StartSoundEnabled` / `CompletionSoundEnabled` preferences. When master is OFF, child controls are visually subdued (`Opacity = 0.45`) and disabled, but retain their configured states.
-- **Unconditional Preview Audition**: Preview buttons on Start and Completion sound rows always play the sound immediately via `ISoundPlayer.PreviewStartTick()` and `PreviewCompletionBell()`, allowing users to test sounds even if sounds are currently disabled.
-- **Continue Playback Semantics**: Resuming a paused session via `Continue` never re-triggers the Start tick sound; Start tick is strictly for newly initialized sessions.
-- **Border Definition**: In Dark mode, outer cards and sub-cards use `#363636` (`FkBorder`, `CardStrokeColorDefaultBrush`, and preset borders) for crisp visual separation against the `#1E1E1E` and `#252525` background layers.
+- **Effective Width Math Over Root ScaleTransform**: To maintain razor-sharp text and precise hit-testing without blurry WinUI scaling, visual scaling is calculated via effective width and proportional element sizing.
+- **Quick Overlay Isolation**: Quick Overlay is strictly locked to 100% scale (480 DIP width) regardless of application zoom level.
+- **Single-Queue Synchronization**: All UI scaling changes (shortcuts and ComboBox) route through `SettingsPageController.UpdateUiScaleAsync` to prevent concurrency races and ensure database integrity.
 
 ## Last Verification
 - **Build**: `dotnet build src/FocusKey.App/FocusKey.App.csproj -c Release` (0 Warnings, 0 Errors).
-- **Test Suite**: `dotnet test -c Release` (825 passed, 0 failed, 0 skipped).
+- **Test Suite**: `dotnet test -c Release` (1,136 passed, 0 failed, 0 skipped).
 
 ## Current Git State
 - Branch: `native/phased-rewrite`
-- Working tree contains verified Settings final polish & session sounds refinement.
+- Working tree contains verified Application UI Scaling / Zoom System.

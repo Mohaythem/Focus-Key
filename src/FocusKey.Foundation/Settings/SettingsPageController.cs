@@ -9,7 +9,8 @@ public enum SettingsField
     DarkPreset, DarkBackground, DarkForeground, DarkAccent,
     SessionSounds, StartSound, CompletionSound, GlobalShortcut, MainWindowShortcut,
     TimeFormat, OverlayPosition,
-    AppearanceExpanded, ShortcutsExpanded, AdvancedExpanded
+    AppearanceExpanded, ShortcutsExpanded, AdvancedExpanded,
+    UiScale
 }
 
 /// <summary>UI-thread auto-save queue. Only committed values are published to runtime.</summary>
@@ -90,6 +91,8 @@ public sealed class SettingsPageController(SettingsService settings, Func<Task> 
         ChangeAsync(SettingsField.ShortcutsExpanded, () => settings.UpdateShortcutsExpandedAsync(value), cancellationToken);
     public Task UpdateAdvancedExpandedAsync(bool value, CancellationToken cancellationToken = default) =>
         ChangeAsync(SettingsField.AdvancedExpanded, () => settings.UpdateAdvancedExpandedAsync(value), cancellationToken);
+    public Task UpdateUiScaleAsync(int percent, CancellationToken cancellationToken = default) =>
+        ChangeAsync(SettingsField.UiScale, () => settings.UpdateUiScalePercentAsync(percent), cancellationToken);
 
     public Task UpdateLightPresetAsync(string presetId, CancellationToken cancellationToken = default)
     {

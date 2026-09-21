@@ -10,7 +10,7 @@ public sealed class SoundSynthesizerTests
     {
         byte[] wav = SoundSynthesizer.GenerateStartTick();
         Assert.NotNull(wav);
-        Assert.True(wav.Length > 1000);
+        Assert.Equal(7100, wav.Length); // 80ms @ 44.1kHz 16-bit mono = 3528 samples * 2 + 44 header
 
         ValidateWavHeader(wav, expectedSampleRate: 44100, expectedChannels: 1, expectedBitsPerSample: 16);
 
@@ -22,10 +22,7 @@ public sealed class SoundSynthesizerTests
             {
                 Directory.CreateDirectory(targetDir);
                 string filePath = Path.Combine(targetDir, "start_tick.wav");
-                if (!File.Exists(filePath))
-                {
-                    File.WriteAllBytes(filePath, wav);
-                }
+                File.WriteAllBytes(filePath, wav);
             }
         }
         catch (IOException)
@@ -39,7 +36,7 @@ public sealed class SoundSynthesizerTests
     {
         byte[] wav = SoundSynthesizer.GenerateCompletionBell();
         Assert.NotNull(wav);
-        Assert.True(wav.Length > 10000); // 2.2s is ~194 kB
+        Assert.Equal(44144, wav.Length); // 500ms @ 44.1kHz 16-bit mono = 22050 samples * 2 + 44 header
 
         ValidateWavHeader(wav, expectedSampleRate: 44100, expectedChannels: 1, expectedBitsPerSample: 16);
 
@@ -51,10 +48,7 @@ public sealed class SoundSynthesizerTests
             {
                 Directory.CreateDirectory(targetDir);
                 string filePath = Path.Combine(targetDir, "completion_bell.wav");
-                if (!File.Exists(filePath))
-                {
-                    File.WriteAllBytes(filePath, wav);
-                }
+                File.WriteAllBytes(filePath, wav);
             }
         }
         catch (IOException)

@@ -9,16 +9,21 @@ public static class SoundSynthesizer
     public static byte[] GenerateStartTick()
     {
         const int sampleRate = 44100;
-        const double duration = 0.14; // 140ms subtle mechanical tick
+        const double duration = 0.080; // 80ms soft organic confirmation tick
         int totalSamples = (int)(sampleRate * duration);
         short[] samples = new short[totalSamples];
 
         for (int i = 0; i < totalSamples; i++)
         {
             double t = (double)i / sampleRate;
-            double snap = Math.Sin(2 * Math.PI * 2600 * t) * Math.Exp(-t / 0.008);
-            double body = Math.Sin(2 * Math.PI * 520 * t) * Math.Exp(-t / 0.035);
-            double val = (snap * 0.45 + body * 0.55) * Math.Exp(-t / 0.04) * 0.40;
+            double attack = t < 0.003 ? Math.Sin((t / 0.003) * (Math.PI / 2)) : 1.0;
+            double endFade = t > 0.065 ? ((duration - t) / 0.015) : 1.0;
+
+            double w1 = Math.Sin(2 * Math.PI * 587.33 * t) * Math.Exp(-t / 0.020);
+            double w2 = Math.Sin(2 * Math.PI * 1174.66 * t) * Math.Exp(-t / 0.012) * 0.30;
+            double w3 = Math.Sin(2 * Math.PI * 293.66 * t) * Math.Exp(-t / 0.025) * 0.20;
+
+            double val = (w1 + w2 + w3) * attack * endFade * 0.40;
             samples[i] = (short)(Math.Clamp(val, -1.0, 1.0) * 32767.0);
         }
 
@@ -28,20 +33,22 @@ public static class SoundSynthesizer
     public static byte[] GenerateCompletionBell()
     {
         const int sampleRate = 44100;
-        const double duration = 2.2; // 2.2s calm meditation singing chime
+        const double duration = 0.500; // 500ms warm pleasant musical chime
         int totalSamples = (int)(sampleRate * duration);
         short[] samples = new short[totalSamples];
 
         for (int i = 0; i < totalSamples; i++)
         {
             double t = (double)i / sampleRate;
-            double attack = t < 0.008 ? Math.Sin((t / 0.008) * (Math.PI / 2)) : 1.0;
-            double f1 = Math.Sin(2 * Math.PI * 528.0 * t) * Math.Exp(-t / 0.85);
-            double f2 = Math.Sin(2 * Math.PI * 1457.0 * t) * Math.Exp(-t / 0.45) * 0.35;
-            double f3 = Math.Sin(2 * Math.PI * 2851.0 * t) * Math.Exp(-t / 0.25) * 0.15;
-            double endFade = t > (duration - 0.1) ? ((duration - t) / 0.1) : 1.0;
+            double attack = t < 0.005 ? Math.Sin((t / 0.005) * (Math.PI / 2)) : 1.0;
+            double endFade = t > 0.420 ? ((duration - t) / 0.080) : 1.0;
 
-            double val = (f1 + f2 + f3) * attack * endFade * 0.55;
+            double c1 = Math.Sin(2 * Math.PI * 523.25 * t) * Math.Exp(-t / 0.160) * 0.50;
+            double c2 = Math.Sin(2 * Math.PI * 659.25 * t) * Math.Exp(-t / 0.140) * 0.35;
+            double c3 = Math.Sin(2 * Math.PI * 783.99 * t) * Math.Exp(-t / 0.120) * 0.25;
+            double c4 = Math.Sin(2 * Math.PI * 1046.50 * t) * Math.Exp(-t / 0.080) * 0.15;
+
+            double val = (c1 + c2 + c3 + c4) * attack * endFade * 0.45;
             samples[i] = (short)(Math.Clamp(val, -1.0, 1.0) * 32767.0);
         }
 

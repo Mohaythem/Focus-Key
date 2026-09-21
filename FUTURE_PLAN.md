@@ -20,6 +20,27 @@ This document serves as the persistent repository-level source of truth for all 
 
 ## Implemented Work Awaiting Final User Acceptance
 
+### Session Sound Behavior & Sound Replacement (Implemented — Awaiting Final User Acceptance)
+**Status:** Implemented — Awaiting Final User Acceptance
+**Scope & Deliverables:**
+1. **Revised Playback Semantics**:
+   - New session Start $\rightarrow$ plays Start sound once.
+   - Continue after Pause $\rightarrow$ plays Start sound once.
+   - User Stop $\rightarrow$ plays Completion sound once (both direct manual stop and Start New finalizing a paused session).
+   - Natural timer completion $\rightarrow$ plays Completion sound THREE times sequentially (with 180ms gap, non-overlapping `SND_SYNC` playback on a background thread).
+   - Interrupted / crash / shutdown $\rightarrow$ completely silent (zero sound playback).
+2. **Settings Controls & Unconditional Preview**:
+   - Master gate toggle (`Session sounds [On/Off]`), Start sound toggle, Completion sound toggle.
+   - Preview buttons play single cue directly (never 3 times) even if master/child sounds are disabled.
+3. **Calm Organic Synthesized Audio Assets**:
+   - 100% app-owned, license-safe mathematical synthesis via `SoundSynthesizer.cs` (44.1kHz 16-bit mono PCM RIFF WAV).
+   - `start_tick.wav`: 80ms soft, organic D5/D6/D4 confirmation tick (7,100 bytes).
+   - `completion_bell.wav`: 500ms warm, pleasant C-Major chord chime (44,144 bytes).
+
+---
+
+## Implemented Work Awaiting Final User Acceptance
+
 ### Application UI Scaling / Zoom System (Implemented — Awaiting Final User Acceptance)
 **Status:** Implemented — Awaiting Final User Acceptance
 **Scope & Deliverables:**

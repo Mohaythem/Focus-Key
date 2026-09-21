@@ -219,7 +219,7 @@ public sealed partial class MainWindow : Window
         WindowsShellIntegration shellIntegration,
         Func<SessionId, CancellationToken, Task<SessionOutcome>>? pause = null,
         Func<SessionId, CancellationToken, Task<SessionOutcome>>? @continue = null,
-        FocusKey.Shell.ISoundPlayer? soundPlayer = null)
+        FocusKey.Foundation.Sounds.ISoundPlayer? soundPlayer = null)
     {
         InitializeComponent();
         _settingsService = startup.Settings;

@@ -452,6 +452,10 @@ public partial class App : Application
     private async Task<SessionOutcome> StopSessionAsync(SessionId expectedId, CancellationToken cancellationToken)
     {
         SessionOutcome result = await _completion!.StopAsync(expectedId, cancellationToken);
+        if (result.Kind == SessionOutcomeKind.Stopped)
+        {
+            _sounds?.PlayCompletionBell();
+        }
         _window?.RefreshPages();
         if (_quickOverlay is not null) await _quickOverlay.RefreshIfVisibleAsync();
         return result;
@@ -468,6 +472,10 @@ public partial class App : Application
     private async Task<SessionOutcome> ContinueSessionAsync(SessionId expectedId, CancellationToken cancellationToken)
     {
         SessionOutcome result = await _completion!.ContinueAsync(expectedId, cancellationToken);
+        if (result.Kind == SessionOutcomeKind.Continued)
+        {
+            _sounds?.PlayStartTick();
+        }
         _window?.RefreshPages();
         if (_quickOverlay is not null) await _quickOverlay.RefreshIfVisibleAsync();
         return result;
@@ -499,7 +507,7 @@ public partial class App : Application
             {
                 try
                 {
-                    _sounds?.PlayCompletionBell();
+                    _sounds?.PlayNaturalCompletionBell();
                     integration.NotifyCompleted(session);
                     _startup?.Logger.Info($"Completion notification submitted: {session.Id} {session.Type}; ended={session.EndedAt:O}.");
                 }

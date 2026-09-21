@@ -98,7 +98,7 @@ public sealed partial class MainWindow : Window
         ShowScaleHud(clamped);
         UpdateSidebarDimensions(MainSurface?.ActualWidth > 0 ? MainSurface.ActualWidth : 880);
         UpdatePageWidths();
-
+        _reports?.ApplyUiScale(clamped);
         _settings?.ApplyUiScale(clamped);
 
         if (persist)

@@ -43,19 +43,38 @@ Phase 15 implements a native, persistent, layout-aware Application UI Scaling / 
 
 ## 3. Layout-Aware Scaling (No Blurry Root Transform)
 
-Rather than applying a blurry root `ScaleTransform` which degrades text rendering and distorts hit-testing, Focus Key uses layout-aware responsive scaling:
+Rather than applying a blurry root `ScaleTransform` which degrades text rendering and distorts hit-testing, Focus Key uses layout-aware responsive scaling across all main surfaces:
 
-1. **Effective Width Math**:
-   $$\text{effectiveWidth} = \frac{\text{physicalWidth}}{\text{scaleFactor}}$$
-   Responsive layout breakpoints in `TodayAdaptiveLayoutHelper` and `MainWindow` operate on effective width rather than raw physical window pixels:
-   - At high scales (e.g. 150%), the navigation rail transitions gracefully from Expanded to Compact or Collapsed (Hamburger drawer) earlier, preventing content overflow.
-   - Today's page layout seamlessly adapts between two-column and single-vertical-stack compositions based on effective available space.
-2. **Proportional Dimension & Typography Scaling**:
-   - Navigation rail width: Expanded `Math.Round(220 * factor)`, Compact `Math.Round(54 * factor)`, Drawer `Math.Round(240 * factor)`.
-   - Timer typography: `RunningText` and `IdleDurationText` font sizes scale with factor (`Math.Round(72 * factor)` on wide layouts, responsive clamped sizes on narrow layouts) ensuring unclipped digit rendering for all session types.
-   - Metric numerals: Focus Time, Work Sessions, Break Time, and Completion Rate font sizes scale cleanly (`Math.Round(24 * factor)`).
-   - Card paddings and min-heights: `SessionHeroCard`, `TodaySummaryCard`, and `ActivityCard` scale paddings and minimum dimensions proportionally.
-   - Action buttons: Button heights (`Math.Round(36 * factor)`), minimum widths, and font sizes scale consistently.
+### 1. Effective Width Math & Breakpoints
+$$\text{effectiveWidth} = \frac{\text{physicalWidth}}{\text{scaleFactor}}$$
+Responsive layout breakpoints in `TodayAdaptiveLayoutHelper` and `MainWindow` operate on effective width rather than raw physical window pixels:
+- At high scales (e.g. 150%), the navigation rail transitions gracefully from Expanded to Compact or Collapsed (Hamburger drawer) earlier, preventing content overflow.
+- Today's page layout seamlessly adapts between two-column and single-vertical-stack compositions based on effective available space.
+
+### 2. Proportional Navigation & Today Scaling
+- Navigation rail width: Expanded `Math.Round(220 * factor)`, Compact `Math.Round(54 * factor)`, Drawer `Math.Round(240 * factor)`.
+- Timer typography: `RunningText` and `IdleDurationText` font sizes scale with factor (`Math.Round(72 * factor)` on wide layouts, responsive clamped sizes on narrow layouts) ensuring unclipped digit rendering for all session types.
+- Metric numerals: Focus Time, Work Sessions, Break Time, and Completion Rate font sizes scale cleanly (`Math.Round(24 * factor)`).
+- Card paddings and min-heights: `SessionHeroCard`, `TodaySummaryCard`, and `ActivityCard` scale paddings and minimum dimensions proportionally.
+- Action buttons: Button heights (`Math.Round(36 * factor)`), minimum widths, and font sizes scale consistently.
+
+### 3. Crisp Reports Surface Scaling
+- **Page Header & Controls**: Page title (`28 * factor`), top header margin, segmented period selector (`Week / Month / Year` buttons, padding, font size, min height), date range subtitle, and navigation buttons (`Previous`, `CalendarDatePicker`, `Next`, `Current`, `Refresh`).
+- **Summary Metrics**: 3-column metric cards (`Card` padding, `30 * factor` Consolas values, labels, subtext).
+- **Native Trend Chart (`ReportsChart.cs`)**: Crisp vector chart drawing scaled with `scaleFactor`:
+  - Plot headroom and plot area height (`Math.Round(150 * scaleFactor)`).
+  - Y-axis label typography, widths (`Math.Round(38 * scaleFactor)`), and gridline offsets.
+  - Focus bar geometry, corner radii (`Math.Round(2 * scaleFactor)`), and dynamic bar width clamping.
+  - X-axis date, day, month, and week labels and tick spacing.
+- **Insights Rail**: Proportional scaling across all 4 insight cards, streak groups, metric values, and stacked layout.
+
+### 4. Zero-Flicker Settings Surface Scaling (`_scaleUpdaters`)
+- In-place scale delegate registration (`RegisterScaleAction`) preserves active UI state, text focus, combobox selections, and color flyout pickers without rebuilding the visual tree:
+  - Form controls: Numeric textboxes (`_workMinutes`, `_breakMinutes`), comboboxes (`_appearance`, `_contrast`, `_timeFormat`, `_uiScale`, `_lightPreset`, `_darkPreset`), toggle switches, and preview buttons.
+  - Nested card hierarchy: `SESSION`, `APPEARANCE`, `SHORTCUTS`, `ADVANCED` top-level cards and sub-cards with scalable headers, chevrons, dividers, and card paddings.
+  - Setting rows: Row min-height (`Math.Round(52 * factor)`), column spacing (`Math.Round(24 * factor)`), title font size (`Math.Round(13 * factor)`), description font size (`Math.Round(12 * factor)`), and padding.
+  - Color pickers: Interactive swatches (`20 * factor`), hex codes (`12 * factor`), flyout width (`280 * factor`), and preset buttons.
+  - Shortcut controls: Custom global shortcut button (`120 * factor` min width, Consolas `12 * factor`), reset button, and error text.
 
 ---
 

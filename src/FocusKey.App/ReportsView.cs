@@ -34,6 +34,16 @@ internal sealed class ReportsView : UserControl, IDisposable
     private Contrast _contrast = Contrast.Standard;
     private Button? _nextButton;
     private bool? _lastBuiltYearEligible;
+    private double _scaleFactor = 1.0;
+    private int _uiScalePercent = UiScaleLevels.DefaultPercent;
+    private readonly TextBlock _title;
+    private readonly Grid _topHeader;
+    private readonly Grid _navGrid;
+    private readonly StackPanel _navRow;
+    private readonly StackPanel _mainPanel;
+    private readonly List<Button> _navButtons = new();
+    private readonly List<FontIcon> _navIcons = new();
+
     internal void ApplyColors(SessionColors colors) { _colors = colors; Render(); }
 
     internal ReportsView(ReportsService service, Action<Exception> report)
@@ -54,66 +64,67 @@ internal sealed class ReportsView : UserControl, IDisposable
         // Build segmented period selector (Year segment hidden initially unless eligible or preview override enabled)
         BuildPeriodSelector(IsYearlyPreviewEnabled());
 
-        var panel = new StackPanel { Spacing = 16, HorizontalAlignment = HorizontalAlignment.Stretch };
+        _mainPanel = new StackPanel { Spacing = 16, HorizontalAlignment = HorizontalAlignment.Stretch };
 
         // 1. Top header row: "Reports" title on left, segmented period selector on right (exact Figma layout)
-        var topHeader = new Grid { HorizontalAlignment = HorizontalAlignment.Stretch, Margin = new Thickness(0, 0, 0, 4) };
-        topHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        topHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        _topHeader = new Grid { HorizontalAlignment = HorizontalAlignment.Stretch, Margin = new Thickness(0, 0, 0, 4) };
+        _topHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        _topHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-        var title = new TextBlock
+        _title = new TextBlock
         {
             Text = "Reports",
             Style = (Style)Application.Current.Resources["FkPageTitleText"],
             VerticalAlignment = VerticalAlignment.Center
         };
-        AutomationProperties.SetHeadingLevel(title, Microsoft.UI.Xaml.Automation.Peers.AutomationHeadingLevel.Level1);
-        topHeader.Children.Add(title);
+        AutomationProperties.SetHeadingLevel(_title, Microsoft.UI.Xaml.Automation.Peers.AutomationHeadingLevel.Level1);
+        _topHeader.Children.Add(_title);
 
         _periodSelector.HorizontalAlignment = HorizontalAlignment.Right;
         Grid.SetColumn(_periodSelector, 1);
-        topHeader.Children.Add(_periodSelector);
+        _topHeader.Children.Add(_periodSelector);
 
         // 2. Sub-header row: date range description on left, navigation controls on right
-        var navGrid = new Grid { ColumnSpacing = 12, RowSpacing = 8, HorizontalAlignment = HorizontalAlignment.Stretch };
-        navGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        navGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        navGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        navGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        _navGrid = new Grid { ColumnSpacing = 12, RowSpacing = 8, HorizontalAlignment = HorizontalAlignment.Stretch };
+        _navGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        _navGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        _navGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        _navGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
         _dateSubtitle.VerticalAlignment = VerticalAlignment.Center;
-        navGrid.Children.Add(_dateSubtitle);
+        _navGrid.Children.Add(_dateSubtitle);
 
-        var navRow = new StackPanel
+        _navRow = new StackPanel
         {
             Orientation = Orientation.Horizontal,
             Spacing = 6,
             HorizontalAlignment = HorizontalAlignment.Right,
             VerticalAlignment = VerticalAlignment.Center
         };
-        navRow.Children.Add(NavButton(new FontIcon { Glyph = "\uE76B", FontSize = 12 }, () => _reports.MoveAsync(-1), "Previous period", "Previous period"));
-        navRow.Children.Add(_date);
+        _navRow.Children.Add(NavButton(new FontIcon { Glyph = "\uE76B", FontSize = 12 }, () => _reports.MoveAsync(-1), "Previous period", "Previous period"));
+        _navRow.Children.Add(_date);
         _nextButton = NavButton(new FontIcon { Glyph = "\uE76C", FontSize = 12 }, () => _reports.MoveAsync(1), "Next period", "Next period");
-        navRow.Children.Add(_nextButton);
-        navRow.Children.Add(NavButton("Current", _reports.CurrentAsync, "Current period", "Current period"));
-        navRow.Children.Add(NavButton(new FontIcon { Glyph = "\uE72C", FontSize = 12 }, _reports.RefreshAsync, "Refresh reports", "Refresh"));
-        Grid.SetColumn(navRow, 1);
-        navGrid.Children.Add(navRow);
+        _navRow.Children.Add(_nextButton);
+        _navRow.Children.Add(NavButton("Current", _reports.CurrentAsync, "Current period", "Current period"));
+        _navRow.Children.Add(NavButton(new FontIcon { Glyph = "\uE72C", FontSize = 12 }, _reports.RefreshAsync, "Refresh reports", "Refresh"));
+        Grid.SetColumn(_navRow, 1);
+        _navGrid.Children.Add(_navRow);
 
-        navGrid.SizeChanged += (_, _) =>
+        _navGrid.SizeChanged += (_, _) =>
         {
-            bool narrow = navGrid.ActualWidth > 0 && navGrid.ActualWidth < 540;
-            Grid.SetRow(navRow, narrow ? 1 : 0);
-            Grid.SetColumn(navRow, narrow ? 0 : 1);
-            Grid.SetColumnSpan(navRow, narrow ? 2 : 1);
-            navRow.HorizontalAlignment = narrow ? HorizontalAlignment.Left : HorizontalAlignment.Right;
+            double factor = _scaleFactor;
+            bool narrow = _navGrid.ActualWidth > 0 && _navGrid.ActualWidth < 540 * factor;
+            Grid.SetRow(_navRow, narrow ? 1 : 0);
+            Grid.SetColumn(_navRow, narrow ? 0 : 1);
+            Grid.SetColumnSpan(_navRow, narrow ? 2 : 1);
+            _navRow.HorizontalAlignment = narrow ? HorizontalAlignment.Left : HorizontalAlignment.Right;
         };
 
-        panel.Children.Add(topHeader);
-        panel.Children.Add(navGrid);
-        panel.Children.Add(_status);
-        panel.Children.Add(_results);
-        Content = panel;
+        _mainPanel.Children.Add(_topHeader);
+        _mainPanel.Children.Add(_navGrid);
+        _mainPanel.Children.Add(_status);
+        _mainPanel.Children.Add(_results);
+        Content = _mainPanel;
 
         _date.DateChanged += async (_, _) => { if (!_rendering && _date.Date is { } date) await _reports.SelectAsync(_reports.Period, DateOnly.FromDateTime(date.DateTime)); };
         _reports.Changed += Render;
@@ -131,8 +142,9 @@ internal sealed class ReportsView : UserControl, IDisposable
         var border = new Border
         {
             Style = (Style)Application.Current.Resources["FkSegmentContainer"],
+            Padding = new Thickness(Math.Round(2 * _scaleFactor))
         };
-        var stack = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2 };
+        var stack = new StackPanel { Orientation = Orientation.Horizontal, Spacing = Math.Round(2 * _scaleFactor) };
         foreach (var period in Enum.GetValues<ReportPeriod>())
         {
             if (period == ReportPeriod.Yearly && !isYearEligible)
@@ -153,6 +165,9 @@ internal sealed class ReportsView : UserControl, IDisposable
                 Content = label,
                 Tag = period,
                 Style = (Style)Application.Current.Resources["FkSegmentInactive"],
+                FontSize = Math.Round(12 * _scaleFactor),
+                Padding = new Thickness(Math.Round(12 * _scaleFactor), Math.Round(6 * _scaleFactor), Math.Round(12 * _scaleFactor), Math.Round(6 * _scaleFactor)),
+                MinHeight = Math.Round(28 * _scaleFactor)
             };
             AutomationProperties.SetName(btn, $"{period} reports");
             btn.Click += async (s, _) =>
@@ -166,6 +181,28 @@ internal sealed class ReportsView : UserControl, IDisposable
         border.Child = stack;
         _periodSelector.Children.Add(border);
         _lastBuiltYearEligible = isYearEligible;
+    }
+
+    private void ScalePeriodSelector()
+    {
+        if (_periodSelector.Children.Count == 0) return;
+        if (_periodSelector.Children[0] is Border border)
+        {
+            border.Padding = new Thickness(Math.Round(2 * _scaleFactor));
+            if (border.Child is StackPanel stack)
+            {
+                stack.Spacing = Math.Round(2 * _scaleFactor);
+                foreach (var child in stack.Children)
+                {
+                    if (child is Button btn)
+                    {
+                        btn.FontSize = Math.Round(12 * _scaleFactor);
+                        btn.Padding = new Thickness(Math.Round(12 * _scaleFactor), Math.Round(6 * _scaleFactor), Math.Round(12 * _scaleFactor), Math.Round(6 * _scaleFactor));
+                        btn.MinHeight = Math.Round(28 * _scaleFactor);
+                    }
+                }
+            }
+        }
     }
 
     private void UpdatePeriodHighlight()
@@ -202,6 +239,51 @@ internal sealed class ReportsView : UserControl, IDisposable
         Render();
     }
 
+    internal void ApplyUiScale(int percent)
+    {
+        int clamped = UiScaleLevels.IsValid(percent) ? percent : UiScaleLevels.DefaultPercent;
+        _uiScalePercent = clamped;
+        _scaleFactor = UiScaleLevels.ToFactor(clamped);
+
+        UpdateStaticScales();
+        Render();
+    }
+
+    private void UpdateStaticScales()
+    {
+        double factor = _scaleFactor;
+        _title.FontSize = Math.Round(28 * factor);
+        _topHeader.Margin = new Thickness(0, 0, 0, Math.Round(4 * factor));
+
+        _navGrid.ColumnSpacing = Math.Round(12 * factor);
+        _navGrid.RowSpacing = Math.Round(8 * factor);
+        _navRow.Spacing = Math.Round(6 * factor);
+        _results.Spacing = Math.Round(12 * factor);
+        _mainPanel.Spacing = Math.Round(16 * factor);
+
+        _date.Width = Math.Round(140 * factor);
+        _date.Height = Math.Round(32 * factor);
+        _date.FontSize = Math.Round(12 * factor);
+
+        _dateSubtitle.FontSize = Math.Round(11 * factor);
+        _status.FontSize = Math.Round(12 * factor);
+
+        foreach (var btn in _navButtons)
+        {
+            btn.MinWidth = Math.Round(32 * factor);
+            btn.Height = Math.Round(32 * factor);
+            btn.FontSize = Math.Round(12 * factor);
+            btn.Padding = new Thickness(Math.Round(8 * factor), 0, Math.Round(8 * factor), 0);
+        }
+
+        foreach (var icon in _navIcons)
+        {
+            icon.FontSize = Math.Round(12 * factor);
+        }
+
+        ScalePeriodSelector();
+    }
+
     private void Render()
     {
         try
@@ -223,7 +305,7 @@ internal sealed class ReportsView : UserControl, IDisposable
             {
                 _dateSubtitle.Text = string.Empty;
                 if (!_reports.IsRefreshing && _reports.Error is null)
-                    _results.Children.Add(Card(Presentation.Text("Choose a reporting period to view completed sessions.")));
+                    _results.Children.Add(Card(Presentation.Text("Choose a reporting period to view completed sessions.", Math.Round(13 * _scaleFactor)), Math.Round(20 * _scaleFactor)));
                 return;
             }
 
@@ -236,7 +318,7 @@ internal sealed class ReportsView : UserControl, IDisposable
             _dateSubtitle.Text = $"{rangeText}  ·  {snapshot.TimeZone.DisplayName}";
 
             // 3-column metric tiles matching design hierarchy: Summary -> Main Chart -> Useful Insights
-            var metrics = new Grid { ColumnSpacing = 8 };
+            var metrics = new Grid { ColumnSpacing = Math.Round(8 * _scaleFactor) };
             for (var i = 0; i < 3; i++) metrics.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             var (card1, val1) = Metric("Focus Time", ReportsFormatting.FormatDuration(totals.FocusTime), "total focus", 0);
             var (card2, val2) = Metric("Work Sessions", totals.CompletedWork.ToString(CultureInfo.InvariantCulture), totals.WorkStarted > totals.CompletedWork ? $"{totals.WorkStarted} started" : "completed", 1);
@@ -248,9 +330,14 @@ internal sealed class ReportsView : UserControl, IDisposable
             metrics.SizeChanged += (_, _) =>
             {
                 if (metrics.ActualWidth <= 0) return;
-                bool compact = metrics.ActualWidth < 540;
-                double fontSize = compact ? 21 : 30;
-                var pad = new Thickness(compact ? 12 : 22, compact ? 16 : 20, compact ? 12 : 22, compact ? 16 : 20);
+                double factor = _scaleFactor;
+                bool compact = metrics.ActualWidth < 540 * factor;
+                double fontSize = Math.Round((compact ? 21 : 30) * factor);
+                var pad = new Thickness(
+                    Math.Round((compact ? 12 : 22) * factor),
+                    Math.Round((compact ? 16 : 20) * factor),
+                    Math.Round((compact ? 12 : 22) * factor),
+                    Math.Round((compact ? 16 : 20) * factor));
                 card1.Padding = pad; val1.FontSize = fontSize;
                 card2.Padding = pad; val2.FontSize = fontSize;
                 card3.Padding = pad; val3.FontSize = fontSize;
@@ -264,8 +351,8 @@ internal sealed class ReportsView : UserControl, IDisposable
             var contentGrid = new Grid
             {
                 HorizontalAlignment = HorizontalAlignment.Stretch,
-                RowSpacing = 12,
-                ColumnSpacing = 12
+                RowSpacing = Math.Round(12 * _scaleFactor),
+                ColumnSpacing = Math.Round(12 * _scaleFactor)
             };
 
             var chart = ChartCard(snapshot);
@@ -278,7 +365,8 @@ internal sealed class ReportsView : UserControl, IDisposable
             Action updateLayout = () =>
             {
                 double width = contentGrid.ActualWidth;
-                bool isWide = width <= 0 || width >= 860;
+                double factor = _scaleFactor;
+                bool isWide = width <= 0 || width >= 860 * factor;
                 if (lastWide == isWide) return;
                 lastWide = isWide;
 
@@ -288,7 +376,7 @@ internal sealed class ReportsView : UserControl, IDisposable
                 if (isWide)
                 {
                     // Dominant chart hero (~72%) + Insights rail (~28%)
-                    contentGrid.ColumnSpacing = 16;
+                    contentGrid.ColumnSpacing = Math.Round(16 * factor);
                     contentGrid.RowSpacing = 0;
                     contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(72, GridUnitType.Star) });
                     contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(28, GridUnitType.Star) });
@@ -306,7 +394,7 @@ internal sealed class ReportsView : UserControl, IDisposable
                 {
                     // Restored / narrow stacked mode
                     contentGrid.ColumnSpacing = 0;
-                    contentGrid.RowSpacing = 16;
+                    contentGrid.RowSpacing = Math.Round(16 * factor);
                     contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                     contentGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
                     contentGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -334,6 +422,7 @@ internal sealed class ReportsView : UserControl, IDisposable
 
     private FrameworkElement InsightsRailCard(ReportsSnapshot snapshot)
     {
+        double factor = _scaleFactor;
         var mainGrid = new Grid
         {
             HorizontalAlignment = HorizontalAlignment.Stretch,
@@ -356,17 +445,17 @@ internal sealed class ReportsView : UserControl, IDisposable
             if (snapshot.Totals.Started == 0 && snapshot.Totals.FocusTime == TimeSpan.Zero)
             {
                 var outerPanel = new StackPanel { Spacing = 0, HorizontalAlignment = HorizontalAlignment.Stretch };
-                var header = Presentation.DimText("INSIGHTS", 11);
+                var header = Presentation.DimText("INSIGHTS", Math.Round(11 * factor));
                 if (Application.Current?.Resources["FkSectionText"] is Style secStyle) header.Style = secStyle;
-                header.Margin = new Thickness(0, 2, 0, 14);
+                header.Margin = new Thickness(0, Math.Round(2 * factor), 0, Math.Round(14 * factor));
                 outerPanel.Children.Add(header);
 
-                var emptyPanel = new StackPanel { Spacing = 6, Margin = new Thickness(0, 4, 0, 0) };
-                var emptyTitle = Presentation.Text("No session activity", 13);
+                var emptyPanel = new StackPanel { Spacing = Math.Round(6 * factor), Margin = new Thickness(0, Math.Round(4 * factor), 0, 0) };
+                var emptyTitle = Presentation.Text("No session activity", Math.Round(13 * factor));
                 emptyTitle.FontWeight = FontWeights.SemiBold;
-                var emptyDesc = Presentation.DimText("Focus time, streaks, peak days, and period comparisons will appear here once you record sessions.", 11);
+                var emptyDesc = Presentation.DimText("Focus time, streaks, peak days, and period comparisons will appear here once you record sessions.", Math.Round(11 * factor));
                 emptyDesc.TextWrapping = TextWrapping.Wrap;
-                emptyDesc.LineHeight = 18;
+                emptyDesc.LineHeight = Math.Round(18 * factor);
                 emptyPanel.Children.Add(emptyTitle);
                 emptyPanel.Children.Add(emptyDesc);
                 outerPanel.Children.Add(emptyPanel);
@@ -414,11 +503,11 @@ internal sealed class ReportsView : UserControl, IDisposable
                     diffLabel = $"Same focus as {periodName}";
                 }
 
-                items.Add(CreateInsightItem(diffValue, diffLabel));
+                items.Add(CreateInsightItem(diffValue, diffLabel, null, factor));
             }
 
             // 2. Streaks (distinct, balanced statistics for current and longest streak)
-            items.Add(CreateStreaksInsightGroup(snapshot.Streaks.CurrentStreak, snapshot.Streaks.LongestStreak));
+            items.Add(CreateStreaksInsightGroup(snapshot.Streaks.CurrentStreak, snapshot.Streaks.LongestStreak, factor));
 
             // 3. Strongest day / week / month
             if (snapshot.Trend.Count > 0)
@@ -453,7 +542,7 @@ internal sealed class ReportsView : UserControl, IDisposable
                         strongestLabel = "Strongest week";
                     }
 
-                    items.Add(CreateInsightItem(strongestValue, strongestLabel, strongestSub));
+                    items.Add(CreateInsightItem(strongestValue, strongestLabel, strongestSub, factor));
                 }
             }
 
@@ -467,7 +556,7 @@ internal sealed class ReportsView : UserControl, IDisposable
                     string activeLabel = "Active focus days";
                     TimeSpan dailyAvg = TimeSpan.FromTicks(snapshot.Totals.FocusTime.Ticks / 7);
                     string activeSub = $"Daily avg: {ReportsFormatting.FormatDuration(dailyAvg)}";
-                    items.Add(CreateInsightItem(activeValue, activeLabel, activeSub));
+                    items.Add(CreateInsightItem(activeValue, activeLabel, activeSub, factor));
                 }
             }
             else if (snapshot.Period == ReportPeriod.Monthly)
@@ -480,7 +569,7 @@ internal sealed class ReportsView : UserControl, IDisposable
                     string activeLabel = "Active focus weeks";
                     TimeSpan weeklyAvg = TimeSpan.FromTicks(snapshot.Totals.FocusTime.Ticks / totalWeeks);
                     string activeSub = $"Weekly avg: {ReportsFormatting.FormatDuration(weeklyAvg)}";
-                    items.Add(CreateInsightItem(activeValue, activeLabel, activeSub));
+                    items.Add(CreateInsightItem(activeValue, activeLabel, activeSub, factor));
                 }
             }
             else if (snapshot.Period == ReportPeriod.Yearly)
@@ -495,21 +584,21 @@ internal sealed class ReportsView : UserControl, IDisposable
                     string activeLabel = "Active focus months";
                     TimeSpan monthlyAvg = TimeSpan.FromTicks(snapshot.Totals.FocusTime.Ticks / Math.Max(1, elapsedMonths));
                     string activeSub = $"Monthly avg: {ReportsFormatting.FormatDuration(monthlyAvg)}";
-                    items.Add(CreateInsightItem(activeValue, activeLabel, activeSub));
+                    items.Add(CreateInsightItem(activeValue, activeLabel, activeSub, factor));
                 }
             }
 
-            bool twoColumns = actualWidth >= 420;
+            bool twoColumns = actualWidth >= 420 * factor;
             if (twoColumns && items.Count > 1)
             {
                 // Wide stacked layout: 2 columns
                 var outerPanel = new StackPanel { Spacing = 0, HorizontalAlignment = HorizontalAlignment.Stretch };
-                var header = Presentation.DimText("INSIGHTS", 11);
+                var header = Presentation.DimText("INSIGHTS", Math.Round(11 * factor));
                 if (Application.Current?.Resources["FkSectionText"] is Style secStyle) header.Style = secStyle;
-                header.Margin = new Thickness(0, 2, 0, 14);
+                header.Margin = new Thickness(0, Math.Round(2 * factor), 0, Math.Round(14 * factor));
                 outerPanel.Children.Add(header);
 
-                var itemsGrid = new Grid { ColumnSpacing = 24, RowSpacing = 16 };
+                var itemsGrid = new Grid { ColumnSpacing = Math.Round(24 * factor), RowSpacing = Math.Round(16 * factor) };
                 itemsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 itemsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
@@ -530,7 +619,6 @@ internal sealed class ReportsView : UserControl, IDisposable
             else
             {
                 // Single column vertical layout (Side rail or narrow stacked)
-                // Use a vertical Grid that distributes the items evenly across the full height of the card
                 var railGrid = new Grid
                 {
                     HorizontalAlignment = HorizontalAlignment.Stretch,
@@ -539,9 +627,9 @@ internal sealed class ReportsView : UserControl, IDisposable
 
                 // Row 0: Header
                 railGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                var header = Presentation.DimText("INSIGHTS", 11);
+                var header = Presentation.DimText("INSIGHTS", Math.Round(11 * factor));
                 if (Application.Current?.Resources["FkSectionText"] is Style secStyle) header.Style = secStyle;
-                header.Margin = new Thickness(0, 2, 0, 8);
+                header.Margin = new Thickness(0, Math.Round(2 * factor), 0, Math.Round(8 * factor));
                 Grid.SetRow(header, 0);
                 railGrid.Children.Add(header);
 
@@ -558,7 +646,7 @@ internal sealed class ReportsView : UserControl, IDisposable
                             HorizontalAlignment = HorizontalAlignment.Stretch,
                             Background = (Application.Current?.Resources["CardStrokeColorDefaultBrush"] as Brush) ?? Presentation.ThemeBrush("FkBorder", true),
                             Opacity = 0.5,
-                            Margin = new Thickness(0, 4, 0, 4)
+                            Margin = new Thickness(0, Math.Round(4 * factor), 0, Math.Round(4 * factor))
                         };
                         Grid.SetRow(div, rowIndex);
                         railGrid.Children.Add(div);
@@ -583,8 +671,8 @@ internal sealed class ReportsView : UserControl, IDisposable
         {
             double w = args.NewSize.Width;
             if (w <= 0) return;
-            bool wasTwo = lastWidth >= 420;
-            bool isTwo = w >= 420;
+            bool wasTwo = lastWidth >= 420 * factor;
+            bool isTwo = w >= 420 * factor;
             if (lastWidth < 0 || wasTwo != isTwo)
             {
                 lastWidth = w;
@@ -594,35 +682,35 @@ internal sealed class ReportsView : UserControl, IDisposable
 
         RebuildInsights(0);
 
-        var card = Card(mainGrid, 22);
-        card.Padding = new Thickness(24, 20, 24, 20);
+        var card = Card(mainGrid, Math.Round(22 * factor));
+        card.Padding = new Thickness(Math.Round(24 * factor), Math.Round(20 * factor), Math.Round(24 * factor), Math.Round(20 * factor));
         card.VerticalAlignment = VerticalAlignment.Stretch;
         return card;
     }
 
-    private UIElement CreateStreaksInsightGroup(int currentStreak, int longestStreak)
+    private UIElement CreateStreaksInsightGroup(int currentStreak, int longestStreak, double factor = 1.0)
     {
-        var groupPanel = new StackPanel { Spacing = 4 };
-        var header = Presentation.DimText("STREAKS", 11);
+        var groupPanel = new StackPanel { Spacing = Math.Round(4 * factor) };
+        var header = Presentation.DimText("STREAKS", Math.Round(11 * factor));
         if (Application.Current?.Resources["FkSectionText"] is Style secStyle) header.Style = secStyle;
-        header.Margin = new Thickness(0, 0, 0, 2);
+        header.Margin = new Thickness(0, 0, 0, Math.Round(2 * factor));
         groupPanel.Children.Add(header);
 
-        var grid = new Grid { ColumnSpacing = 16 };
+        var grid = new Grid { ColumnSpacing = Math.Round(16 * factor) };
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
-        var currentCol = new StackPanel { Spacing = 2 };
-        var currentVal = CreateValueTextBlock($"{currentStreak} {(currentStreak == 1 ? "day" : "days")}");
-        var currentLbl = Presentation.Text("Current", 12);
+        var currentCol = new StackPanel { Spacing = Math.Round(2 * factor) };
+        var currentVal = CreateValueTextBlock($"{currentStreak} {(currentStreak == 1 ? "day" : "days")}", factor);
+        var currentLbl = Presentation.Text("Current", Math.Round(12 * factor));
         currentLbl.FontWeight = FontWeights.Medium;
         currentCol.Children.Add(currentVal);
         currentCol.Children.Add(currentLbl);
         Grid.SetColumn(currentCol, 0);
 
-        var longestCol = new StackPanel { Spacing = 2 };
-        var longestVal = CreateValueTextBlock($"{longestStreak} {(longestStreak == 1 ? "day" : "days")}");
-        var longestLbl = Presentation.Text("Longest", 12);
+        var longestCol = new StackPanel { Spacing = Math.Round(2 * factor) };
+        var longestVal = CreateValueTextBlock($"{longestStreak} {(longestStreak == 1 ? "day" : "days")}", factor);
+        var longestLbl = Presentation.Text("Longest", Math.Round(12 * factor));
         longestLbl.FontWeight = FontWeights.Medium;
         longestCol.Children.Add(longestVal);
         longestCol.Children.Add(longestLbl);
@@ -636,40 +724,40 @@ internal sealed class ReportsView : UserControl, IDisposable
         return groupPanel;
     }
 
-    private static TextBlock CreateValueTextBlock(string value)
+    private static TextBlock CreateValueTextBlock(string value, double factor = 1.0)
     {
         var valBlock = new TextBlock
         {
             Text = value,
-            FontSize = 20,
+            FontSize = Math.Round(20 * factor),
             FontFamily = new FontFamily("Consolas"),
             FontWeight = FontWeights.SemiBold,
             Language = "en-US",
             FlowDirection = FlowDirection.LeftToRight,
             TextReadingOrder = TextReadingOrder.UseFlowDirection,
-            Margin = new Thickness(0, 0, 0, 2)
+            Margin = new Thickness(0, 0, 0, Math.Round(2 * factor))
         };
         if (Application.Current?.Resources["FkMetricValueText"] is Style metricStyle)
         {
             valBlock.Style = metricStyle;
-            valBlock.FontSize = 20;
-            valBlock.Margin = new Thickness(0, 0, 0, 2);
+            valBlock.FontSize = Math.Round(20 * factor);
+            valBlock.Margin = new Thickness(0, 0, 0, Math.Round(2 * factor));
         }
         return valBlock;
     }
 
-    private UIElement CreateInsightItem(string value, string label, string? subtext = null)
+    private UIElement CreateInsightItem(string value, string label, string? subtext = null, double factor = 1.0)
     {
-        var itemPanel = new StackPanel { Spacing = 2 };
-        var valBlock = CreateValueTextBlock(value);
-        var labelBlock = Presentation.Text(label, 12);
+        var itemPanel = new StackPanel { Spacing = Math.Round(2 * factor) };
+        var valBlock = CreateValueTextBlock(value, factor);
+        var labelBlock = Presentation.Text(label, Math.Round(12 * factor));
         labelBlock.FontWeight = FontWeights.Medium;
         itemPanel.Children.Add(valBlock);
         itemPanel.Children.Add(labelBlock);
 
         if (!string.IsNullOrEmpty(subtext))
         {
-            var subBlock = Presentation.DimText(subtext, 11);
+            var subBlock = Presentation.DimText(subtext, Math.Round(11 * factor));
             itemPanel.Children.Add(subBlock);
         }
 
@@ -687,15 +775,16 @@ internal sealed class ReportsView : UserControl, IDisposable
 
     private FrameworkElement ChartCard(ReportsSnapshot snapshot)
     {
-        var body = new StackPanel { Spacing = 14 };
+        double factor = _scaleFactor;
+        var body = new StackPanel { Spacing = Math.Round(14 * factor) };
 
         // Header: title + subtitle on left, work swatch / legend on right
         var header = new Grid();
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-        var titleStack = new StackPanel { Spacing = 2 };
-        var title = Presentation.Text("Focus Activity", 15);
+        var titleStack = new StackPanel { Spacing = Math.Round(2 * factor) };
+        var title = Presentation.Text("Focus Activity", Math.Round(15 * factor));
         title.FontWeight = FontWeights.SemiBold;
         titleStack.Children.Add(title);
 
@@ -706,71 +795,72 @@ internal sealed class ReportsView : UserControl, IDisposable
             ReportPeriod.Yearly => $"Monthly breakdown for {snapshot.Range.Start.Year}",
             _ => string.Empty
         };
-        var subtitle = Presentation.DimText(subtitleText, 11);
+        var subtitle = Presentation.DimText(subtitleText, Math.Round(11 * factor));
         titleStack.Children.Add(subtitle);
         header.Children.Add(titleStack);
 
         var palette = ReportsPalette.Resolve(ActualTheme, _contrast);
-        var legend = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12, VerticalAlignment = VerticalAlignment.Center };
-        legend.Children.Add(Swatch("Focus Time", palette.Work));
+        var legend = new StackPanel { Orientation = Orientation.Horizontal, Spacing = Math.Round(12 * factor), VerticalAlignment = VerticalAlignment.Center };
+        legend.Children.Add(Swatch("Focus Time", palette.Work, factor));
         Grid.SetColumn(legend, 1);
         header.Children.Add(legend);
 
         body.Children.Add(header);
 
-        var chart = new ReportsChart(snapshot.Trend, snapshot.Period, palette, _reports.CurrentDate());
+        var chart = new ReportsChart(snapshot.Trend, snapshot.Period, palette, _reports.CurrentDate(), factor);
         AutomationProperties.SetName(chart, "Focus activity trend chart");
         body.Children.Add(chart);
 
-        var card2 = Card(body, 22);
-        card2.Padding = new Thickness(24, 22, 24, 22);
+        var card2 = Card(body, Math.Round(22 * factor));
+        card2.Padding = new Thickness(Math.Round(24 * factor), Math.Round(22 * factor), Math.Round(24 * factor), Math.Round(22 * factor));
         card2.VerticalAlignment = VerticalAlignment.Stretch;
         return card2;
     }
     private (Border Card, TextBlock Value) Metric(string label, string value, string sub, int column)
     {
-        var p = new StackPanel { Spacing = 4 };
+        double factor = _scaleFactor;
+        var p = new StackPanel { Spacing = Math.Round(4 * factor) };
         var valueText = new TextBlock
         {
             Text = value,
-            FontSize = 28,
+            FontSize = Math.Round(30 * factor),
             FontFamily = new FontFamily("Consolas"),
             FontWeight = Microsoft.UI.Text.FontWeights.Normal,
             Language = "en-US",
             FlowDirection = FlowDirection.LeftToRight,
             TextReadingOrder = TextReadingOrder.UseFlowDirection,
-            Margin = new Thickness(0, 0, 0, 4)
+            Margin = new Thickness(0, 0, 0, Math.Round(4 * factor))
         };
         if (Application.Current?.Resources["FkMetricValueText"] is Style metricStyle)
         {
             valueText.Style = metricStyle;
-            valueText.FontSize = 30;
-            valueText.Margin = new Thickness(0, 0, 0, 4);
+            valueText.FontSize = Math.Round(30 * factor);
+            valueText.Margin = new Thickness(0, 0, 0, Math.Round(4 * factor));
         }
         p.Children.Add(valueText);
-        var labelText = Presentation.Text(label, 12);
+        var labelText = Presentation.Text(label, Math.Round(12 * factor));
         labelText.FontWeight = Microsoft.UI.Text.FontWeights.Medium;
         p.Children.Add(labelText);
-        p.Children.Add(Presentation.DimText(sub, 11));
-        var b = Card(p, 20);
-        b.Padding = new Thickness(22, 20, 22, 20);
+        p.Children.Add(Presentation.DimText(sub, Math.Round(11 * factor)));
+        var b = Card(p, Math.Round(20 * factor));
+        b.Padding = new Thickness(Math.Round(22 * factor), Math.Round(20 * factor), Math.Round(22 * factor), Math.Round(20 * factor));
         Grid.SetColumn(b, column);
         return (b, valueText);
     }
 
-    private static UIElement Swatch(string label, FocusKey.Foundation.Settings.HexColor color)
+    private static UIElement Swatch(string label, FocusKey.Foundation.Settings.HexColor color, double factor = 1.0)
     {
-        var p = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+        var p = new StackPanel { Orientation = Orientation.Horizontal, Spacing = Math.Round(6 * factor) };
         p.Children.Add(new Border
         {
-            Width = 10,
-            Height = 10,
+            Width = Math.Round(10 * factor),
+            Height = Math.Round(10 * factor),
             Background = SessionColorBrush.Create(color),
             BorderBrush = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", p),
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(2)
+            CornerRadius = new CornerRadius(Math.Round(2 * factor))
         });
-        p.Children.Add(Presentation.Text(label, 11, true));
+        p.Children.Add(Presentation.Text(label, Math.Round(11 * factor), true));
         return p;
     }
 
@@ -781,21 +871,23 @@ internal sealed class ReportsView : UserControl, IDisposable
         return b;
     }
 
-    private static Button NavButton(object content, Func<Task> action, string name, string? tooltip = null)
+    private Button NavButton(object content, Func<Task> action, string name, string? tooltip = null)
     {
         var b = new Button
         {
             Content = content,
-            MinWidth = 32,
-            Height = 32,
-            FontSize = 12,
-            Padding = new Thickness(8, 0, 8, 0),
+            MinWidth = Math.Round(32 * _scaleFactor),
+            Height = Math.Round(32 * _scaleFactor),
+            FontSize = Math.Round(12 * _scaleFactor),
+            Padding = new Thickness(Math.Round(8 * _scaleFactor), 0, Math.Round(8 * _scaleFactor), 0),
             VerticalAlignment = VerticalAlignment.Center,
             CornerRadius = (CornerRadius)(Application.Current?.Resources["FkControlRadius"] ?? new CornerRadius(4)),
         };
         AutomationProperties.SetName(b, name);
         if (!string.IsNullOrEmpty(tooltip)) ToolTipService.SetToolTip(b, tooltip);
         b.Click += async (_, _) => await action();
+        _navButtons.Add(b);
+        if (content is FontIcon icon) _navIcons.Add(icon);
         return b;
     }
 

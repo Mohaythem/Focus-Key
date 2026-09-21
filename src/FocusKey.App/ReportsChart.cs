@@ -17,19 +17,24 @@ namespace FocusKey;
 /// </summary>
 internal sealed class ReportsChart : Grid
 {
-    private const double TopHeadroom = 30;
-    private const double PlotAreaHeight = 300;
-    private const double TotalPlotHeight = TopHeadroom + PlotAreaHeight; // 330 DIP
+    private const double BaseTopHeadroom = 30;
+    private const double BasePlotAreaHeight = 300;
 
-    internal ReportsChart(IReadOnlyList<ReportBucket> trend, ReportPeriod period, ReportsPalette palette, DateOnly? currentDate = null)
+    internal ReportsChart(IReadOnlyList<ReportBucket> trend, ReportPeriod period, ReportsPalette palette, DateOnly? currentDate = null, double scaleFactor = 1.0)
     {
         Language = "en-US";
         FlowDirection = FlowDirection.LeftToRight;
 
-        ColumnSpacing = 8;
-        ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(46) });
+        double factor = Math.Clamp(scaleFactor, 0.8, 1.5);
+        double topHeadroom = Math.Round(BaseTopHeadroom * factor);
+        double plotAreaHeight = Math.Round(BasePlotAreaHeight * factor);
+        double totalPlotHeight = topHeadroom + plotAreaHeight;
+        double axisColWidth = Math.Round(46 * factor);
+
+        ColumnSpacing = Math.Round(8 * factor);
+        ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(axisColWidth) });
         ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        RowDefinitions.Add(new RowDefinition { Height = new GridLength(TotalPlotHeight) });
+        RowDefinitions.Add(new RowDefinition { Height = new GridLength(totalPlotHeight) });
         RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
         double effectiveMax = trend.Count == 0 ? 0 : trend.Max(b => b.Totals.FocusTime.TotalSeconds);
@@ -48,36 +53,36 @@ internal sealed class ReportsChart : Grid
         // 1. Y-Axis column (Column 0): ticks from 0h up to ceilingHours in stepHours steps
         var axisCanvas = new Canvas
         {
-            Width = 46,
-            Height = TotalPlotHeight,
+            Width = axisColWidth,
+            Height = totalPlotHeight,
             Language = "en-US",
             FlowDirection = FlowDirection.LeftToRight
         };
         for (int h = 0; h <= ceilingHours; h += stepHours)
         {
             double fraction = (double)h / ceilingHours;
-            double y = TopHeadroom + PlotAreaHeight * (1.0 - fraction);
+            double y = topHeadroom + plotAreaHeight * (1.0 - fraction);
             var label = new TextBlock
             {
                 Text = ReportsFormatting.FormatAxisHour(h),
                 Style = Application.Current?.Resources["FkMutedText"] as Style,
-                FontSize = 11,
+                FontSize = Math.Round(11 * factor),
                 FontWeight = FontWeights.Normal,
                 Foreground = secBrush,
-                Width = 40,
+                Width = Math.Round(40 * factor),
                 TextAlignment = TextAlignment.Right,
                 Language = "en-US",
                 FlowDirection = FlowDirection.LeftToRight,
                 TextReadingOrder = TextReadingOrder.UseFlowDirection
             };
             Canvas.SetLeft(label, 0);
-            Canvas.SetTop(label, y - 8);
+            Canvas.SetTop(label, y - Math.Round(8 * factor));
             axisCanvas.Children.Add(label);
         }
         Children.Add(axisCanvas);
 
         // 2. Plot Host (Column 1, Row 0): Grid lines + Focus bars
-        var plotGrid = new Grid { Height = TotalPlotHeight, HorizontalAlignment = HorizontalAlignment.Stretch };
+        var plotGrid = new Grid { Height = totalPlotHeight, HorizontalAlignment = HorizontalAlignment.Stretch };
         Grid.SetColumn(plotGrid, 1);
         Children.Add(plotGrid);
 
@@ -94,7 +99,7 @@ internal sealed class ReportsChart : Grid
         for (int h = 0; h <= ceilingHours; h += stepHours)
         {
             double fraction = (double)h / ceilingHours;
-            double y = TopHeadroom + PlotAreaHeight * (1.0 - fraction);
+            double y = topHeadroom + plotAreaHeight * (1.0 - fraction);
             var line = new Line
             {
                 X1 = 0,
@@ -119,8 +124,8 @@ internal sealed class ReportsChart : Grid
             {
                 X1 = 0,
                 X2 = 0,
-                Y1 = TopHeadroom,
-                Y2 = TopHeadroom + PlotAreaHeight,
+                Y1 = topHeadroom,
+                Y2 = topHeadroom + plotAreaHeight,
                 Stroke = gridStroke,
                 StrokeThickness = 1,
                 StrokeDashArray = new DoubleCollection { 3, 3 },
@@ -163,7 +168,7 @@ internal sealed class ReportsChart : Grid
                 {
                     Text = durationText,
                     Style = Application.Current?.Resources["FkText"] as Style,
-                    FontSize = period == ReportPeriod.Yearly ? 10 : 11,
+                    FontSize = Math.Round((period == ReportPeriod.Yearly ? 10 : 11) * factor),
                     FontFamily = new FontFamily("Consolas"),
                     FontWeight = FontWeights.SemiBold,
                     Foreground = fgBrush,
@@ -171,21 +176,21 @@ internal sealed class ReportsChart : Grid
                     Language = "en-US",
                     FlowDirection = FlowDirection.LeftToRight,
                     TextReadingOrder = TextReadingOrder.UseFlowDirection,
-                    Margin = new Thickness(0, 0, 0, 4)
+                    Margin = new Thickness(0, 0, 0, Math.Round(4 * factor))
                 };
                 barStack.Children.Add(durationLabel);
             }
 
             if (focusSecs > 0)
             {
-                double rawHeight = (focusSecs / (ceilingHours * 3600.0)) * PlotAreaHeight;
-                double barHeight = Math.Max(4, Math.Min(PlotAreaHeight, rawHeight));
+                double rawHeight = (focusSecs / (ceilingHours * 3600.0)) * plotAreaHeight;
+                double barHeight = Math.Max(Math.Round(4 * factor), Math.Min(plotAreaHeight, rawHeight));
                 var bar = new Border
                 {
                     Height = barHeight,
-                    Width = period == ReportPeriod.Yearly ? 28 : 44, // Dynamically adjusted on SizeChanged
+                    Width = period == ReportPeriod.Yearly ? Math.Round(28 * factor) : Math.Round(44 * factor), // Dynamically adjusted on SizeChanged
                     Background = SessionColorBrush.Create(palette.Work),
-                    CornerRadius = new CornerRadius(4, 4, 0, 0),
+                    CornerRadius = new CornerRadius(Math.Round(4 * factor), Math.Round(4 * factor), 0, 0),
                     HorizontalAlignment = HorizontalAlignment.Center,
                     VerticalAlignment = VerticalAlignment.Bottom
                 };
@@ -209,11 +214,11 @@ internal sealed class ReportsChart : Grid
         // Calm empty notice if zero activity across entire period
         if (effectiveMax <= 0)
         {
-            var emptyNotice = Presentation.DimText("No focus activity recorded for this period", 12);
+            var emptyNotice = Presentation.DimText("No focus activity recorded for this period", Math.Round(12 * factor));
             emptyNotice.Foreground = secBrush;
             emptyNotice.HorizontalAlignment = HorizontalAlignment.Center;
             emptyNotice.VerticalAlignment = VerticalAlignment.Center;
-            emptyNotice.Margin = new Thickness(0, TopHeadroom, 0, 0);
+            emptyNotice.Margin = new Thickness(0, topHeadroom, 0, 0);
             plotGrid.Children.Add(emptyNotice);
         }
 
@@ -247,13 +252,13 @@ internal sealed class ReportsChart : Grid
                     ReportPeriod.Monthly => 0.58,
                     _ => 0.72
                 };
-                double maxBarWidth = period switch
+                double maxBarWidth = Math.Round((period switch
                 {
                     ReportPeriod.Yearly => 64,
                     ReportPeriod.Monthly => 128,
                     _ => 116
-                };
-                double minBarWidth = period == ReportPeriod.Yearly ? 14 : 24;
+                }) * factor);
+                double minBarWidth = Math.Round((period == ReportPeriod.Yearly ? 14 : 24) * factor);
                 double dynamicBarWidth = Math.Clamp(Math.Floor(colW * fillRatio), minBarWidth, maxBarWidth);
                 foreach (var bar in barBorders)
                 {
@@ -263,7 +268,7 @@ internal sealed class ReportsChart : Grid
         };
 
         // 3. X-Axis Day/Week Labels (Row 1, Column 1)
-        var labelsGrid = new Grid { Margin = new Thickness(0, 8, 0, 0) };
+        var labelsGrid = new Grid { Margin = new Thickness(0, Math.Round(8 * factor), 0, 0) };
         Grid.SetRow(labelsGrid, 1);
         Grid.SetColumn(labelsGrid, 1);
 
@@ -276,7 +281,7 @@ internal sealed class ReportsChart : Grid
             var labelStack = new StackPanel
             {
                 HorizontalAlignment = HorizontalAlignment.Center,
-                Spacing = 2
+                Spacing = Math.Round(2 * factor)
             };
 
             if (period == ReportPeriod.Weekly &&
@@ -289,7 +294,7 @@ internal sealed class ReportsChart : Grid
                 var dateText = new TextBlock
                 {
                     Text = ReportsFormatting.FormatDayDate(day),
-                    FontSize = 11,
+                    FontSize = Math.Round(11 * factor),
                     FontWeight = isRightmost ? FontWeights.SemiBold : FontWeights.Normal,
                     Foreground = isRightmost ? fgBrush : secBrush,
                     HorizontalAlignment = HorizontalAlignment.Center,
@@ -300,7 +305,7 @@ internal sealed class ReportsChart : Grid
                 var dayText = new TextBlock
                 {
                     Text = ReportsFormatting.FormatDayOfWeek(day),
-                    FontSize = 10,
+                    FontSize = Math.Round(10 * factor),
                     FontWeight = isRightmost ? FontWeights.SemiBold : FontWeights.Normal,
                     Foreground = isRightmost ? fgBrush : secBrush,
                     HorizontalAlignment = HorizontalAlignment.Center,
@@ -324,7 +329,7 @@ internal sealed class ReportsChart : Grid
                 var monthText = new TextBlock
                 {
                     Text = ReportsFormatting.FormatYearMonth(i + 1),
-                    FontSize = 11,
+                    FontSize = Math.Round(11 * factor),
                     FontWeight = isCurrentMonth ? FontWeights.SemiBold : FontWeights.Normal,
                     Foreground = isCurrentMonth ? fgBrush : secBrush,
                     HorizontalAlignment = HorizontalAlignment.Center,
@@ -340,7 +345,7 @@ internal sealed class ReportsChart : Grid
                 var weekText = new TextBlock
                 {
                     Text = ReportsFormatting.FormatMonthWeek(i + 1),
-                    FontSize = 11,
+                    FontSize = Math.Round(11 * factor),
                     FontWeight = isRightmost ? FontWeights.SemiBold : FontWeights.Normal,
                     Foreground = isRightmost ? fgBrush : secBrush,
                     HorizontalAlignment = HorizontalAlignment.Center,

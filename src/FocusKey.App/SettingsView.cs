@@ -111,6 +111,11 @@ internal sealed class SettingsView : UserControl
     private Action<bool>? _setShortcutsExpanded;
     private Action<bool>? _setAdvancedExpanded;
 
+    private double _scaleFactor = 1.0;
+    private int _uiScalePercent = UiScaleLevels.DefaultPercent;
+    private readonly List<Action<double>> _scaleUpdaters = new();
+    private void RegisterScaleAction(Action<double> action) => _scaleUpdaters.Add(action);
+
     internal SettingsView(
         SettingsService settings,
         FocusKey.Foundation.History.HistoricalFocusService history,
@@ -173,8 +178,89 @@ internal sealed class SettingsView : UserControl
 
         HorizontalAlignment = HorizontalAlignment.Stretch;
 
+        RegisterScaleAction(factor =>
+        {
+            _workMinutes.Width = Math.Round(60 * factor);
+            _workMinutes.Height = Math.Round(32 * factor);
+            _workMinutes.FontSize = Math.Round(13 * factor);
+            _workMinutes.Padding = new Thickness(Math.Round(6 * factor), Math.Round(4 * factor), Math.Round(6 * factor), Math.Round(4 * factor));
+
+            _workSeconds.Width = Math.Round(60 * factor);
+            _workSeconds.Height = Math.Round(32 * factor);
+            _workSeconds.FontSize = Math.Round(13 * factor);
+            _workSeconds.Padding = new Thickness(Math.Round(6 * factor), Math.Round(4 * factor), Math.Round(6 * factor), Math.Round(4 * factor));
+
+            _breakMinutes.Width = Math.Round(60 * factor);
+            _breakMinutes.Height = Math.Round(32 * factor);
+            _breakMinutes.FontSize = Math.Round(13 * factor);
+            _breakMinutes.Padding = new Thickness(Math.Round(6 * factor), Math.Round(4 * factor), Math.Round(6 * factor), Math.Round(4 * factor));
+
+            _breakSeconds.Width = Math.Round(60 * factor);
+            _breakSeconds.Height = Math.Round(32 * factor);
+            _breakSeconds.FontSize = Math.Round(13 * factor);
+            _breakSeconds.Padding = new Thickness(Math.Round(6 * factor), Math.Round(4 * factor), Math.Round(6 * factor), Math.Round(4 * factor));
+
+            _appearance.MinWidth = Math.Round(160 * factor);
+            _appearance.Height = Math.Round(32 * factor);
+            _appearance.FontSize = Math.Round(12 * factor);
+
+            _contrast.MinWidth = Math.Round(160 * factor);
+            _contrast.Height = Math.Round(32 * factor);
+            _contrast.FontSize = Math.Round(12 * factor);
+
+            _timeFormat.MinWidth = Math.Round(160 * factor);
+            _timeFormat.Height = Math.Round(32 * factor);
+            _timeFormat.FontSize = Math.Round(12 * factor);
+
+            _uiScale.MinWidth = Math.Round(160 * factor);
+            _uiScale.Height = Math.Round(32 * factor);
+            _uiScale.FontSize = Math.Round(12 * factor);
+
+            _lightPreset.MinWidth = Math.Round(200 * factor);
+            _lightPreset.Height = Math.Round(32 * factor);
+            _lightPreset.FontSize = Math.Round(12 * factor);
+
+            _darkPreset.MinWidth = Math.Round(200 * factor);
+            _darkPreset.Height = Math.Round(32 * factor);
+            _darkPreset.FontSize = Math.Round(12 * factor);
+
+            _sessionSounds.FontSize = Math.Round(12 * factor);
+            _startSound.FontSize = Math.Round(12 * factor);
+            _completionSound.FontSize = Math.Round(12 * factor);
+            _startWithWindows.FontSize = Math.Round(12 * factor);
+
+            _startSoundPreviewButton.FontSize = Math.Round(12 * factor);
+            _startSoundPreviewButton.Height = Math.Round(32 * factor);
+            _startSoundPreviewButton.Padding = new Thickness(Math.Round(10 * factor), Math.Round(5 * factor), Math.Round(10 * factor), Math.Round(5 * factor));
+            _startSoundPreviewButton.CornerRadius = new CornerRadius(Math.Round(4 * factor));
+
+            _completionSoundPreviewButton.FontSize = Math.Round(12 * factor);
+            _completionSoundPreviewButton.Height = Math.Round(32 * factor);
+            _completionSoundPreviewButton.Padding = new Thickness(Math.Round(10 * factor), Math.Round(5 * factor), Math.Round(10 * factor), Math.Round(5 * factor));
+            _completionSoundPreviewButton.CornerRadius = new CornerRadius(Math.Round(4 * factor));
+
+            _resetOverlayPositionButton.FontSize = Math.Round(12 * factor);
+            _resetOverlayPositionButton.Height = Math.Round(32 * factor);
+            _resetOverlayPositionButton.Padding = new Thickness(Math.Round(12 * factor), Math.Round(6 * factor), Math.Round(12 * factor), Math.Round(6 * factor));
+
+            _importHistoryButton.FontSize = Math.Round(12 * factor);
+            _importHistoryButton.Height = Math.Round(32 * factor);
+            _importHistoryButton.Padding = new Thickness(Math.Round(12 * factor), Math.Round(6 * factor), Math.Round(12 * factor), Math.Round(6 * factor));
+
+            _exportHistoryButton.FontSize = Math.Round(12 * factor);
+            _exportHistoryButton.Height = Math.Round(32 * factor);
+            _exportHistoryButton.Padding = new Thickness(Math.Round(12 * factor), Math.Round(6 * factor), Math.Round(12 * factor), Math.Round(6 * factor));
+
+            _reload.FontSize = Math.Round(12 * factor);
+            _reload.Height = Math.Round(32 * factor);
+            _reload.Padding = new Thickness(Math.Round(12 * factor), Math.Round(6 * factor), Math.Round(12 * factor), Math.Round(6 * factor));
+
+            _status.FontSize = Math.Round(11 * factor);
+        });
+
         // 1. SESSION (Permanent Top-Level Card)
         var sessionLayout = new StackPanel { Spacing = 12 };
+        RegisterScaleAction(factor => sessionLayout.Spacing = Math.Round(12 * factor));
 
         // Sub-card A: DURATIONS
         var durationsPanel = new StackPanel { Spacing = 0 };
@@ -195,6 +281,7 @@ internal sealed class SettingsView : UserControl
 
         // 2. APPEARANCE (Collapsible Top-Level Card)
         var appearanceLayout = new StackPanel { Spacing = 12 };
+        RegisterScaleAction(factor => appearanceLayout.Spacing = Math.Round(12 * factor));
 
         // Sub-card A: SYSTEM APPEARANCE
         var systemAppearance = new StackPanel { Spacing = 0 };
@@ -253,6 +340,7 @@ internal sealed class SettingsView : UserControl
 
         // 3. SHORTCUTS (Collapsible Top-Level Card)
         var shortcutsLayout = new StackPanel { Spacing = 12 };
+        RegisterScaleAction(factor => shortcutsLayout.Spacing = Math.Round(12 * factor));
 
         // Sub-card A: QUICK OVERLAY
         var overlayShortcutPanel = new StackPanel { Spacing = 0 };
@@ -279,6 +367,7 @@ internal sealed class SettingsView : UserControl
 
         // 4. ADVANCED (Collapsible Top-Level Card)
         var advancedLayout = new StackPanel { Spacing = 12 };
+        RegisterScaleAction(factor => advancedLayout.Spacing = Math.Round(12 * factor));
 
         // Sub-card A: STARTUP
         var startupPanel = new StackPanel { Spacing = 0 };
@@ -340,6 +429,16 @@ internal sealed class SettingsView : UserControl
         panel.Children.Add(_editor);
         panel.Children.Add(footer);
         Content = panel;
+
+        RegisterScaleAction(factor =>
+        {
+            _fields.Spacing = Math.Round(16 * factor);
+            footer.Spacing = Math.Round(8 * factor);
+            footer.Margin = new Thickness(Math.Round(4 * factor), Math.Round(20 * factor), Math.Round(4 * factor), Math.Round(16 * factor));
+            title.FontSize = Math.Round(28 * factor);
+            topHeader.Margin = new Thickness(0, 0, 0, Math.Round(4 * factor));
+            panel.Spacing = Math.Round(16 * factor);
+        });
 
         _reload.Click += async (_, _) =>
         {
@@ -557,6 +656,7 @@ internal sealed class SettingsView : UserControl
         RefreshVisuals();
         Render();
         RefreshStartupToggle();
+        ApplyUiScale(UiScaleLevels.DefaultPercent);
     }
 
     internal async Task OpenAsync()
@@ -751,7 +851,19 @@ internal sealed class SettingsView : UserControl
         _applying = true;
         try
         {
-            UpdateUiScaleSelection(percent);
+            int clamped = UiScaleLevels.IsValid(percent)
+                ? percent
+                : (percent < UiScaleLevels.MinPercent ? UiScaleLevels.MinPercent : (percent > UiScaleLevels.MaxPercent ? UiScaleLevels.MaxPercent : UiScaleLevels.DefaultPercent));
+            _uiScalePercent = clamped;
+            double factor = UiScaleLevels.ToFactor(clamped);
+            _scaleFactor = factor;
+
+            UpdateUiScaleSelection(clamped);
+
+            for (int i = 0; i < _scaleUpdaters.Count; i++)
+            {
+                _scaleUpdaters[i](factor);
+            }
         }
         finally
         {
@@ -765,15 +877,7 @@ internal sealed class SettingsView : UserControl
     public void ApplySettings(ApplicationSettings settings)
     {
         if (settings is null) return;
-        _applying = true;
-        try
-        {
-            UpdateUiScaleSelection(settings.UiScalePercent);
-        }
-        finally
-        {
-            _applying = false;
-        }
+        ApplyUiScale(settings.UiScalePercent);
     }
 
     private void UpdateUiScaleSelection(int percent)
@@ -833,28 +937,38 @@ internal sealed class SettingsView : UserControl
     private static HexColor ColorValue(ColorPicker picker) =>
         HexColor.Parse($"#{picker.Color.R:X2}{picker.Color.G:X2}{picker.Color.B:X2}");
 
-    private static void ConfigureColor(Button button, ColorPicker picker, string name)
+    private void ConfigureColor(Button button, ColorPicker picker, string name)
     {
         var flyout = new Flyout { Content = picker };
         button.Flyout = flyout;
         button.Style = Application.Current?.Resources["FkColorButton"] as Style;
         button.VerticalAlignment = VerticalAlignment.Center;
         button.HorizontalAlignment = HorizontalAlignment.Right;
+
+        Border? swatch = null;
+        TextBlock? hexText = null;
+        StackPanel? preview = null;
+
         void Preview()
         {
             var color = ColorValue(picker);
-            var preview = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, VerticalAlignment = VerticalAlignment.Center };
-            var swatch = new Border
+            double factor = _scaleFactor;
+            preview = new StackPanel { Orientation = Orientation.Horizontal, Spacing = Math.Round(8 * factor), VerticalAlignment = VerticalAlignment.Center };
+            swatch = new Border
             {
                 Style = Application.Current?.Resources["FkSwatchBorder"] as Style,
                 Background = SessionColorBrush.Create(color),
-                VerticalAlignment = VerticalAlignment.Center
+                VerticalAlignment = VerticalAlignment.Center,
+                Width = Math.Round(20 * factor),
+                Height = Math.Round(20 * factor),
+                CornerRadius = new CornerRadius(Math.Round(4 * factor))
             };
-            var hexText = new TextBlock
+            hexText = new TextBlock
             {
                 Text = color.Value.ToUpperInvariant(),
                 Style = Application.Current?.Resources["FkColorHexText"] as Style,
-                VerticalAlignment = VerticalAlignment.Center
+                VerticalAlignment = VerticalAlignment.Center,
+                FontSize = Math.Round(12 * factor)
             };
             preview.Children.Add(swatch);
             preview.Children.Add(hexText);
@@ -863,6 +977,21 @@ internal sealed class SettingsView : UserControl
         }
         picker.ColorChanged += (_, _) => Preview();
         Preview();
+
+        RegisterScaleAction(factor =>
+        {
+            picker.Width = Math.Round(280 * factor);
+            button.Padding = new Thickness(Math.Round(12 * factor), Math.Round(6 * factor), Math.Round(12 * factor), Math.Round(6 * factor));
+            button.Height = Math.Round(32 * factor);
+            if (preview is not null) preview.Spacing = Math.Round(8 * factor);
+            if (swatch is not null)
+            {
+                swatch.Width = Math.Round(20 * factor);
+                swatch.Height = Math.Round(20 * factor);
+                swatch.CornerRadius = new CornerRadius(Math.Round(4 * factor));
+            }
+            if (hexText is not null) hexText.FontSize = Math.Round(12 * factor);
+        });
     }
 
     private static readonly (string Name, HexColor Color)[] WorkColorPresets =
@@ -887,6 +1016,7 @@ internal sealed class SettingsView : UserControl
     {
         var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right };
         var swatches = new List<Border>();
+        var presetButtons = new List<Button>();
 
         void UpdateSwatches(HexColor current)
         {
@@ -926,6 +1056,7 @@ internal sealed class SettingsView : UserControl
                 MinHeight = 20,
                 MinWidth = 20
             };
+            presetButtons.Add(btn);
             ToolTipService.SetToolTip(btn, $"{preset.Name} ({preset.Color.Value})");
             AutomationProperties.SetName(btn, $"{preset.Name}, {preset.Color.Value}");
 
@@ -956,6 +1087,24 @@ internal sealed class SettingsView : UserControl
         customButton.Margin = new Thickness(6, 0, 0, 0);
         panel.Children.Add(customButton);
         UpdateSwatches(ColorValue(picker));
+
+        RegisterScaleAction(factor =>
+        {
+            panel.Spacing = Math.Round(6 * factor);
+            customButton.Margin = new Thickness(Math.Round(6 * factor), 0, 0, 0);
+            for (int i = 0; i < swatches.Count; i++)
+            {
+                swatches[i].Width = Math.Round(20 * factor);
+                swatches[i].Height = Math.Round(20 * factor);
+                swatches[i].CornerRadius = new CornerRadius(Math.Round(4 * factor));
+            }
+            for (int i = 0; i < presetButtons.Count; i++)
+            {
+                presetButtons[i].MinWidth = Math.Round(20 * factor);
+                presetButtons[i].MinHeight = Math.Round(20 * factor);
+            }
+        });
+
         return panel;
     }
 
@@ -1048,6 +1197,21 @@ internal sealed class SettingsView : UserControl
             CancelShortcutListening();
             await ApplyNewShortcutAsync(GlobalShortcut.Default);
         };
+
+        RegisterScaleAction(factor =>
+        {
+            root.Spacing = Math.Round(6 * factor);
+            row.Spacing = Math.Round(8 * factor);
+            _shortcutButton.MinWidth = Math.Round(120 * factor);
+            _shortcutButton.Height = Math.Round(32 * factor);
+            _shortcutButton.Padding = new Thickness(Math.Round(12 * factor), Math.Round(6 * factor), Math.Round(12 * factor), Math.Round(6 * factor));
+            _shortcutText.FontSize = Math.Round(12 * factor);
+            _resetShortcutButton.FontSize = Math.Round(12 * factor);
+            _resetShortcutButton.Height = Math.Round(32 * factor);
+            _resetShortcutButton.Padding = new Thickness(Math.Round(10 * factor), Math.Round(6 * factor), Math.Round(10 * factor), Math.Round(6 * factor));
+            _resetShortcutButton.CornerRadius = new CornerRadius(Math.Round(4 * factor));
+            _shortcutError.FontSize = Math.Round(11 * factor);
+        });
 
         return root;
     }
@@ -1227,6 +1391,21 @@ internal sealed class SettingsView : UserControl
             await ApplyNewMainWindowShortcutAsync(GlobalShortcut.DefaultMainWindow);
         };
 
+        RegisterScaleAction(factor =>
+        {
+            root.Spacing = Math.Round(6 * factor);
+            row.Spacing = Math.Round(8 * factor);
+            _mainWindowShortcutButton.MinWidth = Math.Round(120 * factor);
+            _mainWindowShortcutButton.Height = Math.Round(32 * factor);
+            _mainWindowShortcutButton.Padding = new Thickness(Math.Round(12 * factor), Math.Round(6 * factor), Math.Round(12 * factor), Math.Round(6 * factor));
+            _mainWindowShortcutText.FontSize = Math.Round(12 * factor);
+            _resetMainWindowShortcutButton.FontSize = Math.Round(12 * factor);
+            _resetMainWindowShortcutButton.Height = Math.Round(32 * factor);
+            _resetMainWindowShortcutButton.Padding = new Thickness(Math.Round(10 * factor), Math.Round(6 * factor), Math.Round(10 * factor), Math.Round(6 * factor));
+            _resetMainWindowShortcutButton.CornerRadius = new CornerRadius(Math.Round(4 * factor));
+            _mainWindowShortcutError.FontSize = Math.Round(11 * factor);
+        });
+
         return root;
     }
 
@@ -1367,7 +1546,7 @@ internal sealed class SettingsView : UserControl
         return box;
     }
 
-    private static StackPanel DurationFields(TextBox minutes, TextBox seconds)
+    private StackPanel DurationFields(TextBox minutes, TextBox seconds)
     {
         var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right };
         panel.Children.Add(minutes);
@@ -1378,10 +1557,18 @@ internal sealed class SettingsView : UserControl
         var secondsLabel = Presentation.Text("sec", 12, true);
         secondsLabel.VerticalAlignment = VerticalAlignment.Center;
         panel.Children.Add(secondsLabel);
+
+        RegisterScaleAction(factor =>
+        {
+            panel.Spacing = Math.Round(8 * factor);
+            minutesLabel.FontSize = Math.Round(12 * factor);
+            secondsLabel.FontSize = Math.Round(12 * factor);
+        });
+
         return panel;
     }
 
-    private static StackPanel SoundActionFields(Button previewButton, ToggleSwitch toggle)
+    private StackPanel SoundActionFields(Button previewButton, ToggleSwitch toggle)
     {
         var panel = new StackPanel
         {
@@ -1392,6 +1579,12 @@ internal sealed class SettingsView : UserControl
         };
         panel.Children.Add(previewButton);
         panel.Children.Add(toggle);
+
+        RegisterScaleAction(factor =>
+        {
+            panel.Spacing = Math.Round(8 * factor);
+        });
+
         return panel;
     }
 
@@ -1425,6 +1618,13 @@ internal sealed class SettingsView : UserControl
         };
         panel.Children.Add(contentContainer);
 
+        RegisterScaleAction(factor =>
+        {
+            heading.FontSize = Math.Round(13 * factor);
+            heading.Margin = new Thickness(Math.Round(16 * factor), Math.Round(14 * factor), Math.Round(16 * factor), Math.Round(14 * factor));
+            contentContainer.Padding = new Thickness(Math.Round(14 * factor));
+        });
+
         card.Child = panel;
         return card;
     }
@@ -1441,6 +1641,7 @@ internal sealed class SettingsView : UserControl
         if (string.IsNullOrWhiteSpace(title))
         {
             border.Child = content;
+            RegisterScaleAction(factor => border.CornerRadius = new CornerRadius(Math.Round(6 * factor)));
             return border;
         }
 
@@ -1463,6 +1664,13 @@ internal sealed class SettingsView : UserControl
         };
         panel.Children.Add(divider);
         panel.Children.Add(content);
+
+        RegisterScaleAction(factor =>
+        {
+            border.CornerRadius = new CornerRadius(Math.Round(6 * factor));
+            heading.FontSize = Math.Round(11 * factor);
+            heading.Margin = new Thickness(Math.Round(16 * factor), Math.Round(12 * factor), Math.Round(16 * factor), Math.Round(10 * factor));
+        });
 
         border.Child = panel;
         return border;
@@ -1564,11 +1772,21 @@ internal sealed class SettingsView : UserControl
         rootPanel.Children.Add(divider);
         rootPanel.Children.Add(contentContainer);
 
+        RegisterScaleAction(factor =>
+        {
+            chevron.FontSize = Math.Round(11 * factor);
+            heading.FontSize = Math.Round(13 * factor);
+            headerButton.CornerRadius = new CornerRadius(Math.Round(8 * factor));
+            headerButton.Padding = new Thickness(Math.Round(16 * factor), Math.Round(14 * factor), Math.Round(16 * factor), Math.Round(14 * factor));
+            headerButton.MinHeight = Math.Round(48 * factor);
+            contentContainer.Padding = new Thickness(Math.Round(14 * factor));
+        });
+
         card.Child = rootPanel;
         return card;
     }
 
-    private static Grid Row(string label, string? description, FrameworkElement control, bool last = false)
+    private Grid Row(string label, string? description, FrameworkElement control, bool last = false)
     {
         var grid = new Grid
         {
@@ -1589,9 +1807,10 @@ internal sealed class SettingsView : UserControl
         var labelText = Presentation.Text(label, 13);
         labelText.TextWrapping = TextWrapping.Wrap;
         copy.Children.Add(labelText);
+        TextBlock? descriptionText = null;
         if (!string.IsNullOrWhiteSpace(description))
         {
-            var descriptionText = Presentation.DimText(description);
+            descriptionText = Presentation.DimText(description);
             descriptionText.TextWrapping = TextWrapping.Wrap;
             copy.Children.Add(descriptionText);
         }
@@ -1602,6 +1821,19 @@ internal sealed class SettingsView : UserControl
         control.HorizontalAlignment = HorizontalAlignment.Right;
         Grid.SetColumn(control, 1);
         grid.Children.Add(control);
+
+        RegisterScaleAction(factor =>
+        {
+            grid.MinHeight = Math.Round(52 * factor);
+            grid.ColumnSpacing = Math.Round(24 * factor);
+            grid.Padding = new Thickness(Math.Round(16 * factor), Math.Round(14 * factor), Math.Round(16 * factor), Math.Round(14 * factor));
+            copy.Spacing = Math.Round(3 * factor);
+            labelText.FontSize = Math.Round(13 * factor);
+            if (descriptionText is not null)
+            {
+                descriptionText.FontSize = Math.Round(12 * factor);
+            }
+        });
 
         return grid;
     }

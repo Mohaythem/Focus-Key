@@ -170,6 +170,7 @@ internal sealed class ReportsView : UserControl, IDisposable
                 MinHeight = Math.Round(28 * _scaleFactor)
             };
             AutomationProperties.SetName(btn, $"{period} reports");
+            AutomationProperties.SetItemType(btn, "Radio");
             btn.Click += async (s, _) =>
             {
                 if (!_rendering && s is Button b && b.Tag is ReportPeriod p)
@@ -219,6 +220,8 @@ internal sealed class ReportsView : UserControl, IDisposable
                 bool active = p == _reports.Period;
                 btn.Style = active ? activeStyle : inactiveStyle;
                 btn.Opacity = 1.0;
+                AutomationProperties.SetItemStatus(btn, active ? "Selected" : "Not Selected");
+                AutomationProperties.SetName(btn, $"{p} reports, {(active ? "Selected" : "Not Selected")}");
             }
         }
     }
@@ -808,12 +811,13 @@ internal sealed class ReportsView : UserControl, IDisposable
         body.Children.Add(header);
 
         var chart = new ReportsChart(snapshot.Trend, snapshot.Period, palette, _reports.CurrentDate(), factor);
-        AutomationProperties.SetName(chart, "Focus activity trend chart");
+        AutomationProperties.SetName(chart, $"Focus activity trend chart, {subtitleText}");
         body.Children.Add(chart);
 
         var card2 = Card(body, Math.Round(22 * factor));
         card2.Padding = new Thickness(Math.Round(24 * factor), Math.Round(22 * factor), Math.Round(24 * factor), Math.Round(22 * factor));
         card2.VerticalAlignment = VerticalAlignment.Stretch;
+        AutomationProperties.SetName(card2, $"Focus Activity Chart for {subtitleText}. Total focus time: {ReportsFormatting.FormatDuration(snapshot.Totals.FocusTime)}, {snapshot.Totals.CompletedWork} completed work sessions.");
         return card2;
     }
     private (Border Card, TextBlock Value) Metric(string label, string value, string sub, int column)
@@ -844,6 +848,7 @@ internal sealed class ReportsView : UserControl, IDisposable
         p.Children.Add(Presentation.DimText(sub, Math.Round(11 * factor)));
         var b = Card(p, Math.Round(20 * factor));
         b.Padding = new Thickness(Math.Round(22 * factor), Math.Round(20 * factor), Math.Round(22 * factor), Math.Round(20 * factor));
+        AutomationProperties.SetName(b, $"{label}: {value}, {sub}");
         Grid.SetColumn(b, column);
         return (b, valueText);
     }

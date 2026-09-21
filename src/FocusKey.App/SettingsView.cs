@@ -161,7 +161,9 @@ internal sealed class SettingsView : UserControl
         AutomationProperties.SetAutomationId(_uiScale, "UiScaleComboBox");
         ToolTipService.SetToolTip(_uiScale, "Adjust application user interface scale.");
         AutomationProperties.SetName(_resetOverlayPositionButton, "Reset overlay window position");
+        AutomationProperties.SetHelpText(_resetOverlayPositionButton, "Reset Quick Overlay window position to center screen");
         AutomationProperties.SetName(_sessionSounds, "Session sounds");
+        AutomationProperties.SetHelpText(_sessionSounds, "Master switch to enable or disable all session audio cues.");
         AutomationProperties.SetName(_startSound, "Start sound");
         AutomationProperties.SetName(_completionSound, "Completion sound");
         AutomationProperties.SetName(_startSoundPreviewButton, "Preview start sound");
@@ -169,8 +171,13 @@ internal sealed class SettingsView : UserControl
         ToolTipService.SetToolTip(_startSoundPreviewButton, "Preview start sound");
         ToolTipService.SetToolTip(_completionSoundPreviewButton, "Preview completion sound");
         AutomationProperties.SetName(_startWithWindows, "Start with Windows");
+        AutomationProperties.SetHelpText(_startWithWindows, "Launch Focus Key automatically when you sign in to Windows.");
         AutomationProperties.SetName(_importHistoryButton, "Import history");
+        AutomationProperties.SetHelpText(_importHistoryButton, "Import focus history records from a CSV file.");
         AutomationProperties.SetName(_exportHistoryButton, "Export history");
+        AutomationProperties.SetHelpText(_exportHistoryButton, "Export all focus history records to a CSV file.");
+        AutomationProperties.SetName(_reload, "Reload saved settings");
+        AutomationProperties.SetHelpText(_reload, "Reload saved configuration from disk, discarding uncommitted edits.");
         AutomationProperties.SetLiveSetting(_status, AutomationLiveSetting.Polite);
         AutomationProperties.SetAutomationId(_status, "SettingsStatus");
         if (Application.Current?.Resources["FkMutedText"] is Style statusStyle) _status.Style = statusStyle;
@@ -674,6 +681,17 @@ internal sealed class SettingsView : UserControl
         _completionSound.Opacity = masterOn ? 1.0 : 0.6;
         _startSoundPreviewButton.IsEnabled = true;
         _completionSoundPreviewButton.IsEnabled = true;
+
+        if (masterOn)
+        {
+            AutomationProperties.SetHelpText(_startSound, "Played when a Work or Break session starts.");
+            AutomationProperties.SetHelpText(_completionSound, "Played when a session completes.");
+        }
+        else
+        {
+            AutomationProperties.SetHelpText(_startSound, "Disabled because Session sounds master switch is turned off.");
+            AutomationProperties.SetHelpText(_completionSound, "Disabled because Session sounds master switch is turned off.");
+        }
     }
 
     private void RefreshStartupToggle()
@@ -1027,6 +1045,10 @@ internal sealed class SettingsView : UserControl
                 swatches[i].BorderBrush = isSelected
                     ? Presentation.ThemeBrush("FkForeground", this)
                     : Presentation.ThemeBrush("CardStrokeColorDefaultBrush", this);
+                AutomationProperties.SetItemStatus(presetButtons[i], isSelected ? "Selected" : "Not Selected");
+                AutomationProperties.SetName(presetButtons[i], isSelected
+                    ? $"{presets[i].Name}, {presets[i].Color.Value}, Selected"
+                    : $"{presets[i].Name}, {presets[i].Color.Value}, Not Selected");
             }
         }
 
@@ -1058,6 +1080,7 @@ internal sealed class SettingsView : UserControl
             };
             presetButtons.Add(btn);
             ToolTipService.SetToolTip(btn, $"{preset.Name} ({preset.Color.Value})");
+            AutomationProperties.SetItemType(btn, "Radio");
             AutomationProperties.SetName(btn, $"{preset.Name}, {preset.Color.Value}");
 
             btn.Click += async (_, _) =>
@@ -1542,7 +1565,24 @@ internal sealed class SettingsView : UserControl
             Padding = new Thickness(6, 4, 6, 4),
             VerticalAlignment = VerticalAlignment.Center
         };
-        AutomationProperties.SetName(box, name);
+        string accessibleName = name switch
+        {
+            "Work minutes" => "Work session duration minutes",
+            "Work seconds" => "Work session duration seconds",
+            "Break minutes" => "Break session duration minutes",
+            "Break seconds" => "Break session duration seconds",
+            _ => name
+        };
+        string helpText = name switch
+        {
+            "Work minutes" => "Enter work session length in minutes",
+            "Work seconds" => "Enter work session length in seconds",
+            "Break minutes" => "Enter break session length in minutes",
+            "Break seconds" => "Enter break session length in seconds",
+            _ => name
+        };
+        AutomationProperties.SetName(box, accessibleName);
+        AutomationProperties.SetHelpText(box, helpText);
         return box;
     }
 
@@ -1598,6 +1638,7 @@ internal sealed class SettingsView : UserControl
 
         var panel = new StackPanel { Spacing = 0, HorizontalAlignment = HorizontalAlignment.Stretch };
         var heading = Presentation.BodyStrong("SESSION", 13);
+        AutomationProperties.SetHeadingLevel(heading, AutomationHeadingLevel.Level2);
         heading.Margin = new Thickness(16, 14, 16, 14);
         panel.Children.Add(heading);
 
@@ -1626,6 +1667,7 @@ internal sealed class SettingsView : UserControl
         });
 
         card.Child = panel;
+        AutomationProperties.SetName(card, "Session settings");
         return card;
     }
 
@@ -1647,6 +1689,7 @@ internal sealed class SettingsView : UserControl
 
         var panel = new StackPanel { Spacing = 0 };
         var heading = Presentation.DimText(title, 11);
+        AutomationProperties.SetHeadingLevel(heading, AutomationHeadingLevel.Level3);
         if (Application.Current?.Resources["FkSectionText"] is Style style)
         {
             heading.Style = style;
@@ -1701,6 +1744,7 @@ internal sealed class SettingsView : UserControl
         };
 
         var heading = Presentation.BodyStrong(title, 13);
+        AutomationProperties.SetHeadingLevel(heading, AutomationHeadingLevel.Level2);
         heading.VerticalAlignment = VerticalAlignment.Center;
         heading.HorizontalAlignment = HorizontalAlignment.Left;
 
@@ -1728,6 +1772,7 @@ internal sealed class SettingsView : UserControl
             Padding = new Thickness(16, 14, 16, 14),
             MinHeight = 48
         };
+        AutomationProperties.SetItemType(headerButton, "CollapsibleSection");
 
         var divider = new Border
         {
@@ -1754,7 +1799,9 @@ internal sealed class SettingsView : UserControl
             chevron.Glyph = expanded ? "\uE70E" : "\uE76C";
             divider.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
             contentContainer.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
-            AutomationProperties.SetName(headerButton, $"{title}, {(expanded ? "expanded" : "collapsed")}");
+            AutomationProperties.SetItemStatus(headerButton, expanded ? "Expanded" : "Collapsed");
+            AutomationProperties.SetName(headerButton, $"{title} settings, {(expanded ? "Expanded" : "Collapsed")}");
+            AutomationProperties.SetHelpText(headerButton, expanded ? "Activate to collapse section" : "Activate to expand section");
         }
 
         ApplyVisual(isExpanded);

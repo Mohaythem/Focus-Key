@@ -102,7 +102,7 @@
                         Foreground="{ThemeResource FkSecondary}"
                         VerticalAlignment="Center"
                         HorizontalAlignment="Center"
-                        AutomationProperties.Name="Close Overlay"
+                        AutomationProperties.Name="Close Quick Overlay"
                         Click="OnCloseButtonClick" />
                 </StackPanel>
             </Grid>
@@ -126,6 +126,7 @@
                         FocusVisualPrimaryThickness="1"
                         TabIndex="0"
                         AutomationProperties.Name="Work"
+                        AutomationProperties.ItemType="Radio"
                         Click="OnWorkClicked">
                         <StackPanel Spacing="6" Padding="4,2">
                             <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
@@ -155,6 +156,7 @@
                         FocusVisualPrimaryThickness="1"
                         TabIndex="1"
                         AutomationProperties.Name="Break"
+                        AutomationProperties.ItemType="Radio"
                         Click="OnBreakClicked">
                         <StackPanel Spacing="6" Padding="4,2">
                             <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">

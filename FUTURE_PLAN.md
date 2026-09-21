@@ -12,9 +12,29 @@ This document serves as the persistent repository-level source of truth for all 
 
 ---
 
-## Active Work (Current Roadmap Task)
+## Implemented Work Awaiting Final User Acceptance
 
-*None currently active.*
+### Full Accessibility + Windows Narrator Audit (Implemented — Awaiting Final User Acceptance)
+**Status:** Implemented — Awaiting Final User Acceptance
+**Scope & Deliverables:**
+1. **Real App Keyboard + Narrator Validation**:
+   - Comprehensive end-to-end verification across Today, Reports, Settings, Quick Overlay, Navigation Shell, and Close/Hide Dialog.
+   - Core workflow 100% usable without mouse: Launch $\rightarrow$ Work/Break selector $\rightarrow$ Start $\rightarrow$ Pause $\rightarrow$ Continue $\rightarrow$ Start New $\rightarrow$ Page navigation $\rightarrow$ Settings adjustments $\rightarrow$ Close/Hide/Restore.
+2. **Accessible Tree & Automation Properties**:
+   - Logical Tab order and visible high-contrast focus indicators across all pages.
+   - Meaningful accessible names, roles (`Radio`, `CollapsibleSection`, `Navigation`), and descriptions on all interactive elements, icon-only buttons, and composite cards.
+   - Communicating active, paused, idle, running, selected, checked, and expanded states without relying on color alone (`ItemStatus` = `"Selected"` / `"Not Selected"`, `"Expanded"` / `"Collapsed"`).
+   - Polite live region announcements for state transitions, timer countdowns, and transient feedback without flooding speech synthesis.
+3. **Reports Chart & Metric Accessibility**:
+   - Accessible composite descriptions for summary metric cards combining label, value, and subtitle (`"Focus Time: 12h 30m, total focus"`).
+   - High-level chart overview and individual column bucket tooltip descriptions accessible to Windows Narrator.
+4. **Settings & Overlay Accessibility**:
+   - Collapsible sections announcing expanded/collapsed state, heading levels (`Level2`, `Level3`), and keyboard toggling.
+   - Unambiguous names, descriptions, and help text for numeric editors (`"Work session duration minutes"`), toggles, ComboBoxes, and shortcut recorders with listening state announcements.
+   - Quick Overlay accessible controls with mode, duration, running/paused status, and close action.
+5. **Theme & Text Scaling Compatibility**:
+   - Verification across Dark, Light, Higher Contrast themes.
+   - Fully compatible with Windows text scaling and app UI scaling without clipping or overlapping.
 
 ---
 

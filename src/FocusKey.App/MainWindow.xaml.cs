@@ -1051,8 +1051,12 @@ public sealed partial class MainWindow : Window
 
         string workDur = WorkChoiceDuration?.Text ?? "25 min";
         string breakDur = BreakChoiceDuration?.Text ?? "10 min";
-        AutomationProperties.SetName(WorkChoiceCard, isWorkSelected ? $"Work Session, {workDur}, Selected" : $"Select Work Session, {workDur}");
-        AutomationProperties.SetName(BreakChoiceCard, !isWorkSelected ? $"Break Session, {breakDur}, Selected" : $"Select Break Session, {breakDur}");
+        AutomationProperties.SetItemStatus(WorkChoiceCard, isWorkSelected ? "Selected" : "Not Selected");
+        AutomationProperties.SetItemStatus(BreakChoiceCard, !isWorkSelected ? "Selected" : "Not Selected");
+        AutomationProperties.SetName(WorkChoiceCard, isWorkSelected ? $"Work session, {workDur}, Selected" : $"Work session, {workDur}, Not Selected");
+        AutomationProperties.SetName(BreakChoiceCard, !isWorkSelected ? $"Break session, {breakDur}, Selected" : $"Break session, {breakDur}, Not Selected");
+        string startDur = isWorkSelected ? workDur : breakDur;
+        AutomationProperties.SetName(StartIdleButton, $"Start {(isWorkSelected ? "Work" : "Break")} session, {startDur}");
 
         // 3. Durations & Subtitles in Idle Hero Body
         var durations = _today?.Snapshot?.Durations ?? SessionDurations.Default;
@@ -1116,10 +1120,18 @@ public sealed partial class MainWindow : Window
                 BreakChoiceDuration.Text = Presentation.Duration(snapshot.Durations.Break);
 
             // Daily Summary 2x2 Metrics
-            FocusValue.Text = Presentation.Duration(snapshot.WorkTime);
+            string focusDurStr = Presentation.Duration(snapshot.WorkTime);
+            string breakDurStr = Presentation.Duration(snapshot.BreakTime);
+            string completionRateStr = snapshot.CompletionRate is { } rate ? rate.ToString("0", CultureInfo.InvariantCulture) + "%" : "—";
+            FocusValue.Text = focusDurStr;
             WorkValue.Text = snapshot.CompletedWorkCount.ToString(CultureInfo.InvariantCulture);
-            BreakValue.Text = Presentation.Duration(snapshot.BreakTime);
-            CompletionValue.Text = snapshot.CompletionRate is { } rate ? rate.ToString("0", CultureInfo.InvariantCulture) + "%" : "—";
+            BreakValue.Text = breakDurStr;
+            CompletionValue.Text = completionRateStr;
+
+            if (FocusMetricPanel is not null) AutomationProperties.SetName(FocusMetricPanel, $"Focus Time: {focusDurStr}");
+            if (WorkMetricPanel is not null) AutomationProperties.SetName(WorkMetricPanel, $"Work Sessions: {snapshot.CompletedWorkCount} completed");
+            if (BreakMetricPanel is not null) AutomationProperties.SetName(BreakMetricPanel, $"Break Time: {breakDurStr}");
+            if (CompletionMetricPanel is not null) AutomationProperties.SetName(CompletionMetricPanel, $"Completion Rate: {completionRateStr}");
 
             // Activity Card
             if (ActivityCountText is not null)
@@ -1147,6 +1159,8 @@ public sealed partial class MainWindow : Window
                     string started = TodayFormatting.FormatClockTime(session.StartedAt, snapshot.TimeZone, _timeFormat);
                     string duration = session.ActualDuration is { } actual ? Presentation.Duration(actual) : $"{Presentation.Duration(session.PlannedDuration)} planned";
                     var row = new Grid { ColumnSpacing = 10, Padding = new Thickness(0, 7, 8, 7) };
+                    AutomationProperties.SetName(row, $"{started}, {session.Type} session, {duration}, {session.Status}");
+                    AutomationProperties.SetItemType(row, "Activity record");
                     foreach (var width in new[] { new GridLength(42), new GridLength(6), new GridLength(1, GridUnitType.Star), GridLength.Auto, new GridLength(72) })
                         row.ColumnDefinitions.Add(new ColumnDefinition { Width = width });
 
@@ -1201,6 +1215,10 @@ public sealed partial class MainWindow : Window
         bool hasActive = _today.Snapshot?.Active is not null;
         if (!hasActive)
         {
+            AutomationProperties.SetName(TodayNav, "Today");
+            if (DrawerTodayNav is not null) AutomationProperties.SetName(DrawerTodayNav, "Today");
+            if (HamburgerButton is not null) AutomationProperties.SetName(HamburgerButton, "Open navigation");
+
             if (TodayExpandedDot is not null) TodayExpandedDot.Visibility = Visibility.Collapsed;
             if (TodayCompactDot is not null) TodayCompactDot.Visibility = Visibility.Collapsed;
             if (HamburgerActiveDot is not null) HamburgerActiveDot.Visibility = Visibility.Collapsed;
@@ -1208,10 +1226,20 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        var activeType = _today.Snapshot!.Active!.Type;
+        var active = _today.Snapshot!.Active!;
+        var activeSnapshot = SessionSnapshot.For(active, DateTimeOffset.UtcNow);
+        var rem = TimeSpan.FromSeconds(Math.Ceiling(activeSnapshot.Remaining.TotalSeconds));
+        string remStr = string.Format(CultureInfo.InvariantCulture, "{0:00}:{1:00}", (int)rem.TotalMinutes, rem.Seconds);
+        string stateStr = active.Status == SessionStatus.Paused ? "paused" : "running";
+        string activeNavName = $"Today, {active.Type} session {stateStr}, {remStr} remaining";
+        AutomationProperties.SetName(TodayNav, activeNavName);
+        if (DrawerTodayNav is not null) AutomationProperties.SetName(DrawerTodayNav, activeNavName);
+        if (HamburgerButton is not null) AutomationProperties.SetName(HamburgerButton, $"Open navigation, {active.Type} session {stateStr}");
+
+        var activeType = active.Type;
         var indicatorColor = activeType == SessionType.Work ? _colors.Work : _colors.Break;
         var dotBrush = SessionColorBrush.Create(indicatorColor);
-        double dotOpacity = _today.Snapshot!.Active!.Status == SessionStatus.Paused ? 0.50 : 1.0;
+        double dotOpacity = active.Status == SessionStatus.Paused ? 0.50 : 1.0;
 
         double windowWidth = MainSurface?.ActualWidth ?? 1200;
         var navMode = TodayAdaptiveLayoutHelper.ResolveNavMode(windowWidth);
@@ -1296,7 +1324,10 @@ public sealed partial class MainWindow : Window
             ? Presentation.ThemeBrush("FkSecondary", isDark)
             : SessionColorBrush.Create(color);
 
-        RunningText.Text = string.Format(CultureInfo.InvariantCulture, "{0:00}:{1:00}", (int)remaining.TotalMinutes, remaining.Seconds);
+        string remFormatted = string.Format(CultureInfo.InvariantCulture, "{0:00}:{1:00}", (int)remaining.TotalMinutes, remaining.Seconds);
+        RunningText.Text = remFormatted;
+        AutomationProperties.SetName(RunningText, $"{active.Type} session, {remFormatted} remaining, {(isPaused ? "Paused" : "Running")}");
+
         RunningHint.Text = isPaused ? "paused" : "remaining";
         RunningHint.Foreground = isPaused
             ? Presentation.ThemeBrush("FkSecondary", isDark)
@@ -1317,10 +1348,12 @@ public sealed partial class MainWindow : Window
             ContinueButton.Background = SessionColorBrush.Create(color);
             ContinueButton.BorderBrush = SessionColorBrush.Create(color);
             ContinueButton.Foreground = SessionColorBrush.Create(SessionColors.Foreground(color));
+            AutomationProperties.SetName(ContinueButton, "Continue session");
 
             StartNewButton.Background = Presentation.ThemeBrush("FkSurface2", isDark);
             StartNewButton.BorderBrush = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", isDark);
             StartNewButton.Foreground = Presentation.ThemeBrush("FkForeground", isDark);
+            AutomationProperties.SetName(StartNewButton, "Start new session");
         }
         else
         {
@@ -1331,6 +1364,7 @@ public sealed partial class MainWindow : Window
             PauseButton.Background = SessionColorBrush.Create(color);
             PauseButton.BorderBrush = SessionColorBrush.Create(color);
             PauseButton.Foreground = SessionColorBrush.Create(SessionColors.Foreground(color));
+            AutomationProperties.SetName(PauseButton, "Pause session");
         }
 
         if (stateChanged)

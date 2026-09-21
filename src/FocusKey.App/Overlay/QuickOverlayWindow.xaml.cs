@@ -236,16 +236,16 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
         // Active Controls
         PauseButton.IsEnabled = hasActive && !state.IsBusy;
         PauseButton.Content = state.IsBusy ? "Please wait…" : isPaused ? "Continue" : "Pause";
-        AutomationProperties.SetName(PauseButton, isPaused ? "Continue Session" : "Pause Session");
+        AutomationProperties.SetName(PauseButton, isPaused ? "Continue session" : "Pause session");
 
         StopButton.IsEnabled = false;
         StopButton.Visibility = Visibility.Collapsed;
-        AutomationProperties.SetName(StopButton, "Stop Session");
+        AutomationProperties.SetName(StopButton, "Stop session");
 
         StartNewButton.Visibility = isPaused ? Visibility.Visible : Visibility.Collapsed;
         StartNewButton.IsEnabled = isPaused && !state.IsBusy;
         StartNewButton.Content = "Start New";
-        AutomationProperties.SetName(StartNewButton, "Start New Session");
+        AutomationProperties.SetName(StartNewButton, "Start new session");
 
         if (state.Active is { } session)
         {
@@ -356,18 +356,22 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
 
         WorkDuration.Text = QuickOverlayDurationFormatter.Format(state.Durations?.Work);
         BreakDuration.Text = QuickOverlayDurationFormatter.Format(state.Durations?.Break);
-        AutomationProperties.SetName(WorkCard, $"Work, {WorkDuration.Text}");
-        AutomationProperties.SetName(BreakCard, $"Break, {BreakDuration.Text}");
+        bool isWorkSelected = state.Selected == SessionType.Work;
+        AutomationProperties.SetItemStatus(WorkCard, isWorkSelected ? "Selected" : "Not Selected");
+        AutomationProperties.SetItemStatus(BreakCard, !isWorkSelected ? "Selected" : "Not Selected");
+        AutomationProperties.SetName(WorkCard, isWorkSelected ? $"Work session, {WorkDuration.Text}, Selected" : $"Work session, {WorkDuration.Text}, Not Selected");
+        AutomationProperties.SetName(BreakCard, !isWorkSelected ? $"Break session, {BreakDuration.Text}, Selected" : $"Break session, {BreakDuration.Text}, Not Selected");
 
-        PaintCard(WorkCard, WorkLabel, WorkDuration, WorkDot, state.Selected == SessionType.Work, _colors.Work, isDark);
-        PaintCard(BreakCard, BreakLabel, BreakDuration, BreakDot, state.Selected == SessionType.Break, _colors.Break, isDark);
+        PaintCard(WorkCard, WorkLabel, WorkDuration, WorkDot, isWorkSelected, _colors.Work, isDark);
+        PaintCard(BreakCard, BreakLabel, BreakDuration, BreakDot, !isWorkSelected, _colors.Break, isDark);
 
         StartButton.IsEnabled = state.CanStart && !state.IsBusy;
         StartButton.Content = state.IsBusy ? "Please wait…" : "Start";
-        AutomationProperties.SetName(StartButton, $"Start {state.Selected}");
+        string chosenDuration = isWorkSelected ? WorkDuration.Text : BreakDuration.Text;
+        AutomationProperties.SetName(StartButton, $"Start {state.Selected} session, {chosenDuration}");
         if (StartKeyHint is not null) StartKeyHint.Text = "Start";
 
-        var startColor = state.Selected == SessionType.Work ? _colors.Work : _colors.Break;
+        var startColor = isWorkSelected ? _colors.Work : _colors.Break;
         StartButton.Background = SessionColorBrush.Create(startColor);
         StartButton.Foreground = SessionColorBrush.Create(SessionColors.Foreground(startColor));
         StartButton.BorderThickness = new Thickness(0);
@@ -398,7 +402,9 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
         if (_closing) return;
         TimeSpan remaining = MiniTimerController.RemainingAt(_state.Active, TimeProvider.System.GetUtcNow());
         ActiveRemaining.Text = MiniTimerController.Format(remaining);
-        AutomationProperties.SetName(ActiveRemaining, $"{_state.Active?.Type}, {ActiveRemaining.Text} remaining");
+        bool isPaused = _state.Active is { Status: SessionStatus.Paused };
+        string statusText = isPaused ? "Paused" : "Running";
+        AutomationProperties.SetName(ActiveRemaining, $"{_state.Active?.Type} session, {ActiveRemaining.Text} remaining, {statusText}");
         if (_state.Active is { } activeSession)
         {
             double totalSecs = activeSession.PlannedDuration.TotalSeconds;

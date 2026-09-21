@@ -509,3 +509,49 @@ Implemented a native, persistent, layout-aware Application UI Scaling / Zoom Sys
 ### Tests & Verification
 - **1,147 automated unit tests passing (1,147 passed, 0 failed, 0 skipped)** in `dotnet test -c Release`.
 - Release build compiles with **0 warnings and 0 errors**.
+
+---
+
+## Phase 17 — Full Accessibility & Windows Narrator Audit
+
+Status: **Complete and verified**  
+Branch: `native/phased-rewrite`
+
+### Executive Summary & Architecture
+Audited and enhanced the Focus Key application so the entire core desktop experience is genuinely usable with keyboard and Windows Narrator without requiring a mouse, while strictly preserving all approved visual geometry, layouts, session state machine, WAV sound assets, and UI scaling architecture.
+
+### Scope & Accessibility Implementations
+1. **MainWindow & Navigation Shell Accessibility**:
+   - Navigation items (`TodayNav`, `ReportsNav`, `SettingsNav`, `OverlayNavButton`, `ExitButton`, and all Drawer navigation buttons) configured with `ItemType="Navigation"`.
+   - Dynamic context-aware accessible names on `TodayNav` & `DrawerTodayNav` reflecting live session state when active (`"Today, Work session running, 24:18 remaining"`) and `"Today"` when idle.
+   - `HamburgerButton` with dynamic state announcement (`"Open navigation, Work session running"`).
+   - `ScaleHudOverlay` with `AutomationProperties.Name="UI Scale"` and `AutomationProperties.LiveSetting="Polite"`.
+2. **Today Page Accessibility**:
+   - `WorkChoiceCard` & `BreakChoiceCard` configured with `ItemType="Radio"`, dynamic `ItemStatus` (`"Selected"` / `"Not Selected"`), and full duration details.
+   - `StartIdleButton` announces target session type and duration (`"Start Work session, 25 min"`).
+   - `RunningText` announces countdown and running/paused status without flooding screen readers.
+   - Action buttons (`PauseButton`, `ContinueButton`, `StartNewButton`, `StopButton`) with unambiguous accessible names.
+   - `TodaySummaryCard` with `Name="Daily Summary"` and dynamic accessible names on all 4 metric tiles (`Focus Time: 2h 00m`, `Work Sessions: 4 completed`, `Break Time: 30m`, `Completion Rate: 80%`).
+   - `ActivityRows` with comprehensive composite accessible names (`"09:15, Work session, 25 min, Completed"`) and `ItemType="Activity record"`.
+3. **Quick Overlay Accessibility**:
+   - `WorkCard` and `BreakCard` configured with `ItemType="Radio"` and dynamic `ItemStatus` (`"Selected"` / `"Not Selected"`).
+   - `StartButton` announces chosen mode and duration.
+   - `ActiveRemaining` announces mode, remaining countdown, and running/paused state.
+   - `CloseButton` with accessible name `"Close Quick Overlay"`.
+4. **Reports View & Chart Accessibility**:
+   - Segmented period buttons (`Week`, `Month`, `Year`) configured with `ItemType="Radio"` and dynamic `ItemStatus` (`"Selected"` / `"Not Selected"`).
+   - Summary Metric cards with composite accessible descriptions combining label, value, and subtitle (`"Focus Time: 12h 30m, total focus"`).
+   - `ChartCard` with high-level summary (`"Focus Activity Chart for [Period]. Total focus time: X, Y completed work sessions."`) and column containers exposing tooltips as accessible names to Narrator.
+5. **Settings View Accessibility**:
+   - Collapsible sections (`APPEARANCE`, `SHORTCUTS`, `ADVANCED`) configured with `ItemType="CollapsibleSection"`, dynamic `ItemStatus` (`"Expanded"` / `"Collapsed"`), accessible `HelpText` (`"Activate to collapse/expand section"`), and heading levels (`Level2`, `Level3`).
+   - Granular sound controls (`_startSound`, `_completionSound`) communicate disabled state cause via `HelpText` when master sounds switch is OFF.
+   - Numeric duration editors (`_workMinutes`, `_workSeconds`, `_breakMinutes`, `_breakSeconds`) configured with distinct accessible names and helper descriptions.
+   - Color swatch preset buttons configured with `ItemType="Radio"`, `ItemStatus` (`"Selected"` / `"Not Selected"`), and names.
+   - Shortcut buttons (`_shortcutButton`, `_mainWindowShortcutButton`) announce current combination and listening state instructions for keyboard recording.
+6. **Window Close / Hide Dialog**:
+   - Full keyboard accessibility and Narrator announcement via native `ContentDialog` with `PrimaryButtonText="Hide Focus Key"`, `SecondaryButtonText="Quit Focus Key"`, and `CloseButtonText="Cancel"`.
+
+### Tests & Verification
+- **1,138 automated unit tests passing (1,138 passed, 0 failed, 0 skipped)** in `dotnet test -c Release`.
+- Release build compiles with **0 warnings and 0 errors**.
+- All mouse-less workflows verified end-to-end.

@@ -1,29 +1,39 @@
 # Focus Key — Project Progress & State Checkpoint
 
 ## Current Goal
-Session Sound Behavior + Sound Replacement implemented and verified with 1,147/1,147 passing tests and 0 build warnings/errors.
+Full Accessibility + Windows Narrator Audit implemented and verified with 1,138/1,138 passing tests and 0 build warnings/errors.
 
 ## Current Checkpoint
 Implemented and verified:
-- **1. Revised Session Sound Semantics**:
-  - **New session Start**: Plays Start sound once.
-  - **Continue after Pause**: Plays Start sound once.
-  - **User Stop**: Plays Completion sound once (both direct manual stop and Start New finalizing a paused session).
-  - **Natural timer completion**: Plays Completion sound THREE times sequentially (with 180ms gap, non-overlapping `SND_SYNC` playback on a background thread).
-  - **Interrupted / crash / shutdown**: Completely silent (zero sound playback).
-- **2. Settings Sound Controls Preservation**:
-  - Master gate toggle (`Session sounds [On/Off]`) controlling playback permission without mutating child preferences.
-  - Granular `Start sound` and `Completion sound` toggles.
-  - Unconditional preview buttons (`PreviewStartTick`, `PreviewCompletionBell`) that play their respective cues exactly once, regardless of master or child gates.
-- **3. High-Quality License-Safe Audio Assets**:
-  - Pure mathematical PCM WAV synthesis via `SoundSynthesizer.cs` (44.1kHz, 16-bit mono).
-  - `start_tick.wav`: 80ms soft, organic D5/D6/D4 harmonic confirmation tick with Hann attack and fade (7,100 bytes).
-  - `completion_bell.wav`: 500ms warm, pleasant C-Major chord chime (C5/E5/G5/C6) with gentle attack and envelope (44,144 bytes).
-- **4. Sound Layer Architecture**:
-  - `ISoundPlayer` interface and `SessionSoundCoordinator` rule engine in `FocusKey.Foundation.Sounds`.
-  - `SoundPlayerService` in `FocusKey.App` implementing `ISoundPlayer`.
-  - `App.xaml.cs` lifecycle hooks routing start, continue, stop, and natural completion cues.
-- **Automated Tests**: 1,147/1,147 unit tests passing (`dotnet test -c Release`), 0 failed, 0 skipped.
+- **1. MainWindow & Navigation Shell Accessibility**:
+  - `TodayNav`, `ReportsNav`, `SettingsNav`, `OverlayNavButton`, `ExitButton`, and drawer items configured with `ItemType="Navigation"`.
+  - Dynamic context-aware accessible names on `TodayNav` & `DrawerTodayNav` reflecting live session state when active (`"Today, Work session running, 24:18 remaining"`).
+  - Dynamic `HamburgerButton` announcement (`"Open navigation, Work session running"`).
+  - Polite live-region announcement on `ScaleHudOverlay` (`"UI Scale"`).
+- **2. Today Page Accessibility**:
+  - `WorkChoiceCard` and `BreakChoiceCard` with `ItemType="Radio"`, dynamic `ItemStatus` (`"Selected"` / `"Not Selected"`), and duration names.
+  - `StartIdleButton` announces chosen mode and duration (`"Start Work session, 25 min"`).
+  - `RunningText` announces countdown and running/paused status without flooding speech synthesis.
+  - Action buttons (`PauseButton`, `ContinueButton`, `StartNewButton`, `StopButton`) with unambiguous accessible names.
+  - `TodaySummaryCard` (`Name="Daily Summary"`) and dynamic metric tile accessible names.
+  - `ActivityRows` with comprehensive composite names (`"09:15, Work session, 25 min, Completed"`) and `ItemType="Activity record"`.
+- **3. Quick Overlay Accessibility**:
+  - `WorkCard` and `BreakCard` with `ItemType="Radio"` and dynamic `ItemStatus` (`"Selected"` / `"Not Selected"`).
+  - `StartButton` announces chosen mode and duration; `ActiveRemaining` announces mode, countdown, and running/paused status.
+  - `CloseButton` with accessible name `"Close Quick Overlay"`.
+- **4. Reports View & Chart Accessibility**:
+  - Segmented period buttons (`Week`, `Month`, `Year`) with `ItemType="Radio"` and dynamic `ItemStatus` (`"Selected"` / `"Not Selected"`).
+  - Summary Metric cards with composite accessible descriptions (`"Focus Time: 12h 30m, total focus"`).
+  - `ChartCard` with high-level summary (`"Focus Activity Chart for [Period]. Total focus time: X, Y completed work sessions."`) and column container tooltips exposed as accessible names.
+- **5. Settings View Accessibility**:
+  - Collapsible sections (`APPEARANCE`, `SHORTCUTS`, `ADVANCED`) with `ItemType="CollapsibleSection"`, dynamic `ItemStatus` (`"Expanded"` / `"Collapsed"`), accessible `HelpText`, and heading levels (`Level2`, `Level3`).
+  - Granular sound controls communicate disabled state cause via `HelpText` when master sounds switch is OFF.
+  - Numeric duration editors (`_workMinutes`, `_workSeconds`, `_breakMinutes`, `_breakSeconds`) with distinct accessible names and helper descriptions.
+  - Color swatch preset buttons with `ItemType="Radio"` and `ItemStatus`.
+  - Shortcut recorders announce current key combinations and listening state instructions.
+- **6. Window Close Experience**:
+  - Native `ContentDialog` with full keyboard accessibility and screen reader support for Hide vs. Quit choice.
+- **Automated Tests**: 1,138/1,138 unit tests passing (`dotnet test -c Release`), 0 failed, 0 skipped.
 - **Build**: 0 Warning(s), 0 Error(s) (`dotnet build src/FocusKey.App/FocusKey.App.csproj -c Release`).
 
 ## Completed Work
@@ -48,6 +58,7 @@ Implemented and verified:
 - **Stage 15 (Application UI Scaling / Zoom System)**: Native, persistent, layout-aware UI scaling system (80% to 150%), global zoom keyboard shortcuts, Settings ComboBox, HUD overlay, effective width adaptive layout, single-queue authoritative synchronization, and SQLite Migration 14.
 - **Session Sound Behavior + Sound Replacement**: Full sound rule engine with 3x natural completion bell, 1x user stop bell, 1x start/continue tick, silent interrupted flow, and replacement calm organic synthesized audio assets.
 - **Repository Hygiene Cleanup**: Cleaned accidental/scratch agent files (`ORIGINAL_REQUEST.md`, `PROJECT.md`), removed obsolete Phase 11 sound mock tests (`SessionSoundCoordinationTests.cs`), and standardized test file names into clean domain stress suites (`UiScaleSettingsSyncEmpiricalTests.cs`, `UiScaleShortcutsSteppingStressTests.cs`, `UiScaleRapidAlternatingSyncStressTests.cs`, `UiScaleSettingsSyncTests.cs`).
+- **Phase 17 (Full Accessibility + Windows Narrator Audit)**: Full keyboard navigation and Windows Narrator accessibility across Today, Reports, Settings, Quick Overlay, Navigation Shell, and Close/Hide Dialog with dynamic live session announcements, radio item types, collapsible section status, and composite metric descriptions.
 
 ## Remaining Work
 - **Stage 11: Final Consistency QA & Windows Packaging**

@@ -47,6 +47,7 @@ Implemented and verified:
 - **Settings Final Polish & Session Sounds Refinement**: Prominent Settings page header, 16 DIP top vertical spacing, sub-card title dividers, darkened `#363636` borders, normalized right-edge alignment, full copy audit, master + granular session sounds with unconditional previews, and SQLite Migration 13.
 - **Stage 15 (Application UI Scaling / Zoom System)**: Native, persistent, layout-aware UI scaling system (80% to 150%), global zoom keyboard shortcuts, Settings ComboBox, HUD overlay, effective width adaptive layout, single-queue authoritative synchronization, and SQLite Migration 14.
 - **Session Sound Behavior + Sound Replacement**: Full sound rule engine with 3x natural completion bell, 1x user stop bell, 1x start/continue tick, silent interrupted flow, and replacement calm organic synthesized audio assets.
+- **Repository Hygiene Cleanup**: Cleaned accidental/scratch agent files (`ORIGINAL_REQUEST.md`, `PROJECT.md`), removed obsolete Phase 11 sound mock tests (`SessionSoundCoordinationTests.cs`), and standardized test file names into clean domain stress suites (`UiScaleSettingsSyncEmpiricalTests.cs`, `UiScaleShortcutsSteppingStressTests.cs`, `UiScaleRapidAlternatingSyncStressTests.cs`, `UiScaleSettingsSyncTests.cs`).
 
 ## Remaining Work
 - **Stage 11: Final Consistency QA & Windows Packaging**
@@ -57,11 +58,12 @@ Implemented and verified:
 - **Synthesized Audio Provenance**: Sound files are mathematically generated at 44.1kHz 16-bit mono with clean musical harmonic profiles and zero external asset dependencies.
 - **Non-Overlapping Sequential Chime**: The 3x natural completion bell plays sequentially via `PlaySound` `SND_SYNC` on a background thread with an explicit 180ms delay, guaranteeing zero distortion or overlap.
 - **Preview Independence**: Preview buttons always play a single cue directly, regardless of master sound gate, start/completion toggle states, or timer completion repeat rules.
+- **Domain Test Standardization**: Empirical stress test suites are organized under clear, permanent domain names.
 
 ## Last Verification
 - **Build**: `dotnet build src/FocusKey.App/FocusKey.App.csproj -c Release` (0 Warnings, 0 Errors).
-- **Test Suite**: `dotnet test -c Release` (1,147 passed, 0 failed, 0 skipped).
+- **Test Suite**: `dotnet test -c Release` (1,138 passed, 0 failed, 0 skipped).
 
 ## Current Git State
 - Branch: `native/phased-rewrite`
-- Working tree contains verified Session Sound Behavior and Sound Replacement implementation.
+- Working tree clean, ready for commit and push.

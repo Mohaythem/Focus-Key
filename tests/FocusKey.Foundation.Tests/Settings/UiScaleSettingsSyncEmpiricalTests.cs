@@ -8,10 +8,10 @@ using Xunit;
 namespace FocusKey.Foundation.Tests.Settings;
 
 /// <summary>
-/// Empirical challenge test suite for Milestone 3 (Settings UI ComboBox & Live Bidirectional Sync).
+/// Empirical challenge test suite for UI scaling settings sync (Settings UI ComboBox & Live Bidirectional Sync).
 /// Tests discrete string/int mapping, boundary values, re-entrancy prevention, and concurrency invariants.
 /// </summary>
-public sealed class ChallengerMilestone3EmpiricalTests
+public sealed class UiScaleSettingsSyncEmpiricalTests
 {
     private static readonly string[] UiScaleOptions = ["80%", "90%", "100%", "110%", "125%", "150%"];
 

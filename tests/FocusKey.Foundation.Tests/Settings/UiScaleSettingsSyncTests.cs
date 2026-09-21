@@ -3,7 +3,7 @@ using Xunit;
 
 namespace FocusKey.Foundation.Tests.Settings;
 
-public sealed class Milestone3UiScaleSettingsSyncTests
+public sealed class UiScaleSettingsSyncTests
 {
     private static readonly string[] UiScaleOptions = ["80%", "90%", "100%", "110%", "125%", "150%"];
 

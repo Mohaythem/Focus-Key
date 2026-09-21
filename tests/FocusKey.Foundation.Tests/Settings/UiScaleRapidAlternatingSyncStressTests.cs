@@ -6,7 +6,7 @@ using Xunit;
 
 namespace FocusKey.Foundation.Tests.Settings;
 
-public sealed class Milestone3ChallengerRapidAlternatingSyncTests
+public sealed class UiScaleRapidAlternatingSyncStressTests
 {
     private static readonly string[] UiScaleOptions = ["80%", "90%", "100%", "110%", "125%", "150%"];
 

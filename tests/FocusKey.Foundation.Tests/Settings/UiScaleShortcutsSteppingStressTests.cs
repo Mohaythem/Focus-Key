@@ -5,11 +5,11 @@ using Xunit;
 namespace FocusKey.Foundation.Tests.Settings;
 
 /// <summary>
-/// Milestone 2 Empirical Challenge Tests:
+/// UI Scaling Shortcuts and Stepping Empirical Stress Tests:
 /// High-iteration stepping sequences, boundary clamping, arbitrary integer mappings,
 /// heavy multi-threaded concurrency, and simulated MainWindow clamping logic.
 /// </summary>
-public sealed class Milestone2ShortcutsAndSteppingStressTests
+public sealed class UiScaleShortcutsSteppingStressTests
 {
     private static readonly int[] StandardProgression = [80, 90, 100, 110, 125, 150];
 

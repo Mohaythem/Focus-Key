@@ -696,28 +696,46 @@ Implemented low-risk native Windows 11 and Fluent Design polish fixes across the
 
 ---
 
-## Phase 22 — Installer & Release Candidate Packaging
+## Phase 22 — Installer & Release Candidate RC1 Packaging
 
 Status: **Complete and verified**  
 Branch: `native/phased-rewrite`
 
 ### Executive Summary & Deliverables
-Packaged the complete, verified application into a self-contained Windows x64 Release distribution and Inno Setup installer (`release\FocusKeySetup.exe`), ready for distribution as a Release Candidate.
+Packaged the complete, verified application into a self-contained Windows x64 Release distribution and Inno Setup installer (`artifacts\release\1.0.0-rc1\FocusKeySetup.exe`, 64,713,868 bytes, ~61.72 MB), verified as Focus Key Release Candidate RC1.
 
 ### Scope & Implementations
-1. **Self-Contained Publish Configuration**:
+1. **Application Version Metadata Alignment**:
+   - Configured `src/FocusKey.App/FocusKey.App.csproj`:
+     - `<Version>1.0.0-rc.1</Version>`
+     - `<AssemblyVersion>1.0.0.0</AssemblyVersion>`
+     - `<FileVersion>1.0.0.0</FileVersion>`
+     - `<InformationalVersion>1.0.0-rc.1</InformationalVersion>`
+   - Added `<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>` for `Assets\AppIcon.ico` to guarantee inclusion in the published asset folder.
+2. **Self-Contained Publish Configuration**:
    - `dotnet publish src/FocusKey.App/FocusKey.App.csproj -c Release -r win-x64 --self-contained true -o publish`
-   - All runtime dependencies, WinUI 3 binaries, SQLite interop, embedded assets, and high-fidelity sound files (`start_tick.wav`, `session_action.wav`, `complete.wav`, `completion_bell.wav`) verified in output.
-2. **Inno Setup Packaging**:
-   - Compiled via Inno Setup 6 (`ISCC.exe`) using `installer.iss`.
-   - Generates `release\FocusKeySetup.exe` (~64.6 MB) with modern LZMA2/ultra64 compression.
+   - All runtime dependencies, WinUI 3 binaries, SQLite interop (`e_sqlite3.dll`), application icon (`Assets\AppIcon.ico`), and all high-fidelity sound files (`start_tick.wav`, `session_action.wav`, `complete.wav`, `completion_bell.wav`) verified in output.
+3. **Inno Setup Packaging**:
+   - Configured `installer.iss`:
+     - `AppVersion=1.0.0-rc.1`
+     - `VersionInfoVersion=1.0.0.0`
+     - `OutputDir=artifacts\release\1.0.0-rc1`
+   - Compiled via Inno Setup 6 (`ISCC.exe`).
+   - Generates `artifacts\release\1.0.0-rc1\FocusKeySetup.exe` (64,713,868 bytes, SHA-256: `892A717FDED91CDD8B72D1077CE50AECA342EDC1F4DF6D4A0D597DF446345939`) with modern LZMA2/ultra64 solid compression.
    - Installs per-user to `%LOCALAPPDATA%\Programs\Focus Key` without requiring UAC administrator elevation.
-   - User data and SQLite databases preserved at `%LOCALAPPDATA%\FocusKey` across upgrades.
+   - Preserves user data and SQLite databases strictly isolated at `%LOCALAPPDATA%\FocusKey`.
    - Start Menu and optional Desktop shortcuts configured.
-   - Registry startup entry integrated for optional "Start with Windows" background shell.
+   - Registry startup entry integrated for "Start with Windows" background shell (`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`).
 
-### Verification
+### Verification & Lifecycle QA
 - **Publish**: `dotnet publish` completed cleanly with 0 errors.
-- **Installer Build**: Inno Setup compiled successfully into `release\FocusKeySetup.exe`.
+- **Installer Build**: Inno Setup compiled successfully into `artifacts\release\1.0.0-rc1\FocusKeySetup.exe`.
+- **Clean Silent Install**: Verified installation into `%LOCALAPPDATA%\Programs\Focus Key\FocusKey.exe`.
+- **Runtime Execution**: Verified native window creation and interactive launch from installed location.
+- **Single-Instance Concurrency**: Verified named mutex activation; secondary launch transfers focus to primary instance and exits cleanly.
+- **Start with Windows**: Verified registry run entry `"C:\Users\...\AppData\Local\Programs\Focus Key\FocusKey.exe" --startup` without development path references.
+- **In-Place Upgrade**: Verified installer running over existing installation without data loss or corruption.
+- **Uninstallation & Data Safety**: Verified uninstaller removes `%LOCALAPPDATA%\Programs\Focus Key` binary files completely while leaving `%LOCALAPPDATA%\FocusKey\focus_key.db` intact.
+- **Clean Reinstall**: Verified clean reinstall from RC1 setup package.
 - **Unit Tests**: 1,141/1,141 tests passing (`dotnet test -c Release`).
 - **Build**: 0 warnings, 0 errors (`dotnet build src/FocusKey.App/FocusKey.App.csproj -c Release`).

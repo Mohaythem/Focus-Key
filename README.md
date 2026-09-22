@@ -1,4 +1,4 @@
-﻿# Focus Key
+# Focus Key
 
 Focus Key is a lightweight, local-first Windows focus utility designed to get out of your way and let you work.
 
@@ -71,7 +71,7 @@ dotnet test FocusKey.slnx -c Release
 
 ### Packaging the Installer
 
-To produce the production installer (`release\FocusKeySetup.exe`):
+To produce the production installer (`artifacts\release\1.0.0\FocusKeySetup.exe`):
 
 ```powershell
 # Publish self-contained native application
@@ -81,7 +81,7 @@ dotnet publish src\FocusKey.App\FocusKey.App.csproj -c Release -r win-x64 --self
 iscc installer.iss
 ```
 
-The output installer will be located in `release\FocusKeySetup.exe`.
+The output installer will be located in `artifacts\release\1.0.0\FocusKeySetup.exe`.
 
 ---
 

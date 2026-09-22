@@ -5,6 +5,8 @@
     <RootNamespace>FocusKey.Foundation</RootNamespace>
     <AssemblyName>FocusKey.Foundation</AssemblyName>
     <IsPackable>false</IsPackable>
+    <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>
+    <DebugSymbols Condition="'$(Configuration)' == 'Release'">false</DebugSymbols>
   </PropertyGroup>
 
   <ItemGroup>

@@ -13,31 +13,32 @@ This document serves as the persistent repository-level source of truth for all 
 ---
 
 ## Pending Future Milestones
-*(None currently pending. All planned development, UI polish, sound integration, accessibility, and packaging milestones are implemented for Release Candidate RC1).*
+*(None currently pending. Focus Key v1.0.0 is released and verified).*
 
 ---
 
 ## Implemented Work Awaiting Final User Acceptance
 
-### Release Candidate RC1 Packaging & Lifecycle QA (Implemented — Awaiting Final User Acceptance)
+### Focus Key v1.0.0 Final Release Packaging & Lifecycle QA (Implemented — Awaiting Final User Acceptance)
 **Status:** Implemented — Awaiting Final User Acceptance
 **Scope & Deliverables:**
 1. **Self-Contained Publish Configuration**:
    - `dotnet publish src/FocusKey.App/FocusKey.App.csproj -c Release -r win-x64 --self-contained true -o publish` targeting `win-x64`.
-   - Embeds application version metadata: `1.0.0-rc.1` (`1.0.0.0`).
+   - Final version metadata: `1.0.0` (`1.0.0.0`).
    - Bundles all high-fidelity WAV sound assets (`start_tick.wav`, `session_action.wav`, `complete.wav`, `completion_bell.wav`), application icon (`Assets\AppIcon.ico`), WinUI 3 binaries, and SQLite interop (`e_sqlite3.dll`).
 2. **Inno Setup Standalone Installer Packaging**:
-   - Clean setup installer (`artifacts\release\1.0.0-rc1\FocusKeySetup.exe`, 64,713,868 bytes, SHA-256: `892A717FDED91CDD8B72D1077CE50AECA342EDC1F4DF6D4A0D597DF446345939`) using Inno Setup 6 with LZMA2/ultra64 solid compression.
+   - Clean setup installer (`artifacts\release\1.0.0\FocusKeySetup.exe`, 64,692,688 bytes, SHA-256: `7F3F43F160C0AC352CA0C09C3BDA95F1240A6311BDD0276F84A6395629B72089`) using Inno Setup 6 with LZMA2/ultra64 solid compression.
    - Installs per-user to `%LOCALAPPDATA%\Programs\Focus Key` without requiring administrator elevation.
+   - Configured `CloseApplications=force` for seamless silent upgrades of running instances.
    - Start Menu and optional Desktop shortcuts.
    - Quiet startup registry entry under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
 3. **Full Lifecycle & User Data Safety QA**:
-   - Clean silent installation verified.
+   - Clean upgrade installation from RC1 to final v1.0.0 verified.
+   - Single uninstall entry in Windows registry and single `unins000.exe` binary.
    - Interactive launch and single-instance mutex lease verified.
    - Start with Windows registry key verified without development path references.
-   - In-place upgrade install over existing version verified without lost data.
    - Silent uninstallation verified removing `%LOCALAPPDATA%\Programs\Focus Key` while preserving user data database at `%LOCALAPPDATA%\FocusKey\focus_key.db`.
-   - Clean reinstall from RC1 installer verified.
+   - Clean reinstall from v1.0.0 installer verified.
 4. **Automated Verification**:
    - 1,141/1,141 tests passing in Release mode (`dotnet test -c Release`).
    - 0 compiler warnings and 0 compiler errors (`dotnet build src/FocusKey.App/FocusKey.App.csproj -c Release`).

@@ -1,25 +1,27 @@
 # Focus Key — Project Progress & State Checkpoint
 
 ## Current Goal
-Release Candidate RC1 packaged (`artifacts\release\1.0.0-rc1\FocusKeySetup.exe`, 64,713,868 bytes) and verified with full runtime lifecycle QA, 1,141/1,141 passing tests, and 0 build warnings/errors.
+Focus Key v1.0.0 final release packaged (`artifacts\release\1.0.0\FocusKeySetup.exe`, 64,692,688 bytes, SHA-256: `7F3F43F160C0AC352CA0C09C3BDA95F1240A6311BDD0276F84A6395629B72089`) and verified with full runtime lifecycle QA, 1,141/1,141 passing tests, and 0 build warnings/errors.
 
 ## Current Checkpoint
 Implemented and verified:
-- **1. Release Candidate Self-Contained Distribution**:
+- **1. Final Release Self-Contained Distribution**:
   - `dotnet publish src/FocusKey.App/FocusKey.App.csproj -c Release -r win-x64 --self-contained true -o publish` completed with 0 errors.
-  - Aligned application version metadata: `Version=1.0.0-rc.1`, `AssemblyVersion=1.0.0.0`, `FileVersion=1.0.0.0`, `InformationalVersion=1.0.0-rc.1`.
-  - All high-fidelity audio assets (`start_tick.wav`, `session_action.wav`, `complete.wav`, `completion_bell.wav`), application icon (`Assets\AppIcon.ico`), WinUI 3 binaries, SQLite interop (`e_sqlite3.dll`), and runtime dependencies verified in output.
+  - Final application version metadata: `Version=1.0.0`, `AssemblyVersion=1.0.0.0`, `FileVersion=1.0.0.0`, `InformationalVersion=1.0.0`.
+  - All high-fidelity audio assets (`start_tick.wav`, `session_action.wav`, `complete.wav`, `completion_bell.wav`), application icon (`Assets\AppIcon.ico`), WinUI 3 binaries, SQLite interop (`e_sqlite3.dll`), and runtime dependencies verified in output. Zero debug/pdb/scratch files in publish output.
 - **2. Inno Setup Standalone Installer Packaging**:
-  - Built `artifacts\release\1.0.0-rc1\FocusKeySetup.exe` (64,713,868 bytes, ~61.72 MB, SHA-256: `892A717FDED91CDD8B72D1077CE50AECA342EDC1F4DF6D4A0D597DF446345939`) via Inno Setup 6 with LZMA2/ultra64 solid compression.
+  - Built `artifacts\release\1.0.0\FocusKeySetup.exe` (64,692,688 bytes, ~61.70 MB, SHA-256: `7F3F43F160C0AC352CA0C09C3BDA95F1240A6311BDD0276F84A6395629B72089`) via Inno Setup 6 with LZMA2/ultra64 solid compression.
   - Per-user installation to `%LOCALAPPDATA%\Programs\Focus Key` without requiring UAC administrator elevation.
+  - Configured `CloseApplications=force` for seamless silent upgrades of running instances.
   - Start Menu and optional Desktop shortcuts configured.
   - Quiet startup and background shell registry entry configured.
-- **3. Full Runtime Lifecycle QA**:
-  - Clean silent installation verified.
+- **3. Full Runtime Lifecycle QA & Upgrade Verification**:
+  - Clean upgrade installation from RC1 to final v1.0.0 verified.
+  - Single uninstall entry in Windows registry (`HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\{A1B2C3D4-FOCUS-KEY1-0000-000000000001}_is1`).
+  - Single `unins000.exe` uninstaller binary verified.
   - Main window HWND creation and interactive launch verified.
   - Single-instance mutex lease verified (secondary launch transfers focus and exits cleanly).
   - Start with Windows registry key verified without development path references.
-  - In-place upgrade install over existing version verified.
   - Silent uninstallation verified removing binary directory while preserving `%LOCALAPPDATA%\FocusKey\focus_key.db`.
   - Clean reinstall verified.
 - **4. Automated Tests**: 1,141/1,141 unit tests passing (`dotnet test -c Release`), 0 failed, 0 skipped.
@@ -50,13 +52,14 @@ Implemented and verified:
 - **Phase 18 (Final User-Selected Sound Integration)**: Integration of exact user audio assets (`start_tick.wav`, `session_action.wav`, `complete.wav`, `completion_bell.wav`), single-playback natural completion bell, and action audio cues for Pause, Continue, Stop, and Start New.
 - **Phase 19 (Final Pre-Release Cleanup + Consistency + Engineering QA)**: Cleaned debug/preview flags (`FOCUSKEY_YEARLY_PREVIEW`), audited Reports (Week/Month/Year), unified sidebar button accessibility properties, verified full runtime smoke workflow (`RuntimeSmokeWorkflowTests.cs`), and confirmed 0 build warnings/errors.
 - **Phase 21 (Final UI Polish Fixes & Runtime Screenshot Verification)**: Close Dialog default action & Enter routing, shortcut recording Fluent accent border, color picker bottom-edge flyout placement, and reports tooltip top clearance clamping.
-- **Phase 22 (Release Candidate RC1 Packaging & Lifecycle QA)**: Self-contained `win-x64` publish distribution, aligned `1.0.0-rc.1` version metadata, and Inno Setup installer package (`artifacts\release\1.0.0-rc1\FocusKeySetup.exe`, 64,713,868 bytes, SHA-256: `892A717FDED91CDD8B72D1077CE50AECA342EDC1F4DF6D4A0D597DF446345939`). Verified installation, launch, single-instance activation, registry startup, in-place upgrade, uninstallation with user data preservation, and clean reinstallation.
+- **Phase 22 (Release Candidate RC1 Packaging & Lifecycle QA)**: Self-contained `win-x64` publish distribution, aligned `1.0.0-rc.1` version metadata, and Inno Setup installer package (`artifacts\release\1.0.0-rc1\FocusKeySetup.exe`, 64,713,868 bytes, SHA-256: `892A717FDED91CDD8B72D1077CE50AECA342EDC1F4DF6D4A0D597DF446345939`).
+- **Phase 23 (Focus Key v1.0.0 Final Release Promotion)**: Promoted version to `1.0.0`, compiled final standalone installer (`artifacts\release\1.0.0\FocusKeySetup.exe`, 64,692,688 bytes, SHA-256: `7F3F43F160C0AC352CA0C09C3BDA95F1240A6311BDD0276F84A6395629B72089`), verified seamless RC1-to-v1.0.0 in-place upgrade, single uninstaller registration, and complete runtime smoke workflow.
 
 ## Remaining Work
-- All development, UI polish, sound integration, accessibility, packaging, and RC1 QA stages are complete.
+- All development, UI polish, sound integration, accessibility, packaging, RC1 testing, and v1.0.0 final release verification stages are complete.
 
 ## Important Active Decisions
-- **Release Candidate Target**: Version metadata is `Focus Key v1.0.0 RC1` (`1.0.0-rc.1` / `1.0.0.0`). Final `v1.0.0` git tags and release publishing remain deferred until final user sign-off.
+- **Final Release Target**: Version metadata is `Focus Key v1.0.0` (`1.0.0` / `1.0.0.0`).
 - **User Audio Provenance**: Sound files are exact user-provided WAV assets (`start_tick.wav`, `session_action.wav`, `complete.wav`, `completion_bell.wav`), unmodified and ungenerated.
 - **Natural Completion Semantics**: `completion_bell.wav` contains three internal chimes recorded directly in the audio asset, played once asynchronously via Win32 `PlaySound`. Looped playback logic was removed.
 - **Session Action Audio**: `session_action.wav` plays once for Pause, Continue, Stop, and Start New.
@@ -64,15 +67,14 @@ Implemented and verified:
 - **Close Dialog Default**: `Hide Focus Key` is the explicit primary action, activated immediately on Enter keypress without interception.
 - **Standalone Distribution**: Self-contained per-user installer without external runtime dependencies.
 - **User Data Isolation**: User SQLite database remains isolated at `%LOCALAPPDATA%\FocusKey\focus_key.db`, preserved across installer upgrades and uninstalls.
-- **Signing Status**: Package is unsigned (standard for initial Release Candidate before production certificate signing).
+- **Signing Status**: Package is unsigned (reported truthfully).
 
 ## Last Verification
 - **Build**: `dotnet build src/FocusKey.App/FocusKey.App.csproj -c Release` (0 Warnings, 0 Errors).
 - **Test Suite**: `dotnet test -c Release` (1,141 passed, 0 failed, 0 skipped).
-- **Publish & Installer**: `dotnet publish` (0 Errors) and Inno Setup compile (`artifacts\release\1.0.0-rc1\FocusKeySetup.exe`, 64,713,868 bytes).
-- **Lifecycle QA**: Silent install, HWND creation, single instance, registry startup key, upgrade, uninstallation, data preservation, and reinstall verified.
+- **Publish & Installer**: `dotnet publish` (0 Errors) and Inno Setup compile (`artifacts\release\1.0.0\FocusKeySetup.exe`, 64,692,688 bytes).
+- **Lifecycle QA**: Silent install, HWND creation, single instance, registry startup key, RC1-to-v1.0.0 upgrade, single uninstaller path, data preservation, and reinstall verified.
 
 ## Current Git State
 - Branch: `native/phased-rewrite`
 - Clean working tree.
-

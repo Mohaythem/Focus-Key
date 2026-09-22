@@ -20,10 +20,10 @@
     <EnableMsixTooling>true</EnableMsixTooling>
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
     
-    <Version>1.0.0-rc.1</Version>
+    <Version>1.0.0</Version>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
     <FileVersion>1.0.0.0</FileVersion>
-    <InformationalVersion>1.0.0-rc.1</InformationalVersion>
+    <InformationalVersion>1.0.0</InformationalVersion>
     <Company>Focus Key</Company>
     <Product>Focus Key</Product>
     <Description>Focus Key - Native Windows Desktop Productivity Timer</Description>

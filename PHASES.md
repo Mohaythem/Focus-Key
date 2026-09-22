@@ -736,6 +736,51 @@ Packaged the complete, verified application into a self-contained Windows x64 Re
 - **Start with Windows**: Verified registry run entry `"C:\Users\...\AppData\Local\Programs\Focus Key\FocusKey.exe" --startup` without development path references.
 - **In-Place Upgrade**: Verified installer running over existing installation without data loss or corruption.
 - **Uninstallation & Data Safety**: Verified uninstaller removes `%LOCALAPPDATA%\Programs\Focus Key` binary files completely while leaving `%LOCALAPPDATA%\FocusKey\focus_key.db` intact.
-- **Clean Reinstall**: Verified clean reinstall from RC1 setup package.
+- **Unit Tests**: 1,141/1,141 tests passing (`dotnet test -c Release`).
+- **Build**: 0 warnings, 0 errors (`dotnet build src/FocusKey.App/FocusKey.App.csproj -c Release`).
+
+---
+
+## Phase 23 — Focus Key v1.0.0 Final Release Promotion
+
+Status: **Complete and verified**  
+Branch: `native/phased-rewrite`
+
+### Executive Summary & Deliverables
+Promoted Focus Key from Release Candidate RC1 to the final production release (**Focus Key v1.0.0**), built the final standalone installer (`artifacts\release\1.0.0\FocusKeySetup.exe`, 64,692,688 bytes, ~61.70 MB), and verified seamless in-place upgrade over RC1.
+
+### Scope & Implementations
+1. **Version Promotion**:
+   - `src/FocusKey.App/FocusKey.App.csproj`:
+     - `<Version>1.0.0</Version>`
+     - `<AssemblyVersion>1.0.0.0</AssemblyVersion>`
+     - `<FileVersion>1.0.0.0</FileVersion>`
+     - `<InformationalVersion>1.0.0</InformationalVersion>`
+   - `src/FocusKey.Foundation/FocusKey.Foundation.csproj`:
+     - Added `<DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>` and `<DebugSymbols Condition="'$(Configuration)' == 'Release'">false</DebugSymbols>` to ensure clean production builds with zero PDB emission.
+   - `installer.iss`:
+     - `AppVersion=1.0.0`
+     - `VersionInfoVersion=1.0.0.0`
+     - `OutputDir=artifacts\release\1.0.0`
+     - `CloseApplications=force` (guarantees safe silent upgrade of background/tray instances).
+2. **Clean Self-Contained Release Publish**:
+   - Executed fresh `dotnet publish` targeting `win-x64` self-contained.
+   - Verified zero non-production files (no PDBs, tests, source files, logs, or databases).
+3. **Inno Setup Production Packaging**:
+   - Compiled via Inno Setup 6 (`ISCC.exe`).
+   - Generated `artifacts\release\1.0.0\FocusKeySetup.exe` (64,692,688 bytes, SHA-256: `7F3F43F160C0AC352CA0C09C3BDA95F1240A6311BDD0276F84A6395629B72089`).
+   - Unsigned status reported truthfully.
+4. **RC1 to Final Upgrade QA**:
+   - Executed silent upgrade over existing RC1 installation.
+   - Confirmed installed binary updated to `1.0.0+ae5383c...`.
+   - Confirmed single `unins000.exe` and single registry uninstall key (`HKCU\...\Uninstall\{A1B2C3D4-FOCUS-KEY1-0000-000000000001}_is1`).
+   - Confirmed existing SQLite database (`%LOCALAPPDATA%\FocusKey\focus_key.db`) and user settings preserved.
+   - Confirmed single-instance activation and focus signaling on installed binary.
+5. **Release Documentation**:
+   - Created standalone [`RELEASE_NOTES.md`](file:///d:/Focus%20Key/RELEASE_NOTES.md) summarizing all features and architecture.
+
+### Verification
+- **Publish**: `dotnet publish` completed cleanly with 0 errors.
+- **Installer Build**: Inno Setup compiled successfully into `artifacts\release\1.0.0\FocusKeySetup.exe`.
 - **Unit Tests**: 1,141/1,141 tests passing (`dotnet test -c Release`).
 - **Build**: 0 warnings, 0 errors (`dotnet build src/FocusKey.App/FocusKey.App.csproj -c Release`).

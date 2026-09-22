@@ -40,22 +40,25 @@ This document serves as the persistent repository-level source of truth for all 
 
 ## Implemented Work Awaiting Final User Acceptance
 
-### Session Sound Behavior & Sound Replacement (Implemented — Awaiting Final User Acceptance)
+### Session Sound Behavior & Final User-Selected Audio Integration (Implemented — Awaiting Final User Acceptance)
 **Status:** Implemented — Awaiting Final User Acceptance
 **Scope & Deliverables:**
-1. **Revised Playback Semantics**:
-   - New session Start $\rightarrow$ plays Start sound once.
-   - Continue after Pause $\rightarrow$ plays Start sound once.
-   - User Stop $\rightarrow$ plays Completion sound once (both direct manual stop and Start New finalizing a paused session).
-   - Natural timer completion $\rightarrow$ plays Completion sound THREE times sequentially (with 180ms gap, non-overlapping `SND_SYNC` playback on a background thread).
+1. **User-Selected High-Fidelity Audio Assets**:
+   - Integrated exact user-provided WAV audio assets into `src/FocusKey.App/Assets/Sounds/` without synthesizing, trimming, modifying, or regenerating:
+     - `start_tick.wav` (1,263,014 bytes, 44.1kHz WAV).
+     - `complete.wav` (707,772 bytes, 44.1kHz WAV).
+     - `completion_bell.wav` (765,704 bytes, 44.1kHz WAV, contains 3 chimes within the file).
+   - Removed synthetic disk asset overwriting on startup and in test fixtures to preserve user audio assets permanently.
+2. **Deterministic Playback Semantics**:
+   - New session Start $\rightarrow$ plays `start_tick.wav` once.
+   - Continue after Pause $\rightarrow$ plays `start_tick.wav` once.
+   - Manual Stop $\rightarrow$ plays `complete.wav` once.
+   - Start New (when finalizing paused session) $\rightarrow$ plays `complete.wav` once.
+   - Natural timer completion $\rightarrow$ plays `completion_bell.wav` ONCE ONLY (single asynchronous Win32 `PlaySound` call; looping logic removed since the WAV file already contains 3 recorded chimes).
    - Interrupted / crash / shutdown $\rightarrow$ completely silent (zero sound playback).
-2. **Settings Controls & Unconditional Preview**:
+3. **Settings Controls & Unconditional Preview**:
    - Master gate toggle (`Session sounds [On/Off]`), Start sound toggle, Completion sound toggle.
-   - Preview buttons play single cue directly (never 3 times) even if master/child sounds are disabled.
-3. **Calm Organic Synthesized Audio Assets**:
-   - 100% app-owned, license-safe mathematical synthesis via `SoundSynthesizer.cs` (44.1kHz 16-bit mono PCM RIFF WAV).
-   - `start_tick.wav`: 80ms soft, organic D5/D6/D4 confirmation tick (7,100 bytes).
-   - `completion_bell.wav`: 500ms warm, pleasant C-Major chord chime (44,144 bytes).
+   - Preview buttons play single cue directly unconditionally (`PreviewStartTick` $\rightarrow$ `start_tick.wav` once, `PreviewCompletionBell` $\rightarrow$ `completion_bell.wav` once).
 
 ---
 

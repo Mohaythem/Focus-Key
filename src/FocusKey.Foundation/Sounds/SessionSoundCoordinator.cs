@@ -4,8 +4,10 @@ namespace FocusKey.Foundation.Sounds;
 
 /// <summary>
 /// Authoritative rule engine for session sound playback events.
-/// Enforces single start cue on Start/Continue, single completion cue on Stop,
-/// triple repetition on Natural Completion, and silence on Interrupted.
+/// Enforces single start cue on Start/Continue (start_tick.wav),
+/// single stop cue on Stop/StartNew (complete.wav),
+/// single completion bell on Natural Completion (completion_bell.wav, containing 3 internal chimes),
+/// and silence on Interrupted.
 /// </summary>
 public sealed class SessionSoundCoordinator
 {
@@ -16,14 +18,14 @@ public sealed class SessionSoundCoordinator
         _player = player ?? throw new ArgumentNullException(nameof(player));
     }
 
-    /// <summary>New session started -> plays Start sound once.</summary>
+    /// <summary>New session started -> plays Start sound (start_tick.wav) once.</summary>
     public void HandleSessionStarted(SessionRecord session)
     {
         if (session is null) return;
         _player.PlayStartTick();
     }
 
-    /// <summary>Continue after Pause -> plays Start sound once if continued.</summary>
+    /// <summary>Continue after Pause -> plays Start sound (start_tick.wav) once if continued.</summary>
     public void HandleSessionContinued(SessionOutcome outcome)
     {
         if (outcome.Kind == SessionOutcomeKind.Continued)
@@ -32,16 +34,16 @@ public sealed class SessionSoundCoordinator
         }
     }
 
-    /// <summary>User Stop (or Start New from Paused) -> plays Completion sound once if stopped.</summary>
+    /// <summary>User Stop (or Start New from Paused) -> plays Stop sound (complete.wav) once if stopped.</summary>
     public void HandleSessionStopped(SessionOutcome outcome)
     {
         if (outcome.Kind == SessionOutcomeKind.Stopped)
         {
-            _player.PlayCompletionBell();
+            _player.PlayStop();
         }
     }
 
-    /// <summary>Natural timer completion -> plays Completion sound three times.</summary>
+    /// <summary>Natural timer completion -> plays completion bell (completion_bell.wav) ONCE ONLY.</summary>
     public void HandleSessionCompleted(SessionRecord session)
     {
         if (session is null) return;

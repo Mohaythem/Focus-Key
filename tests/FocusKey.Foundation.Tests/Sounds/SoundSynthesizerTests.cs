@@ -13,22 +13,6 @@ public sealed class SoundSynthesizerTests
         Assert.Equal(7100, wav.Length); // 80ms @ 44.1kHz 16-bit mono = 3528 samples * 2 + 44 header
 
         ValidateWavHeader(wav, expectedSampleRate: 44100, expectedChannels: 1, expectedBitsPerSample: 16);
-
-        // Ensure asset file exists on disk
-        try
-        {
-            string targetDir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "FocusKey.App", "Assets", "Sounds"));
-            if (Directory.Exists(Path.GetDirectoryName(targetDir)))
-            {
-                Directory.CreateDirectory(targetDir);
-                string filePath = Path.Combine(targetDir, "start_tick.wav");
-                File.WriteAllBytes(filePath, wav);
-            }
-        }
-        catch (IOException)
-        {
-            // File may be locked by another process or audio player
-        }
     }
 
     [Fact]
@@ -39,22 +23,6 @@ public sealed class SoundSynthesizerTests
         Assert.Equal(44144, wav.Length); // 500ms @ 44.1kHz 16-bit mono = 22050 samples * 2 + 44 header
 
         ValidateWavHeader(wav, expectedSampleRate: 44100, expectedChannels: 1, expectedBitsPerSample: 16);
-
-        // Ensure asset file exists on disk
-        try
-        {
-            string targetDir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "FocusKey.App", "Assets", "Sounds"));
-            if (Directory.Exists(Path.GetDirectoryName(targetDir)))
-            {
-                Directory.CreateDirectory(targetDir);
-                string filePath = Path.Combine(targetDir, "completion_bell.wav");
-                File.WriteAllBytes(filePath, wav);
-            }
-        }
-        catch (IOException)
-        {
-            // File may be locked by another process or audio player
-        }
     }
 
     private static void ValidateWavHeader(byte[] wav, int expectedSampleRate, short expectedChannels, short expectedBitsPerSample)

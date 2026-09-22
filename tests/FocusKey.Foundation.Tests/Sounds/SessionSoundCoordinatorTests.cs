@@ -9,13 +9,14 @@ public sealed class SessionSoundCoordinatorTests
     private sealed class MockSoundPlayer : ISoundPlayer
     {
         public int StartTickCount { get; private set; }
-        public int CompletionBellCount { get; private set; }
+        public int StopCount { get; private set; }
         public int NaturalCompletionBellCount { get; private set; }
         public int PreviewStartTickCount { get; private set; }
         public int PreviewCompletionBellCount { get; private set; }
 
         public void PlayStartTick() => StartTickCount++;
-        public void PlayCompletionBell() => CompletionBellCount++;
+        public void PlayStop() => StopCount++;
+        public void PlayCompletionBell() => PlayStop();
         public void PlayNaturalCompletionBell() => NaturalCompletionBellCount++;
         public void PreviewStartTick() => PreviewStartTickCount++;
         public void PreviewCompletionBell() => PreviewCompletionBellCount++;
@@ -31,7 +32,7 @@ public sealed class SessionSoundCoordinatorTests
         coordinator.HandleSessionStarted(session);
 
         Assert.Equal(1, player.StartTickCount);
-        Assert.Equal(0, player.CompletionBellCount);
+        Assert.Equal(0, player.StopCount);
         Assert.Equal(0, player.NaturalCompletionBellCount);
     }
 
@@ -46,7 +47,7 @@ public sealed class SessionSoundCoordinatorTests
         coordinator.HandleSessionContinued(outcome);
 
         Assert.Equal(1, player.StartTickCount);
-        Assert.Equal(0, player.CompletionBellCount);
+        Assert.Equal(0, player.StopCount);
         Assert.Equal(0, player.NaturalCompletionBellCount);
     }
 
@@ -61,7 +62,7 @@ public sealed class SessionSoundCoordinatorTests
         coordinator.HandleSessionContinued(outcome);
 
         Assert.Equal(0, player.StartTickCount);
-        Assert.Equal(0, player.CompletionBellCount);
+        Assert.Equal(0, player.StopCount);
         Assert.Equal(0, player.NaturalCompletionBellCount);
     }
 
@@ -76,7 +77,7 @@ public sealed class SessionSoundCoordinatorTests
         coordinator.HandleSessionStopped(outcome);
 
         Assert.Equal(0, player.StartTickCount);
-        Assert.Equal(1, player.CompletionBellCount);
+        Assert.Equal(1, player.StopCount);
         Assert.Equal(0, player.NaturalCompletionBellCount);
     }
 
@@ -91,12 +92,12 @@ public sealed class SessionSoundCoordinatorTests
         coordinator.HandleSessionStopped(outcome);
 
         Assert.Equal(0, player.StartTickCount);
-        Assert.Equal(0, player.CompletionBellCount);
+        Assert.Equal(0, player.StopCount);
         Assert.Equal(0, player.NaturalCompletionBellCount);
     }
 
     [Fact]
-    public void NaturalCompletion_PlaysCompletionSoundThreeTimes()
+    public void NaturalCompletion_PlaysCompletionSoundOnce()
     {
         var player = new MockSoundPlayer();
         var coordinator = new SessionSoundCoordinator(player);
@@ -105,7 +106,7 @@ public sealed class SessionSoundCoordinatorTests
         coordinator.HandleSessionCompleted(session);
 
         Assert.Equal(0, player.StartTickCount);
-        Assert.Equal(0, player.CompletionBellCount);
+        Assert.Equal(0, player.StopCount);
         Assert.Equal(1, player.NaturalCompletionBellCount);
     }
 
@@ -118,7 +119,7 @@ public sealed class SessionSoundCoordinatorTests
         coordinator.HandleSessionInterrupted();
 
         Assert.Equal(0, player.StartTickCount);
-        Assert.Equal(0, player.CompletionBellCount);
+        Assert.Equal(0, player.StopCount);
         Assert.Equal(0, player.NaturalCompletionBellCount);
         Assert.Equal(0, player.PreviewStartTickCount);
         Assert.Equal(0, player.PreviewCompletionBellCount);
@@ -131,8 +132,8 @@ public sealed class SessionSoundCoordinatorTests
         public bool CompletionEnabled { get; set; } = true;
 
         public int StartTickPlayed { get; private set; }
-        public int CompletionBellPlayed { get; private set; }
-        public int NaturalCompletionRepeatsPlayed { get; private set; }
+        public int StopPlayed { get; private set; }
+        public int NaturalCompletionPlayed { get; private set; }
         public int PreviewStartTickPlayed { get; private set; }
         public int PreviewCompletionBellPlayed { get; private set; }
 
@@ -142,16 +143,18 @@ public sealed class SessionSoundCoordinatorTests
             StartTickPlayed++;
         }
 
-        public void PlayCompletionBell()
+        public void PlayStop()
         {
             if (!MasterEnabled || !CompletionEnabled) return;
-            CompletionBellPlayed++;
+            StopPlayed++;
         }
+
+        public void PlayCompletionBell() => PlayStop();
 
         public void PlayNaturalCompletionBell()
         {
             if (!MasterEnabled || !CompletionEnabled) return;
-            NaturalCompletionRepeatsPlayed += 3;
+            NaturalCompletionPlayed++;
         }
 
         public void PreviewStartTick()
@@ -178,8 +181,8 @@ public sealed class SessionSoundCoordinatorTests
         coordinator.HandleSessionCompleted(session);
 
         Assert.Equal(0, harness.StartTickPlayed);
-        Assert.Equal(0, harness.CompletionBellPlayed);
-        Assert.Equal(0, harness.NaturalCompletionRepeatsPlayed);
+        Assert.Equal(0, harness.StopPlayed);
+        Assert.Equal(0, harness.NaturalCompletionPlayed);
     }
 
     [Fact]
@@ -195,8 +198,8 @@ public sealed class SessionSoundCoordinatorTests
         coordinator.HandleSessionCompleted(session);
 
         Assert.Equal(0, harness.StartTickPlayed);
-        Assert.Equal(1, harness.CompletionBellPlayed);
-        Assert.Equal(3, harness.NaturalCompletionRepeatsPlayed);
+        Assert.Equal(1, harness.StopPlayed);
+        Assert.Equal(1, harness.NaturalCompletionPlayed);
     }
 
     [Fact]
@@ -212,8 +215,8 @@ public sealed class SessionSoundCoordinatorTests
         coordinator.HandleSessionCompleted(session);
 
         Assert.Equal(2, harness.StartTickPlayed); // 1 on Start + 1 on Continue
-        Assert.Equal(0, harness.CompletionBellPlayed);
-        Assert.Equal(0, harness.NaturalCompletionRepeatsPlayed);
+        Assert.Equal(0, harness.StopPlayed);
+        Assert.Equal(0, harness.NaturalCompletionPlayed);
     }
 
     [Fact]
@@ -225,6 +228,6 @@ public sealed class SessionSoundCoordinatorTests
         harness.PreviewCompletionBell();
 
         Assert.Equal(1, harness.PreviewStartTickPlayed);
-        Assert.Equal(1, harness.PreviewCompletionBellPlayed); // Exactly 1, NOT 3 times
+        Assert.Equal(1, harness.PreviewCompletionBellPlayed);
     }
 }

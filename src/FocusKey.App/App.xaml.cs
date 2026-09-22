@@ -454,7 +454,7 @@ public partial class App : Application
         SessionOutcome result = await _completion!.StopAsync(expectedId, cancellationToken);
         if (result.Kind == SessionOutcomeKind.Stopped)
         {
-            _sounds?.PlayCompletionBell();
+            _sounds?.PlayStop();
         }
         _window?.RefreshPages();
         if (_quickOverlay is not null) await _quickOverlay.RefreshIfVisibleAsync();

@@ -555,3 +555,36 @@ Audited and enhanced the Focus Key application so the entire core desktop experi
 - **1,138 automated unit tests passing (1,138 passed, 0 failed, 0 skipped)** in `dotnet test -c Release`.
 - Release build compiles with **0 warnings and 0 errors**.
 - All mouse-less workflows verified end-to-end.
+
+---
+
+## Phase 18 — Final User-Selected Sound Integration
+
+Status: **Complete and verified**  
+Branch: `native/phased-rewrite`
+
+### Executive Summary & Architecture
+Integrated the user-selected high-fidelity audio assets into the application and refined playback semantics across session lifecycle transitions and settings previews.
+
+### Scope & Implementations
+1. **User Audio Assets Integration**:
+   - Integrated exact user-provided WAV assets into `src/FocusKey.App/Assets/Sounds/`:
+     - `start_tick.wav` (1,263,014 bytes, 44.1kHz WAV).
+     - `complete.wav` (707,772 bytes, 44.1kHz WAV).
+     - `completion_bell.wav` (765,704 bytes, 44.1kHz WAV, containing 3 chimes within the file).
+   - Removed synthetic runtime disk generation logic in `SoundPlayerService` (`EnsureSoundAssets`) and in test fixtures (`SoundSynthesizerTests`) to permanently preserve user-provided sound assets.
+2. **Audio Playback Semantics**:
+   - New session Start $\rightarrow$ plays `start_tick.wav` once.
+   - Continue after Pause $\rightarrow$ plays `start_tick.wav` once.
+   - Manual Stop $\rightarrow$ plays `complete.wav` once.
+   - Start New (when finalizing paused session) $\rightarrow$ plays `complete.wav` once.
+   - Natural timer completion $\rightarrow$ plays `completion_bell.wav` ONCE ONLY (single asynchronous Win32 `PlaySound` call; looped repeat removed because the audio asset contains three internal chimes).
+   - Interrupted / crash / shutdown $\rightarrow$ completely silent.
+3. **Settings Controls & Unconditional Preview**:
+   - Master gate toggle (`Session sounds [On/Off]`), Start sound toggle, and Completion sound toggle preserved.
+   - Preview buttons play single cue directly unconditionally (`PreviewStartTick` $\rightarrow$ `start_tick.wav` once, `PreviewCompletionBell` $\rightarrow$ `completion_bell.wav` once).
+
+### Tests & Verification
+- **1,138 automated unit tests passing (1,138 passed, 0 failed, 0 skipped)** in `dotnet test -c Release`.
+- Release build compiles with **0 warnings and 0 errors**.
+

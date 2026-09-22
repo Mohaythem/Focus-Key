@@ -13,7 +13,6 @@ public sealed class SoundPlayerService : ISoundPlayer
     [DllImport("winmm.dll", EntryPoint = "PlaySoundW", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern bool PlaySound(string? pszSound, IntPtr hmod, uint fdwSound);
 
-    private const uint SND_SYNC = 0x0000;
     private const uint SND_ASYNC = 0x0001;
     private const uint SND_NODEFAULT = 0x0002;
     private const uint SND_FILENAME = 0x00020000;
@@ -33,33 +32,39 @@ public sealed class SoundPlayerService : ISoundPlayer
         _startSoundEnabled = startSoundEnabled ?? throw new ArgumentNullException(nameof(startSoundEnabled));
         _completionSoundEnabled = completionSoundEnabled ?? throw new ArgumentNullException(nameof(completionSoundEnabled));
         _soundsDirectory = customSoundsDirectory ?? Path.Combine(AppContext.BaseDirectory, "Assets", "Sounds");
-
-        EnsureSoundAssets();
     }
 
+    /// <summary>Plays start_tick.wav once if master and start sound settings are enabled.</summary>
     public void PlayStartTick()
     {
         if (!_masterSoundsEnabled() || !_startSoundEnabled()) return;
         PlayFile("start_tick.wav");
     }
 
-    public void PlayCompletionBell()
+    /// <summary>Plays complete.wav once if master and completion sound settings are enabled (e.g. on manual Stop or Start New).</summary>
+    public void PlayStop()
+    {
+        if (!_masterSoundsEnabled() || !_completionSoundEnabled()) return;
+        PlayFile("complete.wav");
+    }
+
+    /// <summary>Alias for PlayStop (complete.wav) for backward compatibility.</summary>
+    public void PlayCompletionBell() => PlayStop();
+
+    /// <summary>Plays completion_bell.wav ONCE ONLY if master and completion sound settings are enabled (on natural timer completion).</summary>
+    public void PlayNaturalCompletionBell()
     {
         if (!_masterSoundsEnabled() || !_completionSoundEnabled()) return;
         PlayFile("completion_bell.wav");
     }
 
-    public void PlayNaturalCompletionBell()
-    {
-        if (!_masterSoundsEnabled() || !_completionSoundEnabled()) return;
-        PlayFileRepeated("completion_bell.wav", repeatCount: 3, gapMs: 180);
-    }
-
+    /// <summary>Previews start_tick.wav once unconditionally.</summary>
     public void PreviewStartTick()
     {
         PlayFile("start_tick.wav");
     }
 
+    /// <summary>Previews completion_bell.wav once unconditionally.</summary>
     public void PreviewCompletionBell()
     {
         PlayFile("completion_bell.wav");
@@ -67,8 +72,8 @@ public sealed class SoundPlayerService : ISoundPlayer
 
     private void PlayFile(string filename)
     {
-        string path = Path.Combine(_soundsDirectory, filename);
-        if (File.Exists(path))
+        string? path = ResolveSoundPath(filename);
+        if (path is not null)
         {
             try
             {
@@ -78,45 +83,20 @@ public sealed class SoundPlayerService : ISoundPlayer
         }
     }
 
-    private void PlayFileRepeated(string filename, int repeatCount, int gapMs)
+    private string? ResolveSoundPath(string filename)
     {
-        string path = Path.Combine(_soundsDirectory, filename);
-        if (!File.Exists(path)) return;
+        string candidate = Path.Combine(_soundsDirectory, filename);
+        if (File.Exists(candidate)) return candidate;
 
-        Task.Run(async () =>
-        {
-            for (int i = 0; i < repeatCount; i++)
-            {
-                try
-                {
-                    PlaySound(path, IntPtr.Zero, SND_SYNC | SND_FILENAME | SND_NODEFAULT);
-                }
-                catch { }
+        candidate = Path.Combine(AppContext.BaseDirectory, "Assets", "Sounds", filename);
+        if (File.Exists(candidate)) return candidate;
 
-                if (i < repeatCount - 1 && gapMs > 0)
-                {
-                    try
-                    {
-                        await Task.Delay(gapMs).ConfigureAwait(false);
-                    }
-                    catch { }
-                }
-            }
-        });
-    }
+        candidate = Path.Combine(Directory.GetCurrentDirectory(), "Assets", "Sounds", filename);
+        if (File.Exists(candidate)) return candidate;
 
-    public void EnsureSoundAssets()
-    {
-        try
-        {
-            Directory.CreateDirectory(_soundsDirectory);
+        candidate = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "FocusKey.App", "Assets", "Sounds", filename));
+        if (File.Exists(candidate)) return candidate;
 
-            string startPath = Path.Combine(_soundsDirectory, "start_tick.wav");
-            File.WriteAllBytes(startPath, SoundSynthesizer.GenerateStartTick());
-
-            string bellPath = Path.Combine(_soundsDirectory, "completion_bell.wav");
-            File.WriteAllBytes(bellPath, SoundSynthesizer.GenerateCompletionBell());
-        }
-        catch { }
+        return null;
     }
 }

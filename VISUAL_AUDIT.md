@@ -2,7 +2,7 @@
 
 **Project:** Focus Key — Native Windows 11 Focus Utility  
 **Technology Stack:** C# / .NET 10 / WinUI 3 / Windows App SDK 1.8 / SQLite  
-**Workspace:** `D:\Focus Key`  
+**Workspace:** `<repo-root>`  
 **Repository:** `https://github.com/Mohaythem/Focus-Key.git`  
 **Branch:** `native/phased-rewrite`  
 **Baseline Commit:** `044d1e7`  
@@ -361,4 +361,4 @@ This roadmap organizes the resolution of all audit findings into six strictly se
 ### 8.2 Git Status & Repository Hygiene
 - Working branch: `native/phased-rewrite`
 - Baseline commit: `044d1e7`
-- The only file introduced into the repository is this audit document: `D:\Focus Key\VISUAL_AUDIT.md`.
+- The only file introduced into the repository is this audit document: `VISUAL_AUDIT.md`.

@@ -79,6 +79,9 @@ scratch/
 *.db-shm
 *.db-wal
 *.log
+*.dmp
+*.tmp
+*.temp
 focus_key.db
 focus_key.log
 settings.json

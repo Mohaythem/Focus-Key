@@ -3,11 +3,11 @@
 **Document Version:** 1.0.0  
 **Project:** Focus Key — Native Windows 11 Desktop Focus Utility  
 **Technology Stack:** C# / .NET 10 / WinUI 3 / Windows App SDK 1.8 / SQLite  
-**Workspace:** `D:\Focus Key`  
+**Workspace:** `<repo-root>`  
 **Repository:** `https://github.com/Mohaythem/Focus-Key.git`  
 **Branch:** `native/phased-rewrite`  
 **Baseline Commit:** `044d1e7`  
-**Primary Audit Reference:** [`D:\Focus Key\VISUAL_AUDIT.md`](file:///D:/Focus%20Key/VISUAL_AUDIT.md)  
+**Primary Audit Reference:** [`VISUAL_AUDIT.md`](VISUAL_AUDIT.md)  
 **Status:** Design System Definition Only — Implementation Deferred to Later Stages  
 
 ---

@@ -75,6 +75,42 @@ public sealed class ThemePresetsTests
     }
 
     [Fact]
+    public void CarbonDarkPreset_DimColor_MeetsWcagAaContrastRequirements()
+    {
+        var carbonDark = ThemePresets.DarkPresets[0].Palette;
+        Assert.Equal("#8E8E8E", carbonDark.Dim.Value);
+
+        double Luminance(HexColor hex)
+        {
+            double Channel(int offset)
+            {
+                double value = Convert.ToByte(hex.Value.Substring(offset, 2), 16) / 255.0;
+                return value <= 0.04045 ? value / 12.92 : Math.Pow((value + 0.055) / 1.055, 2.4);
+            }
+            return 0.2126 * Channel(1) + 0.7152 * Channel(3) + 0.0722 * Channel(5);
+        }
+
+        double Contrast(HexColor c1, HexColor c2)
+        {
+            double l1 = Luminance(c1);
+            double l2 = Luminance(c2);
+            return (Math.Max(l1, l2) + 0.05) / (Math.Min(l1, l2) + 0.05);
+        }
+
+        // Contrast against App Background (#121212) must exceed 4.5:1 (WCAG AA)
+        double crBackground = Contrast(carbonDark.Background, carbonDark.Dim);
+        Assert.True(crBackground >= 4.5, $"Dim on Background contrast {crBackground:F2} must be >= 4.5");
+
+        // Contrast against Card Surface (#1E1E1E) must exceed 4.5:1 (WCAG AA)
+        double crSurface = Contrast(carbonDark.Surface, carbonDark.Dim);
+        Assert.True(crSurface >= 4.5, $"Dim on Surface contrast {crSurface:F2} must be >= 4.5");
+
+        // Contrast against Secondary Surface (#252525) must exceed 4.5:1 (WCAG AA)
+        double crSurface2 = Contrast(carbonDark.Surface2, carbonDark.Dim);
+        Assert.True(crSurface2 >= 4.5, $"Dim on Surface2 contrast {crSurface2:F2} must be >= 4.5");
+    }
+
+    [Fact]
     public void FindPreset_DefaultDarkReturnsCarbonStudio()
     {
         var preset = ThemePresets.FindPreset("default", true);

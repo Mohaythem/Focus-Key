@@ -154,31 +154,46 @@ internal sealed class SettingsView : UserControl
         UpdateUiScaleSelection(UiScaleLevels.DefaultPercent);
 
         AutomationProperties.SetName(_appearance, "Color scheme");
+        AutomationProperties.SetAutomationId(_appearance, "SettingsColorSchemeComboBox");
         AutomationProperties.SetName(_contrast, "Contrast");
+        AutomationProperties.SetAutomationId(_contrast, "SettingsContrastComboBox");
         AutomationProperties.SetName(_lightPreset, "Light theme preset");
+        AutomationProperties.SetAutomationId(_lightPreset, "SettingsLightPresetComboBox");
         AutomationProperties.SetName(_darkPreset, "Dark theme preset");
+        AutomationProperties.SetAutomationId(_darkPreset, "SettingsDarkPresetComboBox");
         AutomationProperties.SetName(_timeFormat, "Clock format");
+        AutomationProperties.SetAutomationId(_timeFormat, "SettingsClockFormatComboBox");
         AutomationProperties.SetName(_uiScale, "UI scale");
-        AutomationProperties.SetAutomationId(_uiScale, "UiScaleComboBox");
+        AutomationProperties.SetAutomationId(_uiScale, "SettingsUiScaleComboBox");
         ToolTipService.SetToolTip(_uiScale, "Adjust application user interface scale.");
         AutomationProperties.SetName(_resetOverlayPositionButton, "Reset overlay window position");
         AutomationProperties.SetHelpText(_resetOverlayPositionButton, "Reset Quick Overlay window position to center screen");
+        AutomationProperties.SetAutomationId(_resetOverlayPositionButton, "SettingsResetOverlayPositionButton");
         AutomationProperties.SetName(_sessionSounds, "Session sounds");
         AutomationProperties.SetHelpText(_sessionSounds, "Master switch to enable or disable all session audio cues.");
+        AutomationProperties.SetAutomationId(_sessionSounds, "SettingsSessionSoundsToggle");
         AutomationProperties.SetName(_startSound, "Start sound");
+        AutomationProperties.SetAutomationId(_startSound, "SettingsStartSoundToggle");
         AutomationProperties.SetName(_completionSound, "Completion sound");
+        AutomationProperties.SetAutomationId(_completionSound, "SettingsCompletionSoundToggle");
         AutomationProperties.SetName(_startSoundPreviewButton, "Preview start sound");
+        AutomationProperties.SetAutomationId(_startSoundPreviewButton, "SettingsStartSoundPreviewButton");
         AutomationProperties.SetName(_completionSoundPreviewButton, "Preview completion sound");
+        AutomationProperties.SetAutomationId(_completionSoundPreviewButton, "SettingsCompletionSoundPreviewButton");
         ToolTipService.SetToolTip(_startSoundPreviewButton, "Preview start sound");
         ToolTipService.SetToolTip(_completionSoundPreviewButton, "Preview completion sound");
         AutomationProperties.SetName(_startWithWindows, "Start with Windows");
         AutomationProperties.SetHelpText(_startWithWindows, "Launch Focus Key automatically when you sign in to Windows.");
+        AutomationProperties.SetAutomationId(_startWithWindows, "SettingsStartWithWindowsToggle");
         AutomationProperties.SetName(_importHistoryButton, "Import history");
         AutomationProperties.SetHelpText(_importHistoryButton, "Import focus history records from a CSV file.");
+        AutomationProperties.SetAutomationId(_importHistoryButton, "SettingsImportHistoryButton");
         AutomationProperties.SetName(_exportHistoryButton, "Export history");
         AutomationProperties.SetHelpText(_exportHistoryButton, "Export all focus history records to a CSV file.");
+        AutomationProperties.SetAutomationId(_exportHistoryButton, "SettingsExportHistoryButton");
         AutomationProperties.SetName(_reload, "Reload saved settings");
         AutomationProperties.SetHelpText(_reload, "Reload saved configuration from disk, discarding uncommitted edits.");
+        AutomationProperties.SetAutomationId(_reload, "SettingsReloadButton");
         AutomationProperties.SetLiveSetting(_status, AutomationLiveSetting.Polite);
         AutomationProperties.SetAutomationId(_status, "SettingsStatus");
         if (Application.Current?.Resources["FkMutedText"] is Style statusStyle) _status.Style = statusStyle;
@@ -997,6 +1012,8 @@ internal sealed class SettingsView : UserControl
             preview.Children.Add(hexText);
             button.Content = preview;
             AutomationProperties.SetName(button, $"{name}, {color.Value}, choose color");
+            string colorAutoId = $"Settings{name.Replace(" ", "")}Button";
+            AutomationProperties.SetAutomationId(button, colorAutoId);
         }
         picker.ColorChanged += (_, _) => Preview();
         Preview();
@@ -1176,6 +1193,7 @@ internal sealed class SettingsView : UserControl
         _shortcutButton.Content = _shortcutText;
 
         AutomationProperties.SetName(_shortcutButton, $"Global shortcut, {_currentShortcut}, click to change");
+        AutomationProperties.SetAutomationId(_shortcutButton, "SettingsQuickOverlayShortcutButton");
 
         _resetShortcutButton.Content = "Reset";
         _resetShortcutButton.FontSize = 12;
@@ -1188,6 +1206,7 @@ internal sealed class SettingsView : UserControl
         _resetShortcutButton.VerticalAlignment = VerticalAlignment.Center;
         ToolTipService.SetToolTip(_resetShortcutButton, "Reset to Shift + F3");
         AutomationProperties.SetName(_resetShortcutButton, "Reset shortcut to Shift + F3");
+        AutomationProperties.SetAutomationId(_resetShortcutButton, "SettingsResetQuickOverlayShortcutButton");
 
         row.Children.Add(_shortcutButton);
         row.Children.Add(_resetShortcutButton);
@@ -1373,6 +1392,7 @@ internal sealed class SettingsView : UserControl
         _mainWindowShortcutButton.Content = _mainWindowShortcutText;
 
         AutomationProperties.SetName(_mainWindowShortcutButton, $"Open Focus Key shortcut, {_currentMainWindowShortcut}, click to change");
+        AutomationProperties.SetAutomationId(_mainWindowShortcutButton, "SettingsOpenFocusKeyShortcutButton");
 
         _resetMainWindowShortcutButton.Content = "Reset";
         _resetMainWindowShortcutButton.FontSize = 12;
@@ -1385,6 +1405,7 @@ internal sealed class SettingsView : UserControl
         _resetMainWindowShortcutButton.VerticalAlignment = VerticalAlignment.Center;
         ToolTipService.SetToolTip(_resetMainWindowShortcutButton, "Reset to Shift + F4");
         AutomationProperties.SetName(_resetMainWindowShortcutButton, "Reset shortcut to Shift + F4");
+        AutomationProperties.SetAutomationId(_resetMainWindowShortcutButton, "SettingsResetOpenFocusKeyShortcutButton");
 
         row.Children.Add(_mainWindowShortcutButton);
         row.Children.Add(_resetMainWindowShortcutButton);
@@ -1596,6 +1617,15 @@ internal sealed class SettingsView : UserControl
         };
         AutomationProperties.SetName(box, accessibleName);
         AutomationProperties.SetHelpText(box, helpText);
+        string autoId = name switch
+        {
+            "Work minutes" => "SettingsWorkMinutes",
+            "Work seconds" => "SettingsWorkSeconds",
+            "Break minutes" => "SettingsBreakMinutes",
+            "Break seconds" => "SettingsBreakSeconds",
+            _ => $"Settings{name.Replace(" ", "")}"
+        };
+        AutomationProperties.SetAutomationId(box, autoId);
         return box;
     }
 
@@ -1681,6 +1711,7 @@ internal sealed class SettingsView : UserControl
 
         card.Child = panel;
         AutomationProperties.SetName(card, "Session settings");
+        AutomationProperties.SetAutomationId(card, "SettingsSessionCard");
         return card;
     }
 
@@ -1688,26 +1719,24 @@ internal sealed class SettingsView : UserControl
     {
         var border = new Border
         {
-            Style = Application.Current?.Resources["FkCardSubtle"] as Style,
-            CornerRadius = new CornerRadius(6),
-            Padding = new Thickness(0)
+            Padding = new Thickness(0),
+            HorizontalAlignment = HorizontalAlignment.Stretch
         };
 
         if (string.IsNullOrWhiteSpace(title))
         {
             border.Child = content;
-            RegisterScaleAction(factor => border.CornerRadius = new CornerRadius(Math.Round(6 * factor)));
             return border;
         }
 
-        var panel = new StackPanel { Spacing = 0 };
+        var panel = new StackPanel { Spacing = 0, HorizontalAlignment = HorizontalAlignment.Stretch };
         var heading = Presentation.DimText(title, 11);
         AutomationProperties.SetHeadingLevel(heading, AutomationHeadingLevel.Level3);
         if (Application.Current?.Resources["FkSectionText"] is Style style)
         {
             heading.Style = style;
         }
-        heading.Margin = new Thickness(16, 12, 16, 10);
+        heading.Margin = new Thickness(16, 12, 16, 8);
         panel.Children.Add(heading);
 
         var divider = new Border
@@ -1715,7 +1744,7 @@ internal sealed class SettingsView : UserControl
             Style = Application.Current?.Resources["FkSubCardDivider"] as Style,
             Height = 1,
             Background = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", this),
-            Opacity = 0.4,
+            Opacity = 0.35,
             HorizontalAlignment = HorizontalAlignment.Stretch
         };
         panel.Children.Add(divider);
@@ -1723,9 +1752,8 @@ internal sealed class SettingsView : UserControl
 
         RegisterScaleAction(factor =>
         {
-            border.CornerRadius = new CornerRadius(Math.Round(6 * factor));
             heading.FontSize = Math.Round(11 * factor);
-            heading.Margin = new Thickness(Math.Round(16 * factor), Math.Round(12 * factor), Math.Round(16 * factor), Math.Round(10 * factor));
+            heading.Margin = new Thickness(Math.Round(16 * factor), Math.Round(12 * factor), Math.Round(16 * factor), Math.Round(8 * factor));
         });
 
         border.Child = panel;
@@ -1786,6 +1814,7 @@ internal sealed class SettingsView : UserControl
             MinHeight = 48
         };
         AutomationProperties.SetItemType(headerButton, "CollapsibleSection");
+        AutomationProperties.SetAutomationId(headerButton, $"Settings{title}HeaderButton");
 
         var divider = new Border
         {
@@ -1843,6 +1872,7 @@ internal sealed class SettingsView : UserControl
         });
 
         card.Child = rootPanel;
+        AutomationProperties.SetAutomationId(card, $"Settings{title}Card");
         return card;
     }
 

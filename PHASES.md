@@ -721,3 +721,42 @@ Packaged the complete, verified application into a self-contained Windows x64 Re
 - **Installer Build**: Inno Setup compiled successfully into `release\FocusKeySetup.exe`.
 - **Unit Tests**: 1,141/1,141 tests passing (`dotnet test -c Release`).
 - **Build**: 0 warnings, 0 errors (`dotnet build src/FocusKey.App/FocusKey.App.csproj -c Release`).
+
+---
+
+## Phase 23 — Final Native UI Refinement & Redesign Implementation
+
+Status: **Complete and verified**  
+Date: 2026-09-22  
+Branch: `native/phased-rewrite`
+
+### Executive Summary & Architecture
+Implemented the agreed-upon native UI refinements and redesign improvements from the independent Codex and Antigravity reviews. Preserved Focus Key's mature architecture, SQLite persistence, audio cues, global shortcuts, and Windows 11 Fluent design.
+
+### Scope & Implementations
+1. **Accessibility & Dim Text Contrast (WCAG AA >= 4.5:1)**:
+   - Updated `FkDim` in `src/FocusKey.App/App.xaml` for Dark Theme to `#8E8E8E` (contrast ratio 5.18:1 on card surface `#1E1E1E`, 5.87:1 on background `#121212`).
+   - Updated `ThemePresets.CarbonDark.Dim` to `#8E8E8E`.
+   - Verified with unit test `CarbonDarkPreset_DimColor_MeetsWcagAaContrastRequirements`.
+2. **Breakpoint Coordination & Responsive Reflow**:
+   - Set `BreakpointTodayTwoColumn` to `720.0` DIP in `TodayAdaptiveLayoutHelper.cs`.
+   - Stacks before the Activity rail cramps; verified across test widths and DPI scaling.
+3. **Today — Integrated Focus Deck (Codex Concept A)**:
+   - Unified Hero and Summary into single `SessionHeroCard` deck with subtle 1px divider, 4 Daily Summary metrics, and clean launcher styling without double borders.
+   - Updated `PaintLauncherCards` with 1.0px border and subtle alpha to avoid double outlines.
+   - Paused state automatically restores focus to `ContinueButton`.
+4. **Reports — Native & Honest Data Presentation (Codex Concept C)**:
+   - Added stable `AutomationProperties.AutomationId` across all date pickers, navigation buttons, period selectors, summary metric cards, chart container, insights rail card, and chart column elements.
+5. **Settings — Native Settings Hierarchy (Codex Concept D)**:
+   - Eliminated nested `FkCardSubtle` container boxes in favor of clean Fluent grouped rows with section headers and subtle dividers.
+   - Added stable `AutomationProperties.AutomationId` across all inputs, combos, toggles, buttons, and sections.
+6. **Quick Overlay — Calm Refinement**:
+   - Restrained neutral base styling (`FkSurface2`), removed persistent `Shift + F3` badge and keyboard hints footer.
+   - Added stable `AutomationProperties.AutomationId` to all overlay elements.
+7. **Runtime Visual Verification**:
+   - Captured and visually verified screenshots: `today_idle_wide.png`, `today_running_wide.png`, `today_paused_wide.png`, `today_stacked_narrow.png`, `reports_view.png`, `settings_view.png`, `quick_overlay_idle.png`.
+
+### Tests & Verification
+- **Automated Tests**: 1,147/1,147 unit tests passing (`dotnet test -c Release`), 0 failed, 0 skipped.
+- **Build**: 0 warnings, 0 errors (`dotnet build src/FocusKey.App/FocusKey.App.csproj -c Release`).
+- **Visual Inspection**: Verified high quality, legible contrast, aligned metrics, and absence of visual clutter across all views.

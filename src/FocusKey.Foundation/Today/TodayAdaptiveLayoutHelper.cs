@@ -34,7 +34,7 @@ public static class TodayAdaptiveLayoutHelper
 {
     public const double BreakpointNavExpanded = 1060.0;
     public const double BreakpointNavCompact = 740.0;
-    public const double BreakpointTodayTwoColumn = 620.0;
+    public const double BreakpointTodayTwoColumn = 720.0;
     public const double MaxContentWidth = 1260.0;
 
     public const double SidebarExpandedWidth = 220.0;

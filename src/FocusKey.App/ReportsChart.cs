@@ -212,6 +212,7 @@ internal sealed class ReportsChart : Grid
             };
             ToolTipService.SetToolTip(colContainer, toolTipObj);
             AutomationProperties.SetName(colContainer, tooltip);
+            AutomationProperties.SetAutomationId(colContainer, $"ReportsChartCol_{i}");
 
             Grid.SetColumn(colContainer, i);
             barsGrid.Children.Add(colContainer);

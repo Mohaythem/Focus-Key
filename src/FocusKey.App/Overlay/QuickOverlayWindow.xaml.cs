@@ -50,10 +50,7 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
     }
     internal void ApplyShortcut(GlobalShortcut shortcut)
     {
-        if (OverlayShortcutHint is not null)
-        {
-            OverlayShortcutHint.Text = shortcut.ToString();
-        }
+        // Persistent header shortcut badge removed for visual calm
     }
 
     public QuickOverlayWindow(
@@ -219,14 +216,12 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
                 ? (isPaused ? "WORK SESSION (PAUSED)" : "WORK SESSION")
                 : (isPaused ? "BREAK SESSION (PAUSED)" : "BREAK SESSION");
             HeaderTitle.Foreground = Presentation.ThemeBrush("FkForeground", Surface);
-            ShortcutHintContainer.Visibility = Visibility.Collapsed;
         }
         else
         {
             ActiveBadgeDot.Visibility = Visibility.Collapsed;
             HeaderTitle.Text = "FOCUS KEY";
             HeaderTitle.Foreground = Presentation.ThemeBrush("FkSecondary", Surface);
-            ShortcutHintContainer.Visibility = Visibility.Visible;
         }
 
         // View Visibility
@@ -369,7 +364,6 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
         StartButton.Content = state.IsBusy ? "Please wait…" : "Start";
         string chosenDuration = isWorkSelected ? WorkDuration.Text : BreakDuration.Text;
         AutomationProperties.SetName(StartButton, $"Start {state.Selected} session, {chosenDuration}");
-        if (StartKeyHint is not null) StartKeyHint.Text = "Start";
 
         var startColor = isWorkSelected ? _colors.Work : _colors.Break;
         StartButton.Background = SessionColorBrush.Create(startColor);
@@ -485,14 +479,14 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
         double heightDip;
         if (_state.Active is not null)
         {
-            heightDip = Math.Max(220, Math.Ceiling(Surface.DesiredSize.Height));
+            heightDip = Math.Max(200, Math.Ceiling(Surface.DesiredSize.Height));
         }
         else
         {
-            heightDip = Math.Max(280, Math.Ceiling(Surface.DesiredSize.Height));
+            heightDip = Math.Max(200, Math.Ceiling(Surface.DesiredSize.Height));
             if (_state.Feedback is not null)
             {
-                heightDip = Math.Max(310, heightDip);
+                heightDip = Math.Max(230, heightDip);
             }
         }
 
@@ -667,46 +661,31 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
         }
     }
 
-    private void OnCloseClicked(object sender, PointerRoutedEventArgs args)
-    {
-        args.Handled = true;
-        SaveCurrentPosition();
-        DismissRequested?.Invoke();
-    }
-
     private static void PaintCard(Button card, TextBlock label, TextBlock duration, Microsoft.UI.Xaml.Shapes.Ellipse? dot, bool selected, HexColor color, bool isDark)
     {
         if (dot is not null)
         {
-            dot.Fill = selected
-                ? SessionColorBrush.Create(SessionColors.Foreground(color))
-                : SessionColorBrush.Create(color);
+            dot.Fill = SessionColorBrush.Create(color);
+            dot.Opacity = selected ? 1.0 : (isDark ? 0.45 : 0.50);
         }
 
         if (selected)
         {
-            card.Background = SessionColorBrush.Create(color);
-            card.BorderBrush = SessionColorBrush.Create(color);
-            card.BorderThickness = new Thickness(1);
+            double bgAlpha = isDark ? 0.16 : 0.10;
+            double borderAlpha = isDark ? 0.75 : 0.60;
+            card.Background = SessionColorBrush.CreateAlpha(color, bgAlpha);
+            card.BorderBrush = SessionColorBrush.CreateAlpha(color, borderAlpha);
+            card.BorderThickness = new Thickness(1.0);
             card.Opacity = 1.0;
 
-            var textFg = SessionColorBrush.Create(SessionColors.Foreground(color));
-            label.Foreground = textFg;
-            duration.Foreground = textFg;
+            label.Foreground = Presentation.ThemeBrush("FkForeground", card);
+            duration.Foreground = Presentation.ThemeBrush("FkForeground", card);
         }
         else
         {
-            if (isDark)
-            {
-                card.Background = SessionColorBrush.CreateShaded(color, -20);
-                card.BorderBrush = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", card);
-            }
-            else
-            {
-                card.Background = SessionColorBrush.CreateAlpha(color, 0.10);
-                card.BorderBrush = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", card);
-            }
-            card.BorderThickness = new Thickness(1);
+            card.Background = Presentation.ThemeBrush("FkSurface2", card);
+            card.BorderBrush = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", card);
+            card.BorderThickness = new Thickness(1.0);
             card.Opacity = 1.0;
 
             var dimFg = Presentation.ThemeBrush("FkSecondary", card);

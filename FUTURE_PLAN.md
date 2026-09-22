@@ -12,6 +12,22 @@ This document serves as the persistent repository-level source of truth for all 
 
 ---
 
+## Pending Future Milestones
+
+### Installer / Release Candidate
+**Status:** Pending Next Milestone
+**Scope & Deliverables:**
+1. **Standalone Packaging & Single-File Publish**:
+   - Framework-dependent or self-contained publish configuration targeting `win-x64`.
+   - Asset bundler for sounds, application icons, and native assets.
+2. **Windows Installer Generation**:
+   - Clean setup installer (`FocusKeySetup.exe`) with installation directory selection, Start menu shortcuts, uninstallation registration, and registry-safe setup.
+3. **Release Candidate QA**:
+   - Fresh-machine installation and upgrade test from previous versions.
+   - SHA-256 release checksums and release notes generation.
+
+---
+
 ## Implemented Work Awaiting Final User Acceptance
 
 ### Full Accessibility + Windows Narrator Audit (Implemented — Awaiting Final User Acceptance)
@@ -297,7 +313,7 @@ Completed the Settings and Quick Overlay experience into a unified native Window
 - **Reports Insights Vertical Distribution**: Tall Insights rail matches chart height (~380–420 DIP) with its 4 insight groups distributed vertically across proportional `1*` zones with subtle 1px dividers, eliminating bottom dead space.
 - **72% / 28% Reports Ratio**: 72% Main Chart / 28% Insights Rail with 16 DIP column spacing gives ~340 DIP width to the rail on standard wide desktop, eliminating text wrapping.
 - **Today Summary Card Polish**: Refined internal 2 × 2 metric grid on `TodaySummaryCard` with proportional rows, subtle horizontal divider line, Consolas 26 SemiBold metric values, and clean vertical centering.
-- **Yearly Preview Verification**: Verified `FOCUSKEY_YEARLY_PREVIEW=1` development override with synthetic isolated full-year data (12 months in 2025, Jan–Dec) without modifying real data eligibility logic or altering the user's real database.
+- **Yearly Preview Verification**: Verified Yearly reports with synthetic isolated full-year data (12 months in 2025, Jan–Dec) without altering real data eligibility logic. Temporary preview flag `FOCUSKEY_YEARLY_PREVIEW` has been completely cleaned and removed.
 
 ---
 

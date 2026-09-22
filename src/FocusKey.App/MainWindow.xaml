@@ -76,7 +76,7 @@
       <TextBlock x:Name="SettingsLabel" Text="Settings" FontSize="13" VerticalAlignment="Center"/>
      </StackPanel>
     </ToggleButton>
-    <Button x:Name="ExitButton" Style="{StaticResource FkSidebarButton}" Click="OnExitClick" ToolTipService.ToolTip="Exit App" AutomationProperties.Name="Exit Focus Key">
+    <Button x:Name="ExitButton" Style="{StaticResource FkSidebarButton}" Click="OnExitClick" ToolTipService.ToolTip="Exit App" AutomationProperties.Name="Exit Focus Key" AutomationProperties.ItemType="Navigation">
      <StackPanel x:Name="ExitNavContent" Orientation="Horizontal" Spacing="10">
       <Border x:Name="ExitIconContainer" Width="28" Height="28" HorizontalAlignment="Center" VerticalAlignment="Center">
        <FontIcon x:Name="ExitIcon" Glyph="&#xE7E8;" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
@@ -139,7 +139,7 @@
        <TextBlock Text="Settings" FontSize="13" VerticalAlignment="Center"/>
       </StackPanel>
      </ToggleButton>
-     <Button x:Name="DrawerExitButton" Style="{StaticResource FkSidebarButton}" Click="OnExitClick" AutomationProperties.Name="Exit Focus Key">
+     <Button x:Name="DrawerExitButton" Style="{StaticResource FkSidebarButton}" Click="OnExitClick" AutomationProperties.Name="Exit Focus Key" AutomationProperties.ItemType="Navigation">
       <StackPanel Orientation="Horizontal" Spacing="12">
        <FontIcon Glyph="&#xE7E8;" FontSize="18"/>
        <TextBlock Text="Exit App" FontSize="13" VerticalAlignment="Center"/>

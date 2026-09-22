@@ -61,8 +61,8 @@ internal sealed class ReportsView : UserControl, IDisposable
         _date.MinDate = DateValue(ReportRange.MinimumDate); _date.MaxDate = DateValue(ReportRange.MaximumDate);
         AutomationProperties.SetName(_date, "Date in reporting period");
 
-        // Build segmented period selector (Year segment hidden initially unless eligible or preview override enabled)
-        BuildPeriodSelector(IsYearlyPreviewEnabled());
+        // Build segmented period selector (Year segment hidden initially unless eligible)
+        BuildPeriodSelector(false);
 
         _mainPanel = new StackPanel { Spacing = 16, HorizontalAlignment = HorizontalAlignment.Stretch };
 
@@ -293,7 +293,7 @@ internal sealed class ReportsView : UserControl, IDisposable
         {
             _rendering = true;
             _date.Date = DateValue(_reports.Date);
-            bool showYear = (_reports.Snapshot?.IsYearEligible ?? false) || IsYearlyPreviewEnabled();
+            bool showYear = _reports.Snapshot?.IsYearEligible ?? false;
             if (showYear != _lastBuiltYearEligible)
             {
                 BuildPeriodSelector(showYear);
@@ -768,13 +768,6 @@ internal sealed class ReportsView : UserControl, IDisposable
         return itemPanel;
     }
 
-    /// <summary>
-    /// Temporary development and verification override allowing Yearly reports preview before 1 full year of history is reached.
-    /// MUST be removed after final user visual acceptance.
-    /// </summary>
-    internal static bool IsYearlyPreviewEnabled() =>
-        string.Equals(Environment.GetEnvironmentVariable("FOCUSKEY_YEARLY_PREVIEW"), "1", StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(Environment.GetEnvironmentVariable("FOCUSKEY_YEARLY_PREVIEW"), "true", StringComparison.OrdinalIgnoreCase);
 
     private FrameworkElement ChartCard(ReportsSnapshot snapshot)
     {

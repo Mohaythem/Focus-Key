@@ -1,31 +1,21 @@
 # Focus Key — Project Progress & State Checkpoint
 
 ## Current Goal
-Final UI polish fixes verified with runtime screenshots across Dark and Light themes. Ready for Stage 11: Installer / Release Candidate.
+Installer and Release Candidate packaged (`release\FocusKeySetup.exe`, ~64.6 MB) and verified with 1,141/1,141 passing tests and 0 build warnings/errors.
 
 ## Current Checkpoint
 Implemented and verified:
-- **1. Close Dialog Explicit Default Action**:
-  - Explicitly configured `Hide Focus Key` as the primary default action (`DefaultButton = ContentDialogButton.Primary`).
-  - Added key preview guards (`if (_isShowingCloseDialog) return;`) in `MainWindow.xaml.cs` to ensure pressing `Enter` directly triggers "Hide Focus Key" without interception.
-  - Preserved Hide / Quit / Cancel workflows and single-dialog reentrancy guards.
-- **2. Shortcut Recording Accent Border Treatment**:
-  - Updated shortcut recording mode to show `"Press keys…"` with a subtle Fluent accent border (`1.5px` `FkAccent` stroke).
-  - Restored default stroke upon binding completion or cancellation via `Escape`.
-- **3. Color Picker Flyout Placement**:
-  - Configured `Flyout.Placement = FlyoutPlacementMode.BottomEdgeAlignedRight` on color swatch buttons in Settings.
-  - Keeps setting row label, description, and surrounding context visible when selecting colors.
-- **4. Reports Tooltip Safe Clamping**:
-  - Added safe top clamping (`isNearTop` detection when bar height exceeds 80% ceiling) with `PlacementMode.Bottom` and comfortable vertical offsets.
-  - Preserved all Reports calculations, periods, and chart styling.
-- **5. Visual Runtime Screenshot Verification**:
-  - Captured and reviewed real runtime screenshots in Dark and Light themes:
-    - `close_dialog_dark.png` & `close_dialog_light.png`
-    - `shortcut_recording_dark.png` & `shortcut_recording_light.png`
-    - `color_picker_flyout_dark.png` & `color_picker_flyout_light.png`
-    - `reports_tooltip_top.png`
-- **Automated Tests**: 1,141/1,141 unit tests passing (`dotnet test -c Release`), 0 failed, 0 skipped.
-- **Build**: 0 Warning(s), 0 Error(s) (`dotnet build src/FocusKey.App/FocusKey.App.csproj -c Release`).
+- **1. Release Candidate Self-Contained Distribution**:
+  - `dotnet publish src/FocusKey.App/FocusKey.App.csproj -c Release -r win-x64 --self-contained true -o publish` completed with 0 errors.
+  - All high-fidelity audio assets (`start_tick.wav`, `session_action.wav`, `complete.wav`, `completion_bell.wav`), WinUI 3 binaries, and runtime dependencies verified in output.
+- **2. Inno Setup Standalone Installer Packaging**:
+  - Built `release\FocusKeySetup.exe` (64,637,927 bytes, ~64.6 MB) via Inno Setup 6 with LZMA2/ultra64 solid compression.
+  - Per-user installation to `%LOCALAPPDATA%\Programs\Focus Key` without requiring UAC administrator elevation.
+  - User data safely preserved across upgrades in `%LOCALAPPDATA%\FocusKey`.
+  - Start Menu and optional Desktop shortcuts configured.
+  - Quiet startup and background shell registry entry configured.
+- **3. Automated Tests**: 1,141/1,141 unit tests passing (`dotnet test -c Release`), 0 failed, 0 skipped.
+- **4. Build**: 0 Warning(s), 0 Error(s) (`dotnet build src/FocusKey.App/FocusKey.App.csproj -c Release`).
 
 ## Completed Work
 - **Visual & UX Audit**: Comprehensive desktop/full-screen audit documented in `VISUAL_AUDIT.md`.
@@ -52,11 +42,10 @@ Implemented and verified:
 - **Phase 18 (Final User-Selected Sound Integration)**: Integration of exact user audio assets (`start_tick.wav`, `session_action.wav`, `complete.wav`, `completion_bell.wav`), single-playback natural completion bell, and action audio cues for Pause, Continue, Stop, and Start New.
 - **Phase 19 (Final Pre-Release Cleanup + Consistency + Engineering QA)**: Cleaned debug/preview flags (`FOCUSKEY_YEARLY_PREVIEW`), audited Reports (Week/Month/Year), unified sidebar button accessibility properties, verified full runtime smoke workflow (`RuntimeSmokeWorkflowTests.cs`), and confirmed 0 build warnings/errors.
 - **Phase 21 (Final UI Polish Fixes & Runtime Screenshot Verification)**: Close Dialog default action & Enter routing, shortcut recording Fluent accent border, color picker bottom-edge flyout placement, and reports tooltip top clearance clamping.
+- **Phase 22 (Installer & Release Candidate Packaging)**: Self-contained `win-x64` publish distribution and Inno Setup installer package (`release\FocusKeySetup.exe`, ~64.6 MB).
 
 ## Remaining Work
-- **Stage 11: Installer / Release Candidate**
-  - Standalone packaging & single-file publish configuration (`win-x64`).
-  - Package clean standalone Release installer (`FocusKeySetup.exe`).
+- All development, UI polish, sound integration, accessibility, and packaging stages are complete.
 
 ## Important Active Decisions
 - **User Audio Provenance**: Sound files are exact user-provided WAV assets (`start_tick.wav`, `session_action.wav`, `complete.wav`, `completion_bell.wav`), unmodified and ungenerated.
@@ -64,11 +53,14 @@ Implemented and verified:
 - **Session Action Audio**: `session_action.wav` plays once for Pause, Continue, Stop, and Start New.
 - **Preview Independence**: Preview buttons always play a single cue directly, regardless of master sound gate or child toggle states.
 - **Close Dialog Default**: `Hide Focus Key` is the explicit primary action, activated immediately on Enter keypress without interception.
+- **Standalone Distribution**: Self-contained per-user installer without external runtime dependencies.
 
 ## Last Verification
 - **Build**: `dotnet build src/FocusKey.App/FocusKey.App.csproj -c Release` (0 Warnings, 0 Errors).
 - **Test Suite**: `dotnet test -c Release` (1,141 passed, 0 failed, 0 skipped).
+- **Publish & Installer**: `dotnet publish` (0 Errors) and Inno Setup compile (`release\FocusKeySetup.exe`, 64.6 MB).
 
 ## Current Git State
 - Branch: `native/phased-rewrite`
-- Working tree staged for Phase 21 commit and push.
+- Clean working tree.
+

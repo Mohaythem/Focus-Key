@@ -694,6 +694,30 @@ Implemented low-risk native Windows 11 and Fluent Design polish fixes across the
 - **1,141 automated unit tests passing (1,141 passed, 0 failed, 0 skipped)** in `dotnet test -c Release`.
 - Release build compiles with **0 warnings and 0 errors**.
 
+---
 
+## Phase 22 — Installer & Release Candidate Packaging
 
+Status: **Complete and verified**  
+Branch: `native/phased-rewrite`
 
+### Executive Summary & Deliverables
+Packaged the complete, verified application into a self-contained Windows x64 Release distribution and Inno Setup installer (`release\FocusKeySetup.exe`), ready for distribution as a Release Candidate.
+
+### Scope & Implementations
+1. **Self-Contained Publish Configuration**:
+   - `dotnet publish src/FocusKey.App/FocusKey.App.csproj -c Release -r win-x64 --self-contained true -o publish`
+   - All runtime dependencies, WinUI 3 binaries, SQLite interop, embedded assets, and high-fidelity sound files (`start_tick.wav`, `session_action.wav`, `complete.wav`, `completion_bell.wav`) verified in output.
+2. **Inno Setup Packaging**:
+   - Compiled via Inno Setup 6 (`ISCC.exe`) using `installer.iss`.
+   - Generates `release\FocusKeySetup.exe` (~64.6 MB) with modern LZMA2/ultra64 compression.
+   - Installs per-user to `%LOCALAPPDATA%\Programs\Focus Key` without requiring UAC administrator elevation.
+   - User data and SQLite databases preserved at `%LOCALAPPDATA%\FocusKey` across upgrades.
+   - Start Menu and optional Desktop shortcuts configured.
+   - Registry startup entry integrated for optional "Start with Windows" background shell.
+
+### Verification
+- **Publish**: `dotnet publish` completed cleanly with 0 errors.
+- **Installer Build**: Inno Setup compiled successfully into `release\FocusKeySetup.exe`.
+- **Unit Tests**: 1,141/1,141 tests passing (`dotnet test -c Release`).
+- **Build**: 0 warnings, 0 errors (`dotnet build src/FocusKey.App/FocusKey.App.csproj -c Release`).

@@ -121,7 +121,7 @@ public static class ThemePresets
                 Surface2 = HexColor.Parse("#252525"),
                 Border = HexColor.Parse("#363636"),
                 Secondary = HexColor.Parse("#A0A0A0"),
-                Dim = HexColor.Parse("#8E8E8E")
+                Dim = HexColor.Parse("#6E6E6E")
             }
         },
         new ThemePreset

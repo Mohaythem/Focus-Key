@@ -24,12 +24,9 @@ public sealed class TodayAdaptiveLayoutTests
     [Theory]
     [InlineData(1400.0, TodayCompositionMode.TwoColumn)]
     [InlineData(1000.0, TodayCompositionMode.TwoColumn)]
-    [InlineData(880.0, TodayCompositionMode.TwoColumn)]
-    [InlineData(768.0, TodayCompositionMode.TwoColumn)]
-    [InlineData(720.0, TodayCompositionMode.TwoColumn)]
-    [InlineData(719.0, TodayCompositionMode.VerticalStack)]
-    [InlineData(680.0, TodayCompositionMode.VerticalStack)]
-    [InlineData(640.0, TodayCompositionMode.VerticalStack)]
+    [InlineData(800.0, TodayCompositionMode.TwoColumn)]
+    [InlineData(620.0, TodayCompositionMode.TwoColumn)]
+    [InlineData(619.0, TodayCompositionMode.VerticalStack)]
     [InlineData(500.0, TodayCompositionMode.VerticalStack)]
     [InlineData(350.0, TodayCompositionMode.VerticalStack)]
     public void ResolveTodayComposition(double availableContentWidth, TodayCompositionMode expectedMode)
@@ -51,30 +48,23 @@ public sealed class TodayAdaptiveLayoutTests
 
     [Theory]
     // At 100% scale (factor = 1.0)
-    // 1200 -> Expanded (220 nav, 64 pad -> 916 available >= 720) -> TwoColumn
     [InlineData(1200.0, 100, AdaptiveNavMode.Expanded, TodayCompositionMode.TwoColumn)]
-    // 880 -> Compact (54 nav, 64 pad -> 762 available >= 720) -> TwoColumn
     [InlineData(880.0, 100, AdaptiveNavMode.Compact, TodayCompositionMode.TwoColumn)]
-    // 768 -> Compact (54 nav, 64 pad -> 650 available < 720) -> VerticalStack
-    [InlineData(768.0, 100, AdaptiveNavMode.Compact, TodayCompositionMode.VerticalStack)]
-    // 680 -> Collapsed (0 nav, 64 pad -> 616 available < 720) -> VerticalStack
-    [InlineData(680.0, 100, AdaptiveNavMode.Collapsed, TodayCompositionMode.VerticalStack)]
-    // 640 -> Collapsed (0 nav, 64 pad -> 576 available < 720) -> VerticalStack
-    [InlineData(640.0, 100, AdaptiveNavMode.Collapsed, TodayCompositionMode.VerticalStack)]
+    [InlineData(600.0, 100, AdaptiveNavMode.Collapsed, TodayCompositionMode.VerticalStack)]
     // At 150% scale (factor = 1.5, effective width = actual / 1.5)
-    // 1200 / 1.5 = 800 -> Compact, available = 800 - 54 - 64 = 682 -> VerticalStack (< 720)
-    [InlineData(1200.0, 150, AdaptiveNavMode.Compact, TodayCompositionMode.VerticalStack)]
-    // 1100 / 1.5 = 733.3 -> Collapsed (< 740), available = 733.3 - 0 - 64 = 669.3 -> VerticalStack (< 720)
-    [InlineData(1100.0, 150, AdaptiveNavMode.Collapsed, TodayCompositionMode.VerticalStack)]
-    // 1000 / 1.5 = 666.7 -> Collapsed (< 740), available = 666.7 - 0 - 64 = 602.7 -> VerticalStack (< 720)
+    // 1200 / 1.5 = 800 -> Compact (was Expanded at 100%), available = 800 - 54 - 64 = 682 -> TwoColumn
+    [InlineData(1200.0, 150, AdaptiveNavMode.Compact, TodayCompositionMode.TwoColumn)]
+    // 1100 / 1.5 = 733.3 -> Collapsed (< 740), available = 733.3 - 0 - 64 = 669.3 -> TwoColumn (>= 620)
+    [InlineData(1100.0, 150, AdaptiveNavMode.Collapsed, TodayCompositionMode.TwoColumn)]
+    // 1000 / 1.5 = 666.7 -> Collapsed (< 740), available = 666.7 - 0 - 64 = 602.7 -> VerticalStack (< 620)
     [InlineData(1000.0, 150, AdaptiveNavMode.Collapsed, TodayCompositionMode.VerticalStack)]
-    // 880 / 1.5 = 586.7 -> Collapsed (< 740), available 586.7 - 0 - 64 = 522.7 -> VerticalStack (< 720)
+    // 880 / 1.5 = 586.7 -> Collapsed (< 740), available 586.7 - 0 - 64 = 522.7 -> VerticalStack (< 620)
     [InlineData(880.0, 150, AdaptiveNavMode.Collapsed, TodayCompositionMode.VerticalStack)]
     // At 80% scale (factor = 0.8, effective width = actual / 0.8)
-    // 880 / 0.8 = 1100 -> Expanded, available = 1100 - 220 - 64 = 816 -> TwoColumn (>= 720)
+    // 880 / 0.8 = 1100 -> Expanded (was Compact at 100%)
     [InlineData(880.0, 80, AdaptiveNavMode.Expanded, TodayCompositionMode.TwoColumn)]
-    // 600 / 0.8 = 750 -> Compact, available = 750 - 54 - 64 = 632 -> VerticalStack (< 720)
-    [InlineData(600.0, 80, AdaptiveNavMode.Compact, TodayCompositionMode.VerticalStack)]
+    // 600 / 0.8 = 750 -> Compact (was Collapsed at 100%)
+    [InlineData(600.0, 80, AdaptiveNavMode.Compact, TodayCompositionMode.TwoColumn)]
     public void ScaleAwareEffectiveWidth_ResolvesExpectedLayoutTransitions(
         double physicalWidth, int scalePercent, AdaptiveNavMode expectedNav, TodayCompositionMode expectedComp)
     {

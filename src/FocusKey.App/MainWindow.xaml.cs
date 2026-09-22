@@ -29,7 +29,6 @@ public sealed partial class MainWindow : Window
     private bool _visible;
     private bool _hasRenderedRunning;
     private bool _lastHasRunning;
-    private SessionStatus? _lastActiveStatus;
     private SessionColors _colors = SessionColors.From(ApplicationSettings.Default);
     private readonly SettingsService? _settingsService;
     private readonly Action<Exception>? _startupReport;
@@ -901,44 +900,16 @@ public sealed partial class MainWindow : Window
 
                         if (SessionHeroCard is not null)
                         {
-                            SessionHeroCard.MinHeight = isTwoColumn ? Math.Round(490 * factor) : 0;
-                            SessionHeroCard.Padding = new Thickness(28 * factor, 22 * factor, 28 * factor, 20 * factor);
+                            SessionHeroCard.MinHeight = Math.Round(310 * factor);
+                            SessionHeroCard.Padding = new Thickness(28 * factor, 20 * factor, 28 * factor, 20 * factor);
+                        }
+                        if (TodaySummaryCard is not null)
+                        {
+                            TodaySummaryCard.Padding = new Thickness(24 * factor, 18 * factor, 24 * factor, 18 * factor);
                         }
                         if (ActivityCard is not null)
                         {
                             ActivityCard.Padding = new Thickness(22 * factor, 18 * factor, 22 * factor, 18 * factor);
-                        }
-                        if (SummaryGrid is not null)
-                        {
-                            bool compactSummary = effectiveAvailable < 540;
-                            SummaryGrid.ColumnDefinitions.Clear();
-                            SummaryGrid.RowDefinitions.Clear();
-
-                            if (compactSummary)
-                            {
-                                SummaryGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                                SummaryGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                                SummaryGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                                SummaryGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-
-                                if (FocusMetricPanel is not null) { Grid.SetColumn(FocusMetricPanel, 0); Grid.SetRow(FocusMetricPanel, 0); }
-                                if (WorkMetricPanel is not null) { Grid.SetColumn(WorkMetricPanel, 1); Grid.SetRow(WorkMetricPanel, 0); }
-                                if (BreakMetricPanel is not null) { Grid.SetColumn(BreakMetricPanel, 0); Grid.SetRow(BreakMetricPanel, 1); }
-                                if (CompletionMetricPanel is not null) { Grid.SetColumn(CompletionMetricPanel, 1); Grid.SetRow(CompletionMetricPanel, 1); }
-                            }
-                            else
-                            {
-                                SummaryGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                                SummaryGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                                SummaryGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                                SummaryGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                                SummaryGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-
-                                if (FocusMetricPanel is not null) { Grid.SetColumn(FocusMetricPanel, 0); Grid.SetRow(FocusMetricPanel, 0); }
-                                if (WorkMetricPanel is not null) { Grid.SetColumn(WorkMetricPanel, 1); Grid.SetRow(WorkMetricPanel, 0); }
-                                if (BreakMetricPanel is not null) { Grid.SetColumn(BreakMetricPanel, 2); Grid.SetRow(BreakMetricPanel, 0); }
-                                if (CompletionMetricPanel is not null) { Grid.SetColumn(CompletionMetricPanel, 3); Grid.SetRow(CompletionMetricPanel, 0); }
-                            }
                         }
                         if (StartIdleButton is not null)
                         {
@@ -976,10 +947,10 @@ public sealed partial class MainWindow : Window
                         if (WorkChoiceDuration is not null) WorkChoiceDuration.FontSize = 12.0 * factor;
                         if (BreakChoiceMode is not null) BreakChoiceMode.FontSize = 12.5 * factor;
                         if (BreakChoiceDuration is not null) BreakChoiceDuration.FontSize = 12.0 * factor;
-                        if (FocusValue is not null) FocusValue.FontSize = Math.Round(22 * factor);
-                        if (WorkValue is not null) WorkValue.FontSize = Math.Round(22 * factor);
-                        if (BreakValue is not null) BreakValue.FontSize = Math.Round(22 * factor);
-                        if (CompletionValue is not null) CompletionValue.FontSize = Math.Round(22 * factor);
+                        if (FocusValue is not null) FocusValue.FontSize = Math.Round(24 * factor);
+                        if (WorkValue is not null) WorkValue.FontSize = Math.Round(24 * factor);
+                        if (BreakValue is not null) BreakValue.FontSize = Math.Round(24 * factor);
+                        if (CompletionValue is not null) CompletionValue.FontSize = Math.Round(24 * factor);
                     }
                 }
                 if (ReportsHost is not null)
@@ -1029,11 +1000,11 @@ public sealed partial class MainWindow : Window
         // 1. Work Card
         if (isWorkSelected)
         {
-            double bgAlpha = _isWorkHovered ? (isDark ? 0.20 : 0.14) : (isDark ? 0.14 : 0.08);
+            double bgAlpha = _isWorkHovered ? (isDark ? 0.22 : 0.16) : (isDark ? 0.16 : 0.10);
             double borderAlpha = _isWorkHovered ? (isDark ? 0.85 : 0.70) : (isDark ? 0.70 : 0.55);
             WorkChoiceCard.Background = SessionColorBrush.CreateAlpha(_colors.Work, bgAlpha);
             WorkChoiceCard.BorderBrush = SessionColorBrush.CreateAlpha(_colors.Work, borderAlpha);
-            WorkChoiceCard.BorderThickness = new Thickness(1.0);
+            WorkChoiceCard.BorderThickness = new Thickness(1.5);
             WorkChoiceDot.Fill = SessionColorBrush.Create(_colors.Work);
             WorkChoiceDot.Opacity = 1.0;
             WorkChoiceMode.Foreground = Presentation.ThemeBrush("FkForeground", isDark);
@@ -1056,11 +1027,11 @@ public sealed partial class MainWindow : Window
         // 2. Break Card
         if (!isWorkSelected)
         {
-            double bgAlpha = _isBreakHovered ? (isDark ? 0.20 : 0.14) : (isDark ? 0.14 : 0.08);
+            double bgAlpha = _isBreakHovered ? (isDark ? 0.22 : 0.16) : (isDark ? 0.16 : 0.10);
             double borderAlpha = _isBreakHovered ? (isDark ? 0.85 : 0.70) : (isDark ? 0.70 : 0.55);
             BreakChoiceCard.Background = SessionColorBrush.CreateAlpha(_colors.Break, bgAlpha);
             BreakChoiceCard.BorderBrush = SessionColorBrush.CreateAlpha(_colors.Break, borderAlpha);
-            BreakChoiceCard.BorderThickness = new Thickness(1.0);
+            BreakChoiceCard.BorderThickness = new Thickness(1.5);
             BreakChoiceDot.Fill = SessionColorBrush.Create(_colors.Break);
             BreakChoiceDot.Opacity = 1.0;
             BreakChoiceMode.Foreground = Presentation.ThemeBrush("FkForeground", isDark);
@@ -1307,13 +1278,11 @@ public sealed partial class MainWindow : Window
     private void RenderRunning()
     {
         bool hasActive = _today.Snapshot?.Active is not null;
-        var currentStatus = _today.Snapshot?.Active?.Status;
 
         UpdateActiveNavIndicator();
 
-        bool stateChanged = _hasRenderedRunning && (_lastHasRunning != hasActive || _lastActiveStatus != currentStatus);
+        bool stateChanged = _hasRenderedRunning && (_lastHasRunning != hasActive);
         _lastHasRunning = hasActive;
-        _lastActiveStatus = currentStatus;
         _hasRenderedRunning = true;
 
         if (SessionHeroCard is null || ActiveContent is null || IdleContent is null) return;

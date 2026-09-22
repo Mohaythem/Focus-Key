@@ -60,7 +60,6 @@ internal sealed class ReportsView : UserControl, IDisposable
         AutomationProperties.SetLiveSetting(_status, Microsoft.UI.Xaml.Automation.Peers.AutomationLiveSetting.Polite);
         _date.MinDate = DateValue(ReportRange.MinimumDate); _date.MaxDate = DateValue(ReportRange.MaximumDate);
         AutomationProperties.SetName(_date, "Date in reporting period");
-        AutomationProperties.SetAutomationId(_date, "ReportsDatePicker");
 
         // Build segmented period selector (Year segment hidden initially unless eligible)
         BuildPeriodSelector(false);
@@ -102,12 +101,12 @@ internal sealed class ReportsView : UserControl, IDisposable
             HorizontalAlignment = HorizontalAlignment.Right,
             VerticalAlignment = VerticalAlignment.Center
         };
-        _navRow.Children.Add(NavButton(new FontIcon { Glyph = "\uE76B", FontSize = 12 }, () => _reports.MoveAsync(-1), "Previous period", "Previous period", "ReportsPrevPeriodButton"));
+        _navRow.Children.Add(NavButton(new FontIcon { Glyph = "\uE76B", FontSize = 12 }, () => _reports.MoveAsync(-1), "Previous period", "Previous period"));
         _navRow.Children.Add(_date);
-        _nextButton = NavButton(new FontIcon { Glyph = "\uE76C", FontSize = 12 }, () => _reports.MoveAsync(1), "Next period", "Next period", "ReportsNextPeriodButton");
+        _nextButton = NavButton(new FontIcon { Glyph = "\uE76C", FontSize = 12 }, () => _reports.MoveAsync(1), "Next period", "Next period");
         _navRow.Children.Add(_nextButton);
-        _navRow.Children.Add(NavButton("Current", _reports.CurrentAsync, "Current period", "Current period", "ReportsCurrentPeriodButton"));
-        _navRow.Children.Add(NavButton(new FontIcon { Glyph = "\uE72C", FontSize = 12 }, _reports.RefreshAsync, "Refresh reports", "Refresh", "ReportsRefreshButton"));
+        _navRow.Children.Add(NavButton("Current", _reports.CurrentAsync, "Current period", "Current period"));
+        _navRow.Children.Add(NavButton(new FontIcon { Glyph = "\uE72C", FontSize = 12 }, _reports.RefreshAsync, "Refresh reports", "Refresh"));
         Grid.SetColumn(_navRow, 1);
         _navGrid.Children.Add(_navRow);
 
@@ -172,7 +171,6 @@ internal sealed class ReportsView : UserControl, IDisposable
             };
             AutomationProperties.SetName(btn, $"{period} reports");
             AutomationProperties.SetItemType(btn, "Radio");
-            AutomationProperties.SetAutomationId(btn, $"ReportsPeriod{period}");
             btn.Click += async (s, _) =>
             {
                 if (!_rendering && s is Button b && b.Tag is ReportPeriod p)
@@ -690,7 +688,6 @@ internal sealed class ReportsView : UserControl, IDisposable
         var card = Card(mainGrid, Math.Round(22 * factor));
         card.Padding = new Thickness(Math.Round(24 * factor), Math.Round(20 * factor), Math.Round(24 * factor), Math.Round(20 * factor));
         card.VerticalAlignment = VerticalAlignment.Stretch;
-        AutomationProperties.SetAutomationId(card, "ReportsInsightsRailCard");
         return card;
     }
 
@@ -808,14 +805,12 @@ internal sealed class ReportsView : UserControl, IDisposable
 
         var chart = new ReportsChart(snapshot.Trend, snapshot.Period, palette, _reports.CurrentDate(), factor);
         AutomationProperties.SetName(chart, $"Focus activity trend chart, {subtitleText}");
-        AutomationProperties.SetAutomationId(chart, "ReportsFocusChart");
         body.Children.Add(chart);
 
         var card2 = Card(body, Math.Round(22 * factor));
         card2.Padding = new Thickness(Math.Round(24 * factor), Math.Round(22 * factor), Math.Round(24 * factor), Math.Round(22 * factor));
         card2.VerticalAlignment = VerticalAlignment.Stretch;
         AutomationProperties.SetName(card2, $"Focus Activity Chart for {subtitleText}. Total focus time: {ReportsFormatting.FormatDuration(snapshot.Totals.FocusTime)}, {snapshot.Totals.CompletedWork} completed work sessions.");
-        AutomationProperties.SetAutomationId(card2, "ReportsChartCard");
         return card2;
     }
     private (Border Card, TextBlock Value) Metric(string label, string value, string sub, int column)
@@ -847,14 +842,6 @@ internal sealed class ReportsView : UserControl, IDisposable
         var b = Card(p, Math.Round(20 * factor));
         b.Padding = new Thickness(Math.Round(22 * factor), Math.Round(20 * factor), Math.Round(22 * factor), Math.Round(20 * factor));
         AutomationProperties.SetName(b, $"{label}: {value}, {sub}");
-        string metricAutoId = column switch
-        {
-            0 => "ReportsMetricFocusTime",
-            1 => "ReportsMetricWorkSessions",
-            2 => "ReportsMetricCompletionRate",
-            _ => $"ReportsMetric{column}"
-        };
-        AutomationProperties.SetAutomationId(b, metricAutoId);
         Grid.SetColumn(b, column);
         return (b, valueText);
     }
@@ -882,7 +869,7 @@ internal sealed class ReportsView : UserControl, IDisposable
         return b;
     }
 
-    private Button NavButton(object content, Func<Task> action, string name, string? tooltip = null, string? automationId = null)
+    private Button NavButton(object content, Func<Task> action, string name, string? tooltip = null)
     {
         var b = new Button
         {
@@ -895,7 +882,6 @@ internal sealed class ReportsView : UserControl, IDisposable
             CornerRadius = (CornerRadius)(Application.Current?.Resources["FkControlRadius"] ?? new CornerRadius(4)),
         };
         AutomationProperties.SetName(b, name);
-        if (!string.IsNullOrEmpty(automationId)) AutomationProperties.SetAutomationId(b, automationId);
         if (!string.IsNullOrEmpty(tooltip)) ToolTipService.SetToolTip(b, tooltip);
         b.Click += async (_, _) => await action();
         _navButtons.Add(b);

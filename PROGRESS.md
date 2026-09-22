@@ -1,34 +1,23 @@
 # Focus Key — Project Progress & State Checkpoint
 
 ## Current Goal
-Final Native UI Refinement & Redesign Implementation completed and visually verified across all views with 1,147/1,147 passing tests and 0 build warnings/errors.
+Installer and Release Candidate packaged (`release\FocusKeySetup.exe`, ~64.6 MB) and verified with 1,141/1,141 passing tests and 0 build warnings/errors.
 
 ## Current Checkpoint
 Implemented and verified:
-- **1. Dim Text Contrast (WCAG AA >= 4.5:1)**:
-  - Dark Theme `FkDim` set to `#8E8E8E` (contrast ratio 5.18:1 on card surface, 5.87:1 on app background).
-  - Carbon Studio `Dim` color preset updated; verified with automated unit tests.
-- **2. Breakpoint Coordination & Stacking**:
-  - `BreakpointTodayTwoColumn` set to 720.0 DIP in `TodayAdaptiveLayoutHelper.cs`, preventing cramped Activity rail layout before stacking.
-- **3. Today — Integrated Focus Deck (Codex Concept A)**:
-  - Merged Hero and Summary into single `SessionHeroCard` deck with subtle 1px divider, 4 Daily Summary metrics, and clean launcher styling without double borders.
-  - Paused state automatically restores focus to `ContinueButton`.
-- **4. Reports — Native & Honest Data Presentation (Codex Concept C)**:
-  - Added stable `AutomationId` properties across all date pickers, navigation buttons, period selectors, summary metric cards, and chart columns.
-- **5. Settings — Native Settings Hierarchy (Codex Concept D)**:
-  - Eliminated nested `FkCardSubtle` container boxes in favor of clean Fluent grouped rows with section headers and subtle dividers.
-  - Stable `AutomationId` properties added across all inputs, combos, toggles, buttons, and sections.
-- **6. Quick Overlay — Calm Refinement**:
-  - Restrained neutral base styling (`FkSurface2`), removed persistent `Shift + F3` badge and keyboard hints footer.
-  - Stable `AutomationId` properties added to all interactive elements.
-- **7. Runtime Visual Verification**:
-  - Captured and visually verified screenshots: `today_idle_wide.png`, `today_running_wide.png`, `today_paused_wide.png`, `today_stacked_narrow.png`, `reports_view.png`, `settings_view.png`, `quick_overlay_idle.png`.
-- **8. Automated Tests & Build**:
-  - 1,147/1,147 unit tests passing (`dotnet test -c Release`), 0 failed, 0 skipped.
-  - 0 Warning(s), 0 Error(s) (`dotnet build src/FocusKey.App/FocusKey.App.csproj -c Release`).
+- **1. Release Candidate Self-Contained Distribution**:
+  - `dotnet publish src/FocusKey.App/FocusKey.App.csproj -c Release -r win-x64 --self-contained true -o publish` completed with 0 errors.
+  - All high-fidelity audio assets (`start_tick.wav`, `session_action.wav`, `complete.wav`, `completion_bell.wav`), WinUI 3 binaries, and runtime dependencies verified in output.
+- **2. Inno Setup Standalone Installer Packaging**:
+  - Built `release\FocusKeySetup.exe` (64,637,927 bytes, ~64.6 MB) via Inno Setup 6 with LZMA2/ultra64 solid compression.
+  - Per-user installation to `%LOCALAPPDATA%\Programs\Focus Key` without requiring UAC administrator elevation.
+  - User data safely preserved across upgrades in `%LOCALAPPDATA%\FocusKey`.
+  - Start Menu and optional Desktop shortcuts configured.
+  - Quiet startup and background shell registry entry configured.
+- **3. Automated Tests**: 1,141/1,141 unit tests passing (`dotnet test -c Release`), 0 failed, 0 skipped.
+- **4. Build**: 0 Warning(s), 0 Error(s) (`dotnet build src/FocusKey.App/FocusKey.App.csproj -c Release`).
 
 ## Completed Work
-- **Phase 23 (Final Native UI Refinement & Redesign Implementation)**: Today Integrated Focus Deck, Reports honest data presentation with AutomationIds, Settings native hierarchy without nested boxes, Quick Overlay calm cards, dim text contrast WCAG AA, breakpoint coordination, and runtime visual verification.
 - **Visual & UX Audit**: Comprehensive desktop/full-screen audit documented in `VISUAL_AUDIT.md`.
 - **Visual System Definition**: Carbon Studio / Fluent design system specified in `VISUAL_SYSTEM.md`.
 - **Stage 1 (Foundation)**: Design tokens, contrast corrections, typography styles, and 3-tier geometry (`b52919f`).

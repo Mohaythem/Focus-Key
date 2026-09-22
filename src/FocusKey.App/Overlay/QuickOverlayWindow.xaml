@@ -12,8 +12,7 @@
         Background="{ThemeResource FkOverlay}"
         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
         BorderThickness="1"
-        CornerRadius="8"
-        AutomationProperties.AutomationId="QuickOverlaySurface">
+        CornerRadius="8">
 
         <StackPanel
             x:Name="RootPanel"
@@ -30,8 +29,7 @@
                 PointerMoved="OnHeaderPointerMoved"
                 PointerReleased="OnHeaderPointerReleased"
                 PointerCaptureLost="OnHeaderPointerCaptureLost"
-                VerticalAlignment="Center"
-                AutomationProperties.AutomationId="QuickOverlayHeader">
+                VerticalAlignment="Center">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
@@ -69,25 +67,44 @@
                     HorizontalAlignment="Stretch"
                     VerticalAlignment="Stretch" />
 
-                <!-- Right: Close button -->
-                <Button
-                    x:Name="CloseButton"
+                <!-- Right: Shortcut hint and Close button -->
+                <StackPanel
                     Grid.Column="2"
-                    Content="&#xE8BB;"
-                    FontFamily="{ThemeResource SymbolThemeFontFamily}"
-                    FontSize="10"
-                    Width="24"
-                    Height="24"
-                    Padding="0"
-                    CornerRadius="4"
-                    Background="Transparent"
-                    BorderThickness="0"
-                    Foreground="{ThemeResource FkSecondary}"
-                    VerticalAlignment="Center"
-                    HorizontalAlignment="Center"
-                    AutomationProperties.Name="Close Quick Overlay"
-                    AutomationProperties.AutomationId="QuickOverlayCloseButton"
-                    Click="OnCloseButtonClick" />
+                    Orientation="Horizontal"
+                    Spacing="8"
+                    VerticalAlignment="Center">
+                    <Border
+                        x:Name="ShortcutHintContainer"
+                        Background="{ThemeResource FkSurface2}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="3"
+                        Padding="6,2"
+                        VerticalAlignment="Center">
+                        <TextBlock
+                            x:Name="OverlayShortcutHint"
+                            Text="Shift + F3"
+                            FontFamily="Consolas"
+                            FontSize="10"
+                            Foreground="{ThemeResource FkSecondary}" />
+                    </Border>
+                    <Button
+                        x:Name="CloseButton"
+                        Content="&#xE8BB;"
+                        FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                        FontSize="10"
+                        Width="24"
+                        Height="24"
+                        Padding="0"
+                        CornerRadius="4"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Foreground="{ThemeResource FkSecondary}"
+                        VerticalAlignment="Center"
+                        HorizontalAlignment="Center"
+                        AutomationProperties.Name="Close Quick Overlay"
+                        Click="OnCloseButtonClick" />
+                </StackPanel>
             </Grid>
 
             <!-- 1. Idle Content (Selection Cards + Start Button) -->
@@ -110,7 +127,6 @@
                         TabIndex="0"
                         AutomationProperties.Name="Work"
                         AutomationProperties.ItemType="Radio"
-                        AutomationProperties.AutomationId="QuickOverlayWorkCard"
                         Click="OnWorkClicked">
                         <StackPanel Spacing="6" Padding="4,2">
                             <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
@@ -141,7 +157,6 @@
                         TabIndex="1"
                         AutomationProperties.Name="Break"
                         AutomationProperties.ItemType="Radio"
-                        AutomationProperties.AutomationId="QuickOverlayBreakCard"
                         Click="OnBreakClicked">
                         <StackPanel Spacing="6" Padding="4,2">
                             <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
@@ -174,8 +189,79 @@
                     TabIndex="2"
                     Height="40"
                     AutomationProperties.Name="Start"
-                    AutomationProperties.AutomationId="QuickOverlayStartButton"
                     Click="OnStartClicked" />
+
+                <!-- Keyboard shortcuts (Idle mode) -->
+                <StackPanel
+                    x:Name="KeyboardHints"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Center"
+                    Margin="0,16,0,0">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,16,0">
+                        <Border
+                            Background="{ThemeResource FkSurface2}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            CornerRadius="3"
+                            Padding="5,1">
+                            <TextBlock
+                                Text="←→"
+                                FontFamily="Consolas"
+                                FontSize="10"
+                                Foreground="{ThemeResource FkSecondary}" />
+                        </Border>
+                        <TextBlock
+                            Text="Select"
+                            FontSize="10"
+                            Foreground="{ThemeResource FkSecondary}"
+                            VerticalAlignment="Center"
+                            Margin="5,0,0,0" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,16,0">
+                        <Border
+                            Background="{ThemeResource FkSurface2}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            CornerRadius="3"
+                            Padding="5,1">
+                            <TextBlock
+                                Text="↵"
+                                FontFamily="Consolas"
+                                FontSize="10"
+                                Foreground="{ThemeResource FkSecondary}" />
+                        </Border>
+                        <TextBlock
+                            x:Name="StartKeyHint"
+                            Text="Start"
+                            FontSize="10"
+                            Foreground="{ThemeResource FkSecondary}"
+                            VerticalAlignment="Center"
+                            Margin="5,0,0,0" />
+                    </StackPanel>
+                    <StackPanel
+                        Orientation="Horizontal"
+                        Background="Transparent"
+                        PointerPressed="OnCloseClicked">
+                        <Border
+                            Background="{ThemeResource FkSurface2}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            CornerRadius="3"
+                            Padding="5,1">
+                            <TextBlock
+                                Text="Esc"
+                                FontFamily="Consolas"
+                                FontSize="10"
+                                Foreground="{ThemeResource FkSecondary}" />
+                        </Border>
+                        <TextBlock
+                            Text="Close"
+                            FontSize="10"
+                            Foreground="{ThemeResource FkSecondary}"
+                            VerticalAlignment="Center"
+                            Margin="5,0,0,0" />
+                    </StackPanel>
+                </StackPanel>
             </StackPanel>
 
             <!-- 2. Active Content (Running & Paused modes) -->
@@ -191,8 +277,7 @@
                     Margin="0,0,0,16"
                     Language="en-US"
                     FlowDirection="LeftToRight"
-                    TextReadingOrder="UseFlowDirection"
-                    AutomationProperties.AutomationId="QuickOverlayActiveRemaining" />
+                    TextReadingOrder="UseFlowDirection" />
 
                 <!-- Progress bar line (6 DIP height) -->
                 <Border
@@ -222,7 +307,6 @@
                         FocusVisualPrimaryThickness="1"
                         Visibility="Collapsed"
                         AutomationProperties.Name="Start New Session"
-                        AutomationProperties.AutomationId="QuickOverlayStartNewButton"
                         Click="OnStartNewClicked" />
                     <Button
                         x:Name="StopButton"
@@ -234,7 +318,6 @@
                         FocusVisualPrimaryThickness="1"
                         Visibility="Collapsed"
                         AutomationProperties.Name="Stop Session"
-                        AutomationProperties.AutomationId="QuickOverlayStopButton"
                         Click="OnStopClicked" />
                     <Button
                         x:Name="PauseButton"
@@ -245,7 +328,6 @@
                         FocusVisualSecondaryBrush="Transparent"
                         FocusVisualPrimaryThickness="1"
                         AutomationProperties.Name="Pause Session"
-                        AutomationProperties.AutomationId="QuickOverlayPauseButton"
                         Click="OnPauseClicked" />
                 </StackPanel>
             </StackPanel>

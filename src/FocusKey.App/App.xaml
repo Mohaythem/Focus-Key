@@ -8,7 +8,7 @@
     <SolidColorBrush x:Key="FkOverlay" Color="#1E1E1E"/>
     <SolidColorBrush x:Key="FkBorder" Color="#363636"/><SolidColorBrush x:Key="FkForeground" Color="#E0E0E0"/>
     <SolidColorBrush x:Key="CardStrokeColorDefaultBrush" Color="#363636"/>
-    <SolidColorBrush x:Key="FkSecondary" Color="#A0A0A0"/><SolidColorBrush x:Key="FkDim" Color="#8E8E8E"/>
+    <SolidColorBrush x:Key="FkSecondary" Color="#A0A0A0"/><SolidColorBrush x:Key="FkDim" Color="#6E6E6E"/>
     <SolidColorBrush x:Key="FkAccent" Color="#4CC2FF"/>
     <SolidColorBrush x:Key="FkStatusRunning" Color="#E0E0E0"/>
     <SolidColorBrush x:Key="FkStatusCompleted" Color="#A0A0A0"/>

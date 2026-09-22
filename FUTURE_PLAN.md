@@ -12,37 +12,6 @@ This document serves as the persistent repository-level source of truth for all 
 
 ---
 
-## Active Milestone
-
-### Final Native UI Refinement (Implemented — Awaiting Final User Acceptance)
-**Status:** Implemented — Awaiting Final User Acceptance
-**Scope & Deliverables:**
-1. **Confirmed UX / Accessibility Issues**:
-   - Dim text contrast fix for Dark and Light modes (`#8E8E8E`, >= 4.5:1 WCAG AA for small text).
-   - Paused focus restoration (Running -> Pause focuses Continue; Paused -> Continue / Start New navigation).
-   - Narrow Today breakpoint coordination with Shell breakpoints (720 DIP threshold, zero truncated Activity rows).
-   - Stable AutomationProperties.AutomationId across all interactive controls in Today, Navigation, Reports, Settings, and Quick Overlay.
-   - Focus visual cleanup (single 1px border on selected launcher cards, no heavy double outline).
-2. **Today — Integrated Focus Deck (Codex Concept A)**:
-   - Unified Hero deck with Work teal / Break violet context, large timer, clean linear progress, contextual actions.
-   - Four Daily Summary metrics calmly integrated below the timer/progress deck with a subtle 1px divider.
-   - Preserves Activity rail on the right in wide mode, reflows to vertical stack on narrow mode.
-3. **Reports — Native & Honest Data Presentation (Codex Concept C)**:
-   - Stable AutomationId properties on all controls, pickers, filters, metrics, and chart columns.
-   - Clean native geometry, responsive across scales without empty voids.
-4. **Settings — Native Hierarchy (Codex Concept D)**:
-   - Eliminated nested container boxes (`FkCardSubtle`) in favor of clean Fluent grouped rows with section headers and subtle dividers.
-   - Session, Appearance, Shortcuts, Advanced categories.
-   - Flat Fluent keycaps, preserved settings and SQLite persistence semantics.
-5. **Quick Overlay — Calm Refinement**:
-   - Neutral base cards (`FkSurface2`), restrained Work/Break semantic tint, thin accent border.
-   - Removed persistent Shift+F3 badge and keyboard footer.
-6. **Visual System & Shell Cleanup**:
-   - Consolidate repeated visual tokens into semantic resources.
-   - Coordinated breakpoints and active navigation indicator.
-
----
-
 ## Pending Future Milestones
 
 ### Installer / Release Candidate

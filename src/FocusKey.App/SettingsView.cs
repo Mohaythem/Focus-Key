@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Windows.System;
@@ -957,7 +958,11 @@ internal sealed class SettingsView : UserControl
 
     private void ConfigureColor(Button button, ColorPicker picker, string name)
     {
-        var flyout = new Flyout { Content = picker };
+        var flyout = new Flyout
+        {
+            Content = picker,
+            Placement = FlyoutPlacementMode.BottomEdgeAlignedRight
+        };
         button.Flyout = flyout;
         button.Style = Application.Current?.Resources["FkColorButton"] as Style;
         button.VerticalAlignment = VerticalAlignment.Center;
@@ -1243,8 +1248,10 @@ internal sealed class SettingsView : UserControl
     {
         _isListeningForShortcut = true;
         _shortcutError.Visibility = Visibility.Collapsed;
-        _shortcutText.Text = "[ Press combination ]";
+        _shortcutText.Text = "Press keys…";
         _shortcutText.Foreground = Presentation.ThemeBrush("FkAccent", this);
+        _shortcutButton.BorderBrush = Presentation.ThemeBrush("FkAccent", this);
+        _shortcutButton.BorderThickness = new Thickness(1.5);
         AutomationProperties.SetName(_shortcutButton, "Listening for shortcut. Press key combination or Escape to cancel.");
     }
 
@@ -1259,6 +1266,8 @@ internal sealed class SettingsView : UserControl
         _currentShortcut = shortcut;
         _shortcutText.Text = shortcut.ToString();
         _shortcutText.Foreground = Presentation.ThemeBrush("FkSecondary", this);
+        _shortcutButton.BorderBrush = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", this);
+        _shortcutButton.BorderThickness = new Thickness(1);
         AutomationProperties.SetName(_shortcutButton, $"Global shortcut, {shortcut}, click to change");
     }
 
@@ -1294,7 +1303,7 @@ internal sealed class SettingsView : UserControl
             if (mods.HasFlag(ShortcutModifiers.Control)) parts.Add("Ctrl");
             if (mods.HasFlag(ShortcutModifiers.Alt)) parts.Add("Alt");
             if (mods.HasFlag(ShortcutModifiers.Shift)) parts.Add("Shift");
-            _shortcutText.Text = parts.Count > 0 ? $"{string.Join(" + ", parts)} + …" : "[ Press combination ]";
+            _shortcutText.Text = parts.Count > 0 ? $"{string.Join(" + ", parts)} + …" : "Press keys…";
             return;
         }
 
@@ -1436,8 +1445,10 @@ internal sealed class SettingsView : UserControl
     {
         _isListeningForMainWindowShortcut = true;
         _mainWindowShortcutError.Visibility = Visibility.Collapsed;
-        _mainWindowShortcutText.Text = "[ Press combination ]";
+        _mainWindowShortcutText.Text = "Press keys…";
         _mainWindowShortcutText.Foreground = Presentation.ThemeBrush("FkAccent", this);
+        _mainWindowShortcutButton.BorderBrush = Presentation.ThemeBrush("FkAccent", this);
+        _mainWindowShortcutButton.BorderThickness = new Thickness(1.5);
         AutomationProperties.SetName(_mainWindowShortcutButton, "Listening for shortcut. Press key combination or Escape to cancel.");
     }
 
@@ -1452,6 +1463,8 @@ internal sealed class SettingsView : UserControl
         _currentMainWindowShortcut = shortcut;
         _mainWindowShortcutText.Text = shortcut.ToString();
         _mainWindowShortcutText.Foreground = Presentation.ThemeBrush("FkSecondary", this);
+        _mainWindowShortcutButton.BorderBrush = Presentation.ThemeBrush("CardStrokeColorDefaultBrush", this);
+        _mainWindowShortcutButton.BorderThickness = new Thickness(1);
         AutomationProperties.SetName(_mainWindowShortcutButton, $"Open Focus Key shortcut, {shortcut}, click to change");
     }
 
@@ -1487,7 +1500,7 @@ internal sealed class SettingsView : UserControl
             if (mods.HasFlag(ShortcutModifiers.Control)) parts.Add("Ctrl");
             if (mods.HasFlag(ShortcutModifiers.Alt)) parts.Add("Alt");
             if (mods.HasFlag(ShortcutModifiers.Shift)) parts.Add("Shift");
-            _mainWindowShortcutText.Text = parts.Count > 0 ? $"{string.Join(" + ", parts)} + …" : "[ Press combination ]";
+            _mainWindowShortcutText.Text = parts.Count > 0 ? $"{string.Join(" + ", parts)} + …" : "Press keys…";
             return;
         }
 

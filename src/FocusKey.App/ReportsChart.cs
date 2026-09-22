@@ -5,6 +5,7 @@ using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Shapes;
 
@@ -200,9 +201,16 @@ internal sealed class ReportsChart : Grid
 
             colContainer.Children.Add(barStack);
 
-            // Native tooltip & accessibility
+            // Native tooltip & accessibility with safe top clamping
             string tooltip = ReportsFormatting.FormatTooltip(bucket, period);
-            ToolTipService.SetToolTip(colContainer, tooltip);
+            bool isNearTop = focusSecs > 0 && ceilingHours > 0 && (focusSecs / (ceilingHours * 3600.0)) >= 0.80;
+            var toolTipObj = new ToolTip
+            {
+                Content = tooltip,
+                Placement = isNearTop ? PlacementMode.Bottom : PlacementMode.Top,
+                VerticalOffset = isNearTop ? Math.Round(8 * factor) : Math.Round(-4 * factor)
+            };
+            ToolTipService.SetToolTip(colContainer, toolTipObj);
             AutomationProperties.SetName(colContainer, tooltip);
 
             Grid.SetColumn(colContainer, i);

@@ -659,5 +659,41 @@ Integrated the user-selected audio asset `mixkit-select-click-1109.wav` as `sess
 - **1,141 automated unit tests passing (1,141 passed, 0 failed, 0 skipped)** in `dotnet test -c Release`.
 - Release build compiles with **0 warnings and 0 errors**.
 
+---
+
+## Phase 21 — Final UI Polish Fixes & Runtime Screenshot Verification
+
+Status: **Complete and verified**  
+Branch: `native/phased-rewrite`
+
+### Executive Summary & Architecture
+Implemented low-risk native Windows 11 and Fluent Design polish fixes across the Close Dialog, Settings shortcut recording visual treatment, ColorPicker flyout placement, and Reports chart tooltip top clearance. Verified all changes against the real running application via runtime screenshot captures in both Dark and Light themes.
+
+### Scope & Implementations
+1. **Close Dialog Default Action**:
+   - Explicitly configured `Hide Focus Key` as the primary default action (`DefaultButton = ContentDialogButton.Primary`).
+   - Guarded `OnMainSurfacePreviewKeyDown` and `OnNavGridPreviewKeyDown` when `_isShowingCloseDialog` is active so that pressing `Enter` directly triggers "Hide Focus Key" rather than passing through to page controls.
+   - Preserved all Hide, Quit, and Cancel workflows.
+2. **Shortcut Recording Visual Treatment**:
+   - In `SettingsView.cs`, updated `StartShortcutListening` and `StartMainWindowShortcutListening` to display `"Press keys…"` with an accent border highlight (`1.5px` `FkAccent` stroke) on the recording button.
+   - Restored standard border treatment upon completion or cancellation via `Escape`.
+3. **Color Picker Flyout Placement**:
+   - In `SettingsView.cs`, set `Flyout.Placement = FlyoutPlacementMode.BottomEdgeAlignedRight` on all color swatch flyouts (`ConfigureColor`).
+   - Ensures the color picker popover consistently opens beneath the button without covering the setting row title, description, or context.
+4. **Reports Tooltip Top Clamping**:
+   - In `ReportsChart.cs`, added safe top clamping (`isNearTop` detection when bar height exceeds 80% ceiling) with `PlacementMode.Bottom` and comfortable vertical offsets.
+   - Preserved all underlying report calculations, data structures, and period aggregation semantics.
+5. **Runtime Screenshot Verification**:
+   - Verified real running application visually across Dark and Light modes:
+     - `close_dialog_dark.png` & `close_dialog_light.png`
+     - `shortcut_recording_dark.png` & `shortcut_recording_light.png`
+     - `color_picker_flyout_dark.png` & `color_picker_flyout_light.png`
+     - `reports_tooltip_top.png`
+
+### Tests & Verification
+- **1,141 automated unit tests passing (1,141 passed, 0 failed, 0 skipped)** in `dotnet test -c Release`.
+- Release build compiles with **0 warnings and 0 errors**.
+
+
 
 

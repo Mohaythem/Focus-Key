@@ -1,24 +1,29 @@
 # Focus Key — Project Progress & State Checkpoint
 
 ## Current Goal
-Pause / Continue / Stop / Start New sound updated with `session_action.wav` (`mixkit-select-click-1109.wav`) and verified with 1,141/1,141 passing tests and 0 build warnings/errors.
+Final UI polish fixes verified with runtime screenshots across Dark and Light themes. Ready for Stage 11: Installer / Release Candidate.
 
 ## Current Checkpoint
 Implemented and verified:
-- **1. Session Action Audio Asset Integration**:
-  - Integrated `session_action.wav` (195,014 bytes, 44.1kHz WAV, from user-selected `mixkit-select-click-1109.wav`) into `src/FocusKey.App/Assets/Sounds/`.
-  - Cleaned temporary root copy.
-- **2. Updated Audio Lifecycle Semantics**:
-  - Start session $\rightarrow$ plays `start_tick.wav` once.
-  - Pause session $\rightarrow$ plays `session_action.wav` once.
-  - Continue after Pause $\rightarrow$ plays `session_action.wav` once.
-  - Manual Stop $\rightarrow$ plays `session_action.wav` once.
-  - Start New (finalizing paused session) $\rightarrow$ plays `session_action.wav` once.
-  - Natural timer completion $\rightarrow$ plays `completion_bell.wav` ONCE ONLY.
-  - Interrupted / crash / shutdown $\rightarrow$ completely silent.
-- **3. Settings Controls & Unconditional Preview**:
-  - Automatic playback respects Master Session Sounds gate and individual sound preferences.
-  - Added `PreviewSessionAction` for unconditional preview.
+- **1. Close Dialog Explicit Default Action**:
+  - Explicitly configured `Hide Focus Key` as the primary default action (`DefaultButton = ContentDialogButton.Primary`).
+  - Added key preview guards (`if (_isShowingCloseDialog) return;`) in `MainWindow.xaml.cs` to ensure pressing `Enter` directly triggers "Hide Focus Key" without interception.
+  - Preserved Hide / Quit / Cancel workflows and single-dialog reentrancy guards.
+- **2. Shortcut Recording Accent Border Treatment**:
+  - Updated shortcut recording mode to show `"Press keys…"` with a subtle Fluent accent border (`1.5px` `FkAccent` stroke).
+  - Restored default stroke upon binding completion or cancellation via `Escape`.
+- **3. Color Picker Flyout Placement**:
+  - Configured `Flyout.Placement = FlyoutPlacementMode.BottomEdgeAlignedRight` on color swatch buttons in Settings.
+  - Keeps setting row label, description, and surrounding context visible when selecting colors.
+- **4. Reports Tooltip Safe Clamping**:
+  - Added safe top clamping (`isNearTop` detection when bar height exceeds 80% ceiling) with `PlacementMode.Bottom` and comfortable vertical offsets.
+  - Preserved all Reports calculations, periods, and chart styling.
+- **5. Visual Runtime Screenshot Verification**:
+  - Captured and reviewed real runtime screenshots in Dark and Light themes:
+    - `close_dialog_dark.png` & `close_dialog_light.png`
+    - `shortcut_recording_dark.png` & `shortcut_recording_light.png`
+    - `color_picker_flyout_dark.png` & `color_picker_flyout_light.png`
+    - `reports_tooltip_top.png`
 - **Automated Tests**: 1,141/1,141 unit tests passing (`dotnet test -c Release`), 0 failed, 0 skipped.
 - **Build**: 0 Warning(s), 0 Error(s) (`dotnet build src/FocusKey.App/FocusKey.App.csproj -c Release`).
 
@@ -46,6 +51,7 @@ Implemented and verified:
 - **Phase 17 (Full Accessibility + Windows Narrator Audit)**: Full keyboard navigation and Windows Narrator accessibility across Today, Reports, Settings, Quick Overlay, Navigation Shell, and Close/Hide Dialog with dynamic live session announcements, radio item types, collapsible section status, and composite metric descriptions.
 - **Phase 18 (Final User-Selected Sound Integration)**: Integration of exact user audio assets (`start_tick.wav`, `session_action.wav`, `complete.wav`, `completion_bell.wav`), single-playback natural completion bell, and action audio cues for Pause, Continue, Stop, and Start New.
 - **Phase 19 (Final Pre-Release Cleanup + Consistency + Engineering QA)**: Cleaned debug/preview flags (`FOCUSKEY_YEARLY_PREVIEW`), audited Reports (Week/Month/Year), unified sidebar button accessibility properties, verified full runtime smoke workflow (`RuntimeSmokeWorkflowTests.cs`), and confirmed 0 build warnings/errors.
+- **Phase 21 (Final UI Polish Fixes & Runtime Screenshot Verification)**: Close Dialog default action & Enter routing, shortcut recording Fluent accent border, color picker bottom-edge flyout placement, and reports tooltip top clearance clamping.
 
 ## Remaining Work
 - **Stage 11: Installer / Release Candidate**
@@ -57,6 +63,7 @@ Implemented and verified:
 - **Natural Completion Semantics**: `completion_bell.wav` contains three internal chimes recorded directly in the audio asset, played once asynchronously via Win32 `PlaySound`. Looped playback logic was removed.
 - **Session Action Audio**: `session_action.wav` plays once for Pause, Continue, Stop, and Start New.
 - **Preview Independence**: Preview buttons always play a single cue directly, regardless of master sound gate or child toggle states.
+- **Close Dialog Default**: `Hide Focus Key` is the explicit primary action, activated immediately on Enter keypress without interception.
 
 ## Last Verification
 - **Build**: `dotnet build src/FocusKey.App/FocusKey.App.csproj -c Release` (0 Warnings, 0 Errors).
@@ -64,4 +71,4 @@ Implemented and verified:
 
 ## Current Git State
 - Branch: `native/phased-rewrite`
-- Working tree clean, ready for commit and push.
+- Working tree staged for Phase 21 commit and push.

@@ -422,6 +422,7 @@ public sealed partial class MainWindow : Window
 
     private void OnNavGridPreviewKeyDown(object sender, KeyRoutedEventArgs e)
     {
+        if (_isShowingCloseDialog) return;
         var focused = FocusManager.GetFocusedElement(MainSurface.XamlRoot);
         Control?[] items = [TodayNav, ReportsNav, OverlayNavButton, SettingsNav, ExitButton];
         int currentIndex = -1;
@@ -554,6 +555,7 @@ public sealed partial class MainWindow : Window
 
     private void OnMainSurfacePreviewKeyDown(object sender, KeyRoutedEventArgs e)
     {
+        if (_isShowingCloseDialog) return;
         var focused = FocusManager.GetFocusedElement(MainSurface.XamlRoot);
 
         if (IsTextInput(focused) || IsTextInput(e.OriginalSource))

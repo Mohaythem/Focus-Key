@@ -626,4 +626,38 @@ Completed application-wide engineering QA, UI consistency audit, and clean remov
 - **1,139 automated unit tests passing (1,139 passed, 0 failed, 0 skipped)** in `dotnet test -c Release`.
 - Release build compiles with **0 warnings and 0 errors**.
 
+---
+
+## Phase 20 — Update Pause / Continue / Stop Sound
+
+Status: **Complete and verified**  
+Branch: `native/phased-rewrite`
+
+### Executive Summary & Architecture
+Integrated the user-selected audio asset `mixkit-select-click-1109.wav` as `session_action.wav` into the application. Configured playback for Pause, Continue, Stop, and Start New (when finalizing a paused session) while preserving the natural completion bell and start tick sound behaviors.
+
+### Scope & Implementations
+1. **User Audio Asset Integration**:
+   - Integrated `session_action.wav` (195,014 bytes, 44.1kHz WAV, from `mixkit-select-click-1109.wav`) into `src/FocusKey.App/Assets/Sounds/`.
+   - Cleaned temporary root copy of `mixkit-select-click-1109.wav`.
+2. **Audio Playback Semantics**:
+   - New session Start $\rightarrow$ plays `start_tick.wav` once.
+   - Pause session $\rightarrow$ plays `session_action.wav` once.
+   - Continue after Pause $\rightarrow$ plays `session_action.wav` once.
+   - Manual Stop $\rightarrow$ plays `session_action.wav` once.
+   - Start New (when finalizing paused session) $\rightarrow$ plays `session_action.wav` once.
+   - Natural timer completion $\rightarrow$ plays `completion_bell.wav` ONCE ONLY (single asynchronous Win32 `PlaySound` call).
+   - Interrupted / crash / shutdown $\rightarrow$ completely silent.
+3. **Settings Controls & Gating**:
+   - Automatic playback respects Master Session Sounds gate and individual sound preferences.
+   - Preserved unconditional previews in Settings (`PreviewSessionAction` $\rightarrow$ `session_action.wav` once).
+4. **Automated Test Coverage**:
+   - Added unit tests in `SessionSoundCoordinatorTests.cs` for Pause, Continue, Stop, and Start New sound triggers.
+   - Verified that disabled master and start sound settings properly gate automatic playback.
+
+### Tests & Verification
+- **1,141 automated unit tests passing (1,141 passed, 0 failed, 0 skipped)** in `dotnet test -c Release`.
+- Release build compiles with **0 warnings and 0 errors**.
+
+
 

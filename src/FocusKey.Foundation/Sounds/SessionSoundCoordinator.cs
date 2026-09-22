@@ -4,9 +4,9 @@ namespace FocusKey.Foundation.Sounds;
 
 /// <summary>
 /// Authoritative rule engine for session sound playback events.
-/// Enforces single start cue on Start/Continue (start_tick.wav),
-/// single stop cue on Stop/StartNew (complete.wav),
-/// single completion bell on Natural Completion (completion_bell.wav, containing 3 internal chimes),
+/// Enforces single start cue on Start (start_tick.wav),
+/// single session action cue on Pause / Continue / Stop / Start New (session_action.wav),
+/// single completion bell on Natural Completion (completion_bell.wav),
 /// and silence on Interrupted.
 /// </summary>
 public sealed class SessionSoundCoordinator
@@ -25,16 +25,25 @@ public sealed class SessionSoundCoordinator
         _player.PlayStartTick();
     }
 
-    /// <summary>Continue after Pause -> plays Start sound (start_tick.wav) once if continued.</summary>
+    /// <summary>Pause session -> plays session action sound (session_action.wav) once if paused.</summary>
+    public void HandleSessionPaused(SessionOutcome outcome)
+    {
+        if (outcome.Kind == SessionOutcomeKind.Paused)
+        {
+            _player.PlayPause();
+        }
+    }
+
+    /// <summary>Continue after Pause -> plays session action sound (session_action.wav) once if continued.</summary>
     public void HandleSessionContinued(SessionOutcome outcome)
     {
         if (outcome.Kind == SessionOutcomeKind.Continued)
         {
-            _player.PlayStartTick();
+            _player.PlayContinue();
         }
     }
 
-    /// <summary>User Stop (or Start New from Paused) -> plays Stop sound (complete.wav) once if stopped.</summary>
+    /// <summary>User Stop (or Start New from Paused) -> plays session action sound (session_action.wav) once if stopped.</summary>
     public void HandleSessionStopped(SessionOutcome outcome)
     {
         if (outcome.Kind == SessionOutcomeKind.Stopped)

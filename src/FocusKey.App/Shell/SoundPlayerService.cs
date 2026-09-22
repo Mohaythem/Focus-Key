@@ -41,15 +41,24 @@ public sealed class SoundPlayerService : ISoundPlayer
         PlayFile("start_tick.wav");
     }
 
-    /// <summary>Plays complete.wav once if master and completion sound settings are enabled (e.g. on manual Stop or Start New).</summary>
-    public void PlayStop()
+    /// <summary>Plays session_action.wav once if master and start sound settings are enabled (for Pause, Continue, Stop, Start New).</summary>
+    public void PlaySessionAction()
     {
-        if (!_masterSoundsEnabled() || !_completionSoundEnabled()) return;
-        PlayFile("complete.wav");
+        if (!_masterSoundsEnabled() || !_startSoundEnabled()) return;
+        PlayFile("session_action.wav");
     }
 
-    /// <summary>Alias for PlayStop (complete.wav) for backward compatibility.</summary>
-    public void PlayCompletionBell() => PlayStop();
+    /// <summary>Plays pause sound cue once (session_action.wav).</summary>
+    public void PlayPause() => PlaySessionAction();
+
+    /// <summary>Plays continue sound cue once (session_action.wav).</summary>
+    public void PlayContinue() => PlaySessionAction();
+
+    /// <summary>Plays manual stop sound cue once (session_action.wav).</summary>
+    public void PlayStop() => PlaySessionAction();
+
+    /// <summary>Alias for PlayStop (session_action.wav) for backward compatibility.</summary>
+    public void PlayCompletionBell() => PlaySessionAction();
 
     /// <summary>Plays completion_bell.wav ONCE ONLY if master and completion sound settings are enabled (on natural timer completion).</summary>
     public void PlayNaturalCompletionBell()
@@ -68,6 +77,12 @@ public sealed class SoundPlayerService : ISoundPlayer
     public void PreviewCompletionBell()
     {
         PlayFile("completion_bell.wav");
+    }
+
+    /// <summary>Previews session_action.wav once unconditionally.</summary>
+    public void PreviewSessionAction()
+    {
+        PlayFile("session_action.wav");
     }
 
     private void PlayFile(string filename)

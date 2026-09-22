@@ -62,19 +62,21 @@ This document serves as the persistent repository-level source of truth for all 
 1. **User-Selected High-Fidelity Audio Assets**:
    - Integrated exact user-provided WAV audio assets into `src/FocusKey.App/Assets/Sounds/` without synthesizing, trimming, modifying, or regenerating:
      - `start_tick.wav` (1,263,014 bytes, 44.1kHz WAV).
+     - `session_action.wav` (195,014 bytes, 44.1kHz WAV, from `mixkit-select-click-1109.wav`).
      - `complete.wav` (707,772 bytes, 44.1kHz WAV).
      - `completion_bell.wav` (765,704 bytes, 44.1kHz WAV, contains 3 chimes within the file).
    - Removed synthetic disk asset overwriting on startup and in test fixtures to preserve user audio assets permanently.
 2. **Deterministic Playback Semantics**:
    - New session Start $\rightarrow$ plays `start_tick.wav` once.
-   - Continue after Pause $\rightarrow$ plays `start_tick.wav` once.
-   - Manual Stop $\rightarrow$ plays `complete.wav` once.
-   - Start New (when finalizing paused session) $\rightarrow$ plays `complete.wav` once.
-   - Natural timer completion $\rightarrow$ plays `completion_bell.wav` ONCE ONLY (single asynchronous Win32 `PlaySound` call; looping logic removed since the WAV file already contains 3 recorded chimes).
+   - Pause session $\rightarrow$ plays `session_action.wav` once.
+   - Continue after Pause $\rightarrow$ plays `session_action.wav` once.
+   - Manual Stop $\rightarrow$ plays `session_action.wav` once.
+   - Start New (when finalizing paused session) $\rightarrow$ plays `session_action.wav` once.
+   - Natural timer completion $\rightarrow$ plays `completion_bell.wav` ONCE ONLY (single asynchronous Win32 `PlaySound` call).
    - Interrupted / crash / shutdown $\rightarrow$ completely silent (zero sound playback).
 3. **Settings Controls & Unconditional Preview**:
    - Master gate toggle (`Session sounds [On/Off]`), Start sound toggle, Completion sound toggle.
-   - Preview buttons play single cue directly unconditionally (`PreviewStartTick` $\rightarrow$ `start_tick.wav` once, `PreviewCompletionBell` $\rightarrow$ `completion_bell.wav` once).
+   - Preview buttons play single cue directly unconditionally (`PreviewStartTick` $\rightarrow$ `start_tick.wav` once, `PreviewCompletionBell` $\rightarrow$ `completion_bell.wav` once, `PreviewSessionAction` $\rightarrow$ `session_action.wav` once).
 
 ---
 

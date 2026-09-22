@@ -1,23 +1,25 @@
 # Focus Key — Project Progress & State Checkpoint
 
 ## Current Goal
-Final Pre-Release Cleanup + Consistency + Engineering QA complete and verified with 1,139/1,139 passing tests and 0 build warnings/errors.
+Pause / Continue / Stop / Start New sound updated with `session_action.wav` (`mixkit-select-click-1109.wav`) and verified with 1,141/1,141 passing tests and 0 build warnings/errors.
 
 ## Current Checkpoint
 Implemented and verified:
-- **1. Reports & Yearly Cleanup**:
-  - Removed temporary `FOCUSKEY_YEARLY_PREVIEW` environment variable override and dead preview methods.
-  - Verified exact 4 weekly buckets in Monthly view (1–7, 8–14, 15–21, 22–end).
-  - Verified data-driven Year eligibility against real persisted session and imported history (`earliestDate.AddYears(1) <= today`).
-  - Verified Week / Month / Year calculations across timezones and scaling factors.
-- **2. UI Consistency & Accessibility QA**:
-  - Added `ItemType="Navigation"` to `ExitButton` and `DrawerExitButton` for full tree consistency.
-  - Verified page title hierarchy, spacing, card padding, corner radii, borders, typography, and button heights across Today, Reports, Settings, and Quick Overlay.
-  - Verified Dark, Light, Higher Contrast themes and discrete UI Scaling (80%, 90%, 100%, 110%, 125%, 150%).
-- **3. Engineering QA & Runtime Smoke Test**:
-  - Verified startup, single-instance activation, tray hide/restore, close decision dialog (`Hide` vs `Quit`), `Shift + F3` / `Shift + F4` hotkeys, session lifecycle (Start, Pause, Continue, Stop, Start New, Natural Completion), crash/restart recovery, SQLite migrations 1–14, settings persistence, UI scale persistence, and overlay position persistence.
-  - Added automated end-to-end `RuntimeSmokeWorkflowTests.cs` verifying full application workflow and state persistence.
-- **Automated Tests**: 1,139/1,139 unit tests passing (`dotnet test -c Release`), 0 failed, 0 skipped.
+- **1. Session Action Audio Asset Integration**:
+  - Integrated `session_action.wav` (195,014 bytes, 44.1kHz WAV, from user-selected `mixkit-select-click-1109.wav`) into `src/FocusKey.App/Assets/Sounds/`.
+  - Cleaned temporary root copy.
+- **2. Updated Audio Lifecycle Semantics**:
+  - Start session $\rightarrow$ plays `start_tick.wav` once.
+  - Pause session $\rightarrow$ plays `session_action.wav` once.
+  - Continue after Pause $\rightarrow$ plays `session_action.wav` once.
+  - Manual Stop $\rightarrow$ plays `session_action.wav` once.
+  - Start New (finalizing paused session) $\rightarrow$ plays `session_action.wav` once.
+  - Natural timer completion $\rightarrow$ plays `completion_bell.wav` ONCE ONLY.
+  - Interrupted / crash / shutdown $\rightarrow$ completely silent.
+- **3. Settings Controls & Unconditional Preview**:
+  - Automatic playback respects Master Session Sounds gate and individual sound preferences.
+  - Added `PreviewSessionAction` for unconditional preview.
+- **Automated Tests**: 1,141/1,141 unit tests passing (`dotnet test -c Release`), 0 failed, 0 skipped.
 - **Build**: 0 Warning(s), 0 Error(s) (`dotnet build src/FocusKey.App/FocusKey.App.csproj -c Release`).
 
 ## Completed Work
@@ -42,7 +44,7 @@ Implemented and verified:
 - **Stage 15 (Application UI Scaling / Zoom System)**: Native, persistent, layout-aware UI scaling system (80% to 150%), global zoom keyboard shortcuts, Settings ComboBox, HUD overlay, effective width adaptive layout, single-queue authoritative synchronization, and SQLite Migration 14.
 - **Repository Hygiene Cleanup**: Cleaned accidental/scratch agent files (`ORIGINAL_REQUEST.md`, `PROJECT.md`), removed obsolete Phase 11 sound mock tests (`SessionSoundCoordinationTests.cs`), and standardized test file names into clean domain stress suites (`UiScaleSettingsSyncEmpiricalTests.cs`, `UiScaleShortcutsSteppingStressTests.cs`, `UiScaleRapidAlternatingSyncStressTests.cs`, `UiScaleSettingsSyncTests.cs`).
 - **Phase 17 (Full Accessibility + Windows Narrator Audit)**: Full keyboard navigation and Windows Narrator accessibility across Today, Reports, Settings, Quick Overlay, Navigation Shell, and Close/Hide Dialog with dynamic live session announcements, radio item types, collapsible section status, and composite metric descriptions.
-- **Phase 18 (Final User-Selected Sound Integration)**: Integration of exact user audio assets (`start_tick.wav`, `complete.wav`, `completion_bell.wav`), single-playback natural completion bell, manual stop/StartNew complete cue, single start tick on start/continue, and removal of synthetic file generator overrides.
+- **Phase 18 (Final User-Selected Sound Integration)**: Integration of exact user audio assets (`start_tick.wav`, `session_action.wav`, `complete.wav`, `completion_bell.wav`), single-playback natural completion bell, and action audio cues for Pause, Continue, Stop, and Start New.
 - **Phase 19 (Final Pre-Release Cleanup + Consistency + Engineering QA)**: Cleaned debug/preview flags (`FOCUSKEY_YEARLY_PREVIEW`), audited Reports (Week/Month/Year), unified sidebar button accessibility properties, verified full runtime smoke workflow (`RuntimeSmokeWorkflowTests.cs`), and confirmed 0 build warnings/errors.
 
 ## Remaining Work
@@ -51,13 +53,14 @@ Implemented and verified:
   - Package clean standalone Release installer (`FocusKeySetup.exe`).
 
 ## Important Active Decisions
-- **User Audio Provenance**: Sound files are exact user-provided WAV assets (`start_tick.wav`, `complete.wav`, `completion_bell.wav`), unmodified and ungenerated.
+- **User Audio Provenance**: Sound files are exact user-provided WAV assets (`start_tick.wav`, `session_action.wav`, `complete.wav`, `completion_bell.wav`), unmodified and ungenerated.
 - **Natural Completion Semantics**: `completion_bell.wav` contains three internal chimes recorded directly in the audio asset, played once asynchronously via Win32 `PlaySound`. Looped playback logic was removed.
+- **Session Action Audio**: `session_action.wav` plays once for Pause, Continue, Stop, and Start New.
 - **Preview Independence**: Preview buttons always play a single cue directly, regardless of master sound gate or child toggle states.
 
 ## Last Verification
 - **Build**: `dotnet build src/FocusKey.App/FocusKey.App.csproj -c Release` (0 Warnings, 0 Errors).
-- **Test Suite**: `dotnet test -c Release` (1,139 passed, 0 failed, 0 skipped).
+- **Test Suite**: `dotnet test -c Release` (1,141 passed, 0 failed, 0 skipped).
 
 ## Current Git State
 - Branch: `native/phased-rewrite`

@@ -464,6 +464,10 @@ public partial class App : Application
     private async Task<SessionOutcome> PauseSessionAsync(SessionId expectedId, CancellationToken cancellationToken)
     {
         SessionOutcome result = await _completion!.PauseAsync(expectedId, cancellationToken);
+        if (result.Kind == SessionOutcomeKind.Paused)
+        {
+            _sounds?.PlayPause();
+        }
         _window?.RefreshPages();
         if (_quickOverlay is not null) await _quickOverlay.RefreshIfVisibleAsync();
         return result;
@@ -474,7 +478,7 @@ public partial class App : Application
         SessionOutcome result = await _completion!.ContinueAsync(expectedId, cancellationToken);
         if (result.Kind == SessionOutcomeKind.Continued)
         {
-            _sounds?.PlayStartTick();
+            _sounds?.PlayContinue();
         }
         _window?.RefreshPages();
         if (_quickOverlay is not null) await _quickOverlay.RefreshIfVisibleAsync();

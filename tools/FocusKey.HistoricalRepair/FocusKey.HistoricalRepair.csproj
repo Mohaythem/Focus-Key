@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    One-time, repository-local maintenance tool. It is NOT referenced by the Focus Key application
+    and never runs at startup or during normal session/report processing. It corrects historical_focus
+    aggregate rows that an earlier bulk import accidentally dated after "today". Default mode is a
+    read-only dry run; mutation requires an explicit apply flag plus an explicit database or data-root target.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>FocusKey.HistoricalRepair</RootNamespace>
+    <AssemblyName>FocusKey.HistoricalRepair</AssemblyName>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\FocusKey.Foundation\FocusKey.Foundation.csproj" />
+  </ItemGroup>
+
+</Project>

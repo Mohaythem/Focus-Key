@@ -15,7 +15,19 @@ public sealed class ReportsController(Func<ReportPeriod, DateOnly, CancellationT
     public string? Error { get; private set; }
     public event Action? Changed;
 
-    public Task OpenAsync() { if (_disposed) return Task.CompletedTask; _visible = true; return RefreshAsync(); }
+    public Task OpenAsync()
+    {
+        if (_disposed) return Task.CompletedTask;
+        _visible = true;
+        // Every navigation into Reports enters on Week, resolved against the current local
+        // date at the moment of entry. A prior in-session selection (Month/Year, or a pinned
+        // historical date) must never leak across a Hide/Open boundary, and the entry date
+        // must never be a value captured at construction or a previous visit.
+        Period = ReportPeriod.Weekly;
+        _followCurrent = true;
+        Date = currentDate();
+        return RefreshAsync();
+    }
     public void Hide() { _visible = false; ++_generation; IsRefreshing = false; }
     public Task SelectAsync(ReportPeriod period, DateOnly date)
     {
@@ -27,6 +39,21 @@ public sealed class ReportsController(Func<ReportPeriod, DateOnly, CancellationT
         return RefreshAsync();
     }
     public Task CurrentAsync() { _followCurrent = true; return RefreshAsync(); }
+
+    /// <summary>
+    /// Segmented-selector action: show the CURRENT period of the given type (Week/Month/Year), re-anchored
+    /// to the current local date. Unlike <see cref="SelectAsync"/> (which pins a specific historical date),
+    /// this keeps following the clock, so switching to Week always lands on the real current week and a later
+    /// refresh (or crossing midnight) recomputes against the new current date.
+    /// </summary>
+    public Task SelectPeriodAsync(ReportPeriod period)
+    {
+        if (_disposed) return Task.CompletedTask;
+        Period = period;
+        _followCurrent = true;
+        Date = currentDate();
+        return RefreshAsync();
+    }
     public Task MoveAsync(int direction)
     {
         if (direction is not (-1 or 1)) throw new ArgumentOutOfRangeException(nameof(direction));

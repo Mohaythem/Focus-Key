@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\FocusKey.Foundation\FocusKey.Foundation.csproj" />
+    <ProjectReference Include="..\..\tools\FocusKey.HistoricalRepair\FocusKey.HistoricalRepair.csproj" />
   </ItemGroup>
 
   <ItemGroup>

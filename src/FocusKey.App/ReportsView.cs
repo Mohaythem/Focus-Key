@@ -126,7 +126,16 @@ internal sealed class ReportsView : UserControl, IDisposable
         _mainPanel.Children.Add(_results);
         Content = _mainPanel;
 
-        _date.DateChanged += async (_, _) => { if (!_rendering && _date.Date is { } date) await _reports.SelectAsync(_reports.Period, DateOnly.FromDateTime(date.DateTime)); };
+        _date.DateChanged += async (_, _) =>
+        {
+            // Ignore programmatic echoes from Render(): only a genuine user pick (a different date than the
+            // controller already holds) pins a specific date. This prevents the picker from silently turning
+            // off follow-current during a normal re-render, which would otherwise strand a stale "today".
+            if (_rendering || _date.Date is not { } value) return;
+            var picked = DateOnly.FromDateTime(value.DateTime);
+            if (picked == _reports.Date) return;
+            await _reports.SelectAsync(_reports.Period, picked);
+        };
         _reports.Changed += Render;
         ActualThemeChanged += (_, _) =>
         {
@@ -174,7 +183,7 @@ internal sealed class ReportsView : UserControl, IDisposable
             btn.Click += async (s, _) =>
             {
                 if (!_rendering && s is Button b && b.Tag is ReportPeriod p)
-                    await _reports.SelectAsync(p, _reports.Date);
+                    await _reports.SelectPeriodAsync(p);
             };
             stack.Children.Add(btn);
         }

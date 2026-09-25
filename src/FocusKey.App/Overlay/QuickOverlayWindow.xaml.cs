@@ -589,12 +589,6 @@ public sealed partial class QuickOverlayWindow : Window, IQuickOverlayView
         }
     }
 
-    private void OnCloseButtonClick(object sender, RoutedEventArgs args)
-    {
-        SaveCurrentPosition();
-        DismissRequested?.Invoke();
-    }
-
     private void OnWorkClicked(object sender, RoutedEventArgs args) => SelectionRequested?.Invoke(SessionType.Work);
     private void OnBreakClicked(object sender, RoutedEventArgs args) => SelectionRequested?.Invoke(SessionType.Break);
     private void OnStartClicked(object sender, RoutedEventArgs args) => StartRequested?.Invoke();

@@ -87,17 +87,84 @@ public sealed class ReportsControllerTests
     }
 
     [Fact]
-    public async Task CurrentDateTracksClockUntilUserPinsHistoricalSelection()
+    public async Task CurrentDateTracksClockAndPinnedSelectionSurvivesActiveUse()
     {
         var current = new DateOnly(2026, 9, 2);
         using var controller = new ReportsController((_, _, _) => Task.FromResult(Empty()), () => current, _ => { });
         await controller.OpenAsync();
+        // While following the current period, the date tracks the clock on every refresh.
         current = current.AddDays(1); await controller.RefreshAsync(); Assert.Equal(current, controller.Date);
+        // Pinning a historical selection stops clock tracking during active use.
         var historical = new DateOnly(2026, 8, 10);
         await controller.SelectAsync(ReportPeriod.Weekly, historical);
-        controller.Hide(); current = current.AddDays(1); await controller.OpenAsync();
-        Assert.Equal(historical, controller.Date);
+        current = current.AddDays(1); await controller.RefreshAsync(); Assert.Equal(historical, controller.Date);
+        await controller.MoveAsync(-1); Assert.Equal(historical.AddDays(-7), controller.Date);
+        // The Current control re-attaches to the clock.
         await controller.CurrentAsync(); Assert.Equal(current, controller.Date);
+    }
+
+    [Fact]
+    public async Task OpeningReportsAlwaysEntersWeekRegardlessOfPriorPeriod()
+    {
+        var current = new DateOnly(2026, 9, 25);
+        using var controller = new ReportsController((_, _, _) => Task.FromResult(Empty()), () => current, _ => { });
+        await controller.OpenAsync();
+        Assert.Equal(ReportPeriod.Weekly, controller.Period);
+
+        // Month selected, navigate away, re-enter: back to Week on the current date.
+        await controller.SelectAsync(ReportPeriod.Monthly, new DateOnly(2026, 7, 15));
+        Assert.Equal(ReportPeriod.Monthly, controller.Period);
+        controller.Hide();
+        await controller.OpenAsync();
+        Assert.Equal(ReportPeriod.Weekly, controller.Period);
+        Assert.Equal(current, controller.Date);
+
+        // Year selected, navigate away, re-enter: back to Week on the current date.
+        await controller.SelectAsync(ReportPeriod.Yearly, new DateOnly(2026, 1, 1));
+        Assert.Equal(ReportPeriod.Yearly, controller.Period);
+        controller.Hide();
+        await controller.OpenAsync();
+        Assert.Equal(ReportPeriod.Weekly, controller.Period);
+        Assert.Equal(current, controller.Date);
+    }
+
+    [Fact]
+    public async Task ReopeningReportsResolvesCurrentDateAgainstAdvancedClock()
+    {
+        var current = new DateOnly(2026, 9, 25);
+        using var controller = new ReportsController((_, _, _) => Task.FromResult(Empty()), () => current, _ => { });
+        await controller.OpenAsync();
+        Assert.Equal(new DateOnly(2026, 9, 25), controller.Date);
+
+        controller.Hide();
+        current = new DateOnly(2026, 9, 28); // days pass while the app stays open
+        await controller.OpenAsync();
+        Assert.Equal(new DateOnly(2026, 9, 28), controller.Date);
+
+        controller.Hide();
+        current = new DateOnly(2026, 10, 1); // crossing a month boundary (e.g. across midnight)
+        await controller.OpenAsync();
+        Assert.Equal(new DateOnly(2026, 10, 1), controller.Date);
+    }
+
+    [Fact]
+    public async Task ActiveReportsRefreshDoesNotResetPeriodOrPinnedDate()
+    {
+        var current = new DateOnly(2026, 9, 25);
+        using var controller = new ReportsController((_, _, _) => Task.FromResult(Empty()), () => current, _ => { });
+        await controller.OpenAsync();
+        await controller.SelectAsync(ReportPeriod.Monthly, new DateOnly(2026, 6, 10));
+
+        // Refreshes triggered while actively using Reports (settings reload, manual Refresh)
+        // must preserve the Month/Year view and its pinned date; only navigation into Reports resets.
+        await controller.RefreshAsync();
+        Assert.Equal(ReportPeriod.Monthly, controller.Period);
+        Assert.Equal(new DateOnly(2026, 6, 10), controller.Date);
+
+        current = new DateOnly(2026, 9, 26);
+        await controller.RefreshAsync();
+        Assert.Equal(ReportPeriod.Monthly, controller.Period);
+        Assert.Equal(new DateOnly(2026, 6, 10), controller.Date);
     }
 
     [Fact]
@@ -123,6 +190,68 @@ public sealed class ReportsControllerTests
         await controller.MoveAsync(-1); Assert.Equal(ReportRange.MinimumDate, controller.Date);
         await controller.SelectAsync(period, ReportRange.MaximumDate);
         await controller.MoveAsync(1); Assert.Equal(ReportRange.MaximumDate, controller.Date);
+    }
+
+    [Fact]
+    public async Task SelectPeriodTracksCurrentDateAndFollowsClock()
+    {
+        var current = new DateOnly(2026, 9, 25);
+        using var controller = new ReportsController((_, _, _) => Task.FromResult(Empty()), () => current, _ => { });
+        await controller.OpenAsync();
+
+        await controller.SelectPeriodAsync(ReportPeriod.Monthly);
+        Assert.Equal(ReportPeriod.Monthly, controller.Period);
+        Assert.Equal(current, controller.Date);
+
+        await controller.SelectPeriodAsync(ReportPeriod.Yearly);
+        Assert.Equal(current, controller.Date);
+
+        // Following current: a later refresh recomputes against the advanced clock.
+        current = new DateOnly(2026, 9, 28);
+        await controller.RefreshAsync();
+        Assert.Equal(current, controller.Date);
+
+        await controller.SelectPeriodAsync(ReportPeriod.Weekly);
+        Assert.Equal(ReportPeriod.Weekly, controller.Period);
+        Assert.Equal(current, controller.Date);
+    }
+
+    [Fact]
+    public async Task SelectingWeekReturnsToCurrentWeekAfterHistoricalNavigation()
+    {
+        var current = new DateOnly(2026, 9, 25);
+        using var controller = new ReportsController((_, _, _) => Task.FromResult(Empty()), () => current, _ => { });
+        await controller.OpenAsync();
+
+        // Deliberately browse a historical week (prev), then switch to Month and browse a historical month.
+        await controller.MoveAsync(-1);
+        Assert.Equal(new DateOnly(2026, 9, 18), controller.Date);
+        await controller.SelectPeriodAsync(ReportPeriod.Monthly); // segment click = current month
+        Assert.Equal(current, controller.Date);
+        await controller.MoveAsync(-1);
+        Assert.Equal(new DateOnly(2026, 8, 25), controller.Date);
+
+        // Clicking the Week segment must land on the CURRENT week, not the browsed history.
+        await controller.SelectPeriodAsync(ReportPeriod.Weekly);
+        Assert.Equal(ReportPeriod.Weekly, controller.Period);
+        Assert.Equal(current, controller.Date);
+    }
+
+    [Fact]
+    public async Task HistoricalSelectionStaysHistoricalAcrossRefresh()
+    {
+        var current = new DateOnly(2026, 9, 25);
+        using var controller = new ReportsController((_, _, _) => Task.FromResult(Empty()), () => current, _ => { });
+        await controller.OpenAsync();
+
+        // Pin a specific historical week (the date-picker path).
+        await controller.SelectAsync(ReportPeriod.Weekly, new DateOnly(2026, 8, 5));
+        // Clock advances and a refresh occurs; the pinned historical week must NOT snap to today.
+        current = new DateOnly(2026, 9, 30);
+        await controller.RefreshAsync();
+        Assert.Equal(new DateOnly(2026, 8, 5), controller.Date);
+        await controller.MoveAsync(1);
+        Assert.Equal(new DateOnly(2026, 8, 12), controller.Date);
     }
 
     private static ReportsController New(Func<ReportPeriod, DateOnly, CancellationToken, Task<ReportsSnapshot>> read, Action<Exception>? report = null) =>

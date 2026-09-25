@@ -67,7 +67,7 @@
                     HorizontalAlignment="Stretch"
                     VerticalAlignment="Stretch" />
 
-                <!-- Right: Shortcut hint and Close button -->
+                <!-- Right: Shortcut hint (Esc dismisses; no focusable window chrome) -->
                 <StackPanel
                     Grid.Column="2"
                     Orientation="Horizontal"
@@ -88,22 +88,6 @@
                             FontSize="10"
                             Foreground="{ThemeResource FkSecondary}" />
                     </Border>
-                    <Button
-                        x:Name="CloseButton"
-                        Content="&#xE8BB;"
-                        FontFamily="{ThemeResource SymbolThemeFontFamily}"
-                        FontSize="10"
-                        Width="24"
-                        Height="24"
-                        Padding="0"
-                        CornerRadius="4"
-                        Background="Transparent"
-                        BorderThickness="0"
-                        Foreground="{ThemeResource FkSecondary}"
-                        VerticalAlignment="Center"
-                        HorizontalAlignment="Center"
-                        AutomationProperties.Name="Close Quick Overlay"
-                        Click="OnCloseButtonClick" />
                 </StackPanel>
             </Grid>
 

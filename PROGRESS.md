@@ -79,7 +79,14 @@ Audit → package → verify → present. No release was published; nothing comm
   - **Uninstall** (silent): program dir removed, uninstall registry entry gone, and `%LOCALAPPDATA%\FocusKey\focus_key.db` **preserved** (81,920 bytes, untouched) — uninstall does not delete user data.
   - **Clean install** (no prior install): success; the RC is left installed on this machine.
   - **Finding — local dev DB malformed:** `%LOCALAPPDATA%\FocusKey\focus_key.db` became `SQLite Error 11: database disk image is malformed` (surfaced when launching against the real data root during concurrent-launch/force-close lifecycle testing). The app currently hard-fails startup on a corrupt DB rather than recovering. This is the developer's local file (originally an orphaned pre-rewrite DB, migrated this session; no genuine current-schema user history), left untouched per the "do not modify user data" rule — recommend the user delete/rename it to get a fresh DB. Graceful corrupt-DB recovery is a **post-v1** robustness item, not implemented here (no feature work in this pass).
-  - **Screenshots:** not captured — no reliable, private-data-safe WinUI capture in this environment; `RELEASE_v1.0.0.md` keeps a screenshots placeholder for a human to fill.
+  - **Screenshots:** not captured — no reliable, private-data-safe WinUI capture in this environment; the release page has no screenshot section.
+
+### v1.0.1 promotion (2026-09-25)
+- The remote `v1.0.0` tag already existed (pointing at the pre-corrective commit `94c937c`) and was **left untouched**. The tested corrective release is promoted to **v1.0.1** instead of moving the tag.
+- Version bumped 1.0.0 → 1.0.1 in `src/FocusKey.App/FocusKey.App.csproj` (`Version`/`AssemblyVersion`/`FileVersion`/`InformationalVersion`) and `installer.iss` (`AppVersion`, `VersionInfoVersion`, `OutputDir`). Release doc renamed `RELEASE_v1.0.0.md` → `RELEASE_v1.0.1.md`.
+- Rebuilt clean: self-contained `publish` + Inno Setup → **`artifacts/release/1.0.1/FocusKeySetup.exe`**, 64,681,144 bytes, SHA-256 `96e87cb03a7a1de5414a5b0efd8e11b83d8b86cfa2c84615f54b149f8ab9d5e7` (recorded in `RELEASE_v1.0.1.md`).
+- Verified: tests 1,162 passed / 0 failed / 0 skipped; Release build 0 warnings / 0 errors.
+- Integration: `main` fast-forwarded to this release commit, tag `v1.0.1` created, and the GitHub Release prepared as a **draft** (not published). No force-push; the existing `v1.0.0` tag is unchanged.
 
 
 

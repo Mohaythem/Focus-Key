@@ -1,8 +1,8 @@
-# Focus Key v1.0.0
+# Focus Key v1.0.1
 
 One shortcut. One focused session.
 
-This is the first public release of Focus Key, a small Windows utility for starting Work and Break sessions quickly and reviewing your focus history afterward.
+Focus Key is a small Windows utility for starting Work and Break sessions quickly and reviewing your focus history afterward.
 
 Press `Shift + F3`, choose a session, and start.
 
@@ -48,5 +48,5 @@ Focus Key is local-first. No account, no cloud, no telemetry, and no network cal
 SHA-256 of `FocusKeySetup.exe`:
 
 ```
-307d1b08caef58b1462ce8b5bcc9cd5dd1bffcd790f3df251b8a57c201843eca
+96e87cb03a7a1de5414a5b0efd8e11b83d8b86cfa2c84615f54b149f8ab9d5e7
 ```

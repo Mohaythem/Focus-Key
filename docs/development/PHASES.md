@@ -777,7 +777,7 @@ Promoted Focus Key from Release Candidate RC1 to the final production release (*
    - Confirmed existing SQLite database (`%LOCALAPPDATA%\FocusKey\focus_key.db`) and user settings preserved.
    - Confirmed single-instance activation and focus signaling on installed binary.
 5. **Release Documentation**:
-   - Created standalone [`RELEASE_NOTES.md`](file:///d:/Focus%20Key/RELEASE_NOTES.md) summarizing all features and architecture.
+   - Created standalone [`RELEASE_NOTES.md`](../releases/RELEASE_NOTES.md) summarizing all features and architecture.
 
 ### Verification
 - **Publish**: `dotnet publish` completed cleanly with 0 errors.
